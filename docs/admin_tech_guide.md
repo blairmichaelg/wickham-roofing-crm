@@ -84,6 +84,19 @@ verify against the real report.
 
 ---
 
+## 2b. AI Ingestion Safety & Mathematical Verification Gates
+
+To ensure the highest possible reliability of the data entered into the database, the Wickham Roofing CRM implements a strict **AI Safety and Verification Protocol**:
+
+1. **No-Math Prompt Directive**: The Gemini AI is strictly used as a **locator**, not a calculator. The prompts are hard-configured to instruct the LLM never to perform calculations (such as tax calculations, line item RCV additions, or depreciation logic). It must only extract exact printed numbers from the PDF or report.
+2. **Deterministic Python-Side Math Verification**: Once the AI extracts the values and constructs a `UniversalClaimAST` object, the Python backend executes strict mathematical validation tests:
+   - **Line Item Check**: Every single line item's RCV minus its depreciation must match its ACV exactly (within a ±0.05 tolerance).
+   - **Financials Check**: The overall claim's Gross RCV minus the Total Depreciation and Deductible must match the Net Claim exactly (within a ±0.05 tolerance).
+   - **Roof Geometry Check**: Physical dimensions and measurements (squares, rakes, eaves, valleys) are verified to be non-negative.
+3. **Fail-Safe Operation**: If any mathematical verification fails, or if a negative number is detected where it shouldn't be, the system raises a `ValueError` validation block, stopping the ingestion pipeline and requiring manual review.
+
+---
+
 ## 3. Uploading Measurement Reports & Statement of Loss
 
 From a job's detail page, you'll find the **Control Panel** section

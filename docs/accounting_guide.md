@@ -105,6 +105,14 @@ Once a job is exported, the system permanently marks it as exported. It will **n
 
 ---
 
+## 5b. Financial Data Integrity & Verification
+
+To protect Wickham Roofing against inaccurate accounting data, the system runs strict, automated math checks on all carrier-provided Statement of Loss inputs:
+- **Automatic Math Gates**: The system prevents any incorrect numbers from being saved. If a line item's RCV minus depreciation doesn't equal its ACV, or if the overall claim financials (gross_rcv - depreciation - deductible == net_claim) don't balance within 5 cents, the system will raise an error and block the data from being imported.
+- **Pure Data Ingestion**: The artificial intelligence engine only copies text from documents and is strictly forbidden from calculating or guessing any numbers, ensuring that all math remains 100% deterministic and verified on the Python server side.
+
+---
+
 ## 6. System Permissions & Boundaries
 
 To keep the system organized, certain tools are restricted based on your role.

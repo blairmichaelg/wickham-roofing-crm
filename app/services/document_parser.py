@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 from pathlib import Path
+from typing import Any
 
 import structlog
 
@@ -35,9 +36,20 @@ async def parse_statement_of_loss(
 ) -> UniversalClaimAST:
     """
     Full multimodal SoL parse using Gemini File API.
-    Returns a UniversalClaimAST with every value sourced.
 
-    Raises ValueError if the PDF is unreadable or Gemini fails.
+    Extracts all claim details, line items, geometry, and financials,
+    and returns a UniversalClaimAST with every value sourced.
+
+    Args:
+        pdf_path: Path to the Statement of Loss PDF file.
+        source_doc_sha256: SHA256 checksum of the source document.
+        source_doc_id: FK database ID of the document.
+
+    Returns:
+        UniversalClaimAST: The constructed and mathematically verified AST.
+
+    Raises:
+        ValueError: If the PDF is unreadable, Gemini fails, or verification fails.
     """
     log = logger.bind(pdf_path=str(pdf_path), sha256=source_doc_sha256)
     log.info("sol_parse_started")
@@ -52,6 +64,7 @@ async def parse_statement_of_loss(
         raise ValueError(f"Gemini Statement of Loss extraction failed: {exc}") from exc
 
     def _make_evidence(page: int, raw: str) -> EvidenceRef:
+        """Helper to create EvidenceRef for a value."""
         return EvidenceRef(
             doc_id=source_doc_id,
             page=page,
@@ -59,7 +72,8 @@ async def parse_statement_of_loss(
             extraction_method="gemini-2.5-flash-multimodal"
         )
 
-    def _sourced(value, page: int, raw: str):
+    def _sourced(value: Any, page: int, raw: str) -> SourcedValue[Any]:
+        """Helper to create a SourcedValue wrapper."""
         return SourcedValue(
             value=value,
             evidence=[_make_evidence(page, raw)]

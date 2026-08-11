@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.1.2] - 2026-08-11
+### Added & Hardened (AI Safety & Mathematical Verification Gates)
+- **AI Safety Prompts**: Hardened all Statement of Loss extraction prompt templates in `app/services/ai_service.py` with explicit, mandatory `CRITICAL NO-MATH DIRECTIVE` blocks, preventing the LLM from executing arithmetic or guessing values.
+- **Python-Side Carrier Arithmetic Validation**: Implemented deterministic validation in `UniversalClaimAST` (`app/core/ingestion_models.py`) to verify overall claim financials (`gross_rcv - depreciation - deductible == net_claim`) and line item totals (`claimed_rcv - depreciation == acv`) using Python `Decimal` logic. Any math discrepancies (> $0.05) or negative roof geometry measurements will immediately raise a `ValueError` validation block, stopping ingestion and preventing bad data from entering the database.
+- **Test Suite Expansion**: Added `tests/test_ai_safety_and_math.py` with 6 comprehensive test cases validating prompt templates, valid/invalid AST math, line item mismatches, negative geometry, and `PhotoAnalysis` confidence bounds.
+- **Typing and Docstring Hardening**: Hardened and documented code across the core pipeline files (`ai_service.py`, `document_parser.py`, `ingestion_models.py`, `reconciliation.py`).
+- **User Guides and Manuals Update**: Updated all technical and user guides (`admin_tech_guide.md`, `accounting_guide.md`, `operations_guide.md`, `canvasser_field_guide.md`) to reflect these security, safety, and validation protocols.
+
+### Verification
+- **Test suite: 282 passed** — all green.
+
 ## [2.1.1] - 2026-08-11
 ### Fixed (Production Pipeline Hardening — Deep Workspace Audit)
 - **Admin Kanban Blank Fields (BLOCKER)**: `_fetch_active_jobs_sync` was only selecting 7 columns but the admin Kanban template required `invoice_id`, `canvasser_name`, `supplement_sent_at`, and `carrier_sla_days`. All four were missing, causing invoice badges to show raw UUIDs, ownership labels to be invisible, and the SLA-exceeded alert to never fire. Added all missing columns to the `SELECT`.

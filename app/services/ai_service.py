@@ -305,8 +305,13 @@ Rules:
             You are an expert Xactimate estimator. Analyze this Statement of Loss (SoL) document.
             Extract ONLY the line items located under the "Roof" grouping (ignore any other rooms, general demolition, or recap tables).
             Pay special attention to descriptions that wrap across multiple lines (e.g., "Remove 3 tab 25 yr. composition shingle roofing - incl. felt").
-            If a quantity, unit of measure, or price is blank or missing, you MUST return null, not guess or hallucinate.
-            DO NOT infer or calculate quantities. Extract the exact numerical value printed in the quantity column.
+            
+            CRITICAL NO-MATH DIRECTIVE:
+            - DO NOT perform any arithmetic calculations (e.g. addition, subtraction, multiplication, division, summations, or tax math).
+            - The AI must NEVER calculate any numbers or values.
+            - Only LOCATE and EXTRACT the exact numbers literally printed in the document text.
+            - If a quantity, unit of measure, price, or financial summary field is missing or not written, you MUST return null. Do NOT calculate or guess them.
+            
             If Overhead and Profit (O&P) is not explicitly listed in the summaries, set overhead_and_profit_included to false.
             
             Also extract:
@@ -322,8 +327,12 @@ Rules:
             Extract ONLY the line items located under the "Roof" grouping.
             Symbility formats line items differently. Explicitly look for phrases like "Includes 10% waste on quantity" in the item notes.
             If you find a waste percentage in the notes, map that float (e.g., 0.10) to the waste_percent_included field.
-            DO NOT infer or calculate quantities. Extract the exact numerical value printed in the quantity column.
-            If a quantity, unit of measure, or price is blank or missing, you MUST return null.
+            
+            CRITICAL NO-MATH DIRECTIVE:
+            - DO NOT perform any arithmetic calculations (e.g. addition, subtraction, multiplication, division, summations, or tax math).
+            - The AI must NEVER calculate any numbers or values.
+            - Only LOCATE and EXTRACT the exact numbers literally printed in the document text.
+            - If a quantity, unit of measure, price, or financial summary field is missing or not written, you MUST return null. Do NOT calculate or guess them.
             
             Also extract:
             - claim_number and carrier_name.
@@ -336,8 +345,12 @@ Rules:
             return """
             Analyze this roofing Statement of Loss document.
             Extract ONLY the line items related to roof replacement.
-            DO NOT infer or calculate quantities. Extract the exact numerical value printed in the quantity column.
-            If a quantity, unit of measure, or price is blank or missing, you MUST return null.
+            
+            CRITICAL NO-MATH DIRECTIVE:
+            - DO NOT perform any arithmetic calculations (e.g. addition, subtraction, multiplication, division, summations, or tax math).
+            - The AI must NEVER calculate any numbers or values.
+            - Only LOCATE and EXTRACT the exact numbers literally printed in the document text.
+            - If a quantity, unit of measure, price, or financial summary field is missing or not written, you MUST return null. Do NOT calculate or guess them.
             
             Also extract:
             - claim_number and carrier_name.
@@ -350,8 +363,20 @@ Rules:
     async def extract_sol_from_pdf(self, pdf_path: str | Path, job_id: str | None = None) -> StatementOfLoss:
         """
         Multimodal extraction of a Statement of Loss PDF.
+
         Supports both inline data (for files < 15MB) and Gemini File API (fallback for >= 15MB).
         Enforces structured extraction using the StatementOfLoss Pydantic schema.
+
+        Args:
+            pdf_path: The local path or remote URI of the Statement of Loss PDF.
+            job_id: Optional database job ID for token usage logging.
+
+        Returns:
+            StatementOfLoss: The extracted structured carrier loss statement.
+
+        Raises:
+            FileNotFoundError: If the local path does not exist.
+            RuntimeError: If remote processing fails.
         """
         log = logger.bind(pdf_path=str(pdf_path))
         log.info("sol_extraction_started")
@@ -510,13 +535,27 @@ Rules:
                     lines.append(f"• <b>{d.xactimate_code or 'RFG'} ({d.category}):</b> {d.description}")
             return "<br/>".join(lines)
 
-    async def analyze_roof_photo(self, file_path: Any, original_filename: str | None = None, job_id: str | None = None) -> PhotoAnalysis:
+    async def analyze_roof_photo(
+        self,
+        file_path: str | Path | genai_types.File | Any,
+        original_filename: str | None = None,
+        job_id: str | None = None,
+    ) -> PhotoAnalysis:
         """
         Multimodal damage analysis of a single roof photo.
+
         Supports:
           1. Local file path (Path or str): uses inline mode (if < 15MB) or Files API (if >= 15MB).
           2. Remote file name (str starting with "files/"): fetches and uses Files API directly.
           3. Pre-fetched file object (e.g. MagicMock or genai_types.File): uses it directly in contents.
+
+        Args:
+            file_path: The file path, file object, or file name reference.
+            original_filename: The original filename to associate with the analysis.
+            job_id: Optional database job ID for logging token usage.
+
+        Returns:
+            PhotoAnalysis: The structured forensic analysis results.
         """
         log = logger.bind(job_id=job_id)
         

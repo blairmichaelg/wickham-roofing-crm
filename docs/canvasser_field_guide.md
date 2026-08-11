@@ -261,6 +261,15 @@ still waiting to reach the office.
 
 ---
 
+## 10b. Image Analysis & Structured Forensic Flags
+
+To assist you in presenting storm findings to homeowners and carriers, the app processes your uploaded job photos using Gemini's advanced multimodal vision model:
+- **No-Math Photo Auditing**: The AI analysis focuses strictly on locating and identifying physical damage indicators. The model detects and logs forensic flags such as **hail impact marks**, **wind crease marks**, **granule loss**, and **exposed fiberglass**. 
+- **Automated Evidence Grid**: These forensic flags and narratives populate the **Evidence Grid PDF** that you can use to prove storm damage to homeowners and adjusters. The AI does not compute any pricing or material costs; those are calculated mathematically by the system.
+- **Image Bounds Check**: The confidence score assigned to each detected damage classification is validated to be strictly between 0% and 100%, rejecting any out-of-bounds or non-deterministic AI behavior.
+
+---
+
 ## 11. What You Cannot Do (By Design)
 
 For security, the field app strictly limits what canvassers can access:

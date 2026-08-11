@@ -35,12 +35,14 @@ class ClaimLineItem(BaseModel):
 
     @model_validator(mode='after')
     def validate_math(self) -> 'ClaimLineItem':
-        # (quantity * unit_price) + tax == claimed_rcv (tolerance 0.02)
         """
-        Validate Math functionality.
-        
+        Validate the arithmetic of the line item.
+
+        Verifies that (quantity * unit_price) + tax matches claimed_rcv
+        within a tolerance of 0.02. Sets the `verified` flag accordingly.
+
         Returns:
-            'ClaimLineItem': The resulting output.
+            ClaimLineItem: The validated line item instance.
         """
         q = self.quantity.value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         up = self.unit_price.value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
@@ -99,16 +101,62 @@ class UniversalClaimAST(BaseModel):
     @model_validator(mode='after')
     def validate_total(self) -> 'UniversalClaimAST':
         """
-        Validate Total functionality.
-        
+        Validate overall carrier financial metrics and mathematical consistency.
+
+        Performs three deterministic checks:
+        1. Cross-checks sum of line items RCV against gross RCV.
+        2. Validates overall claim financials equation: gross_rcv - depreciation - deductible == net_claim.
+        3. Validates each line item's RCV minus depreciation matches ACV.
+        4. Ensures all physical roof geometry values are non-negative.
+
         Returns:
-            'UniversalClaimAST': The resulting output.
+            UniversalClaimAST: The validated instance.
+
+        Raises:
+            ValueError: If any mathematical constraint or bounds check fails.
         """
+        # 1. Cross-check total line items RCV against gross RCV
         total_rcv = sum((item.claimed_rcv.value for item in self.line_items), Decimal("0.00"))
-        
-        # Simple cross-check. If they mismatch significantly, we could flag it.
-        # For now, we rely on the line-item level verification.
         if abs(total_rcv - self.financials.gross_rcv.value) <= Decimal("0.05"):
             self.financials.gross_rcv.verified = True
+        
+        # 2. Enforce strict overall claim financials math: gross_rcv - total_depreciation - deductible == net_claim
+        gross = self.financials.gross_rcv.value
+        dep = self.financials.total_depreciation.value
+        ded = self.financials.deductible.value
+        net = self.financials.net_claim.value
+        
+        expected_net = gross - dep - ded
+        if abs(expected_net - net) <= Decimal("0.05"):
+            self.financials.net_claim.verified = True
+        else:
+            self.financials.net_claim.verified = False
+            raise ValueError(
+                f"Overall claim financials mismatch: gross_rcv ({gross}) - total_depreciation ({dep}) - deductible ({ded}) "
+                f"= expected net claim ({expected_net}), but net_claim was extracted as {net}."
+            )
+            
+        # 3. Enforce strict line item math: claimed_rcv - depreciation == acv
+        for item in self.line_items:
+            item_rcv = item.claimed_rcv.value
+            item_dep = item.depreciation.value
+            item_acv = item.acv.value
+            expected_acv = item_rcv - item_dep
+            if abs(expected_acv - item_acv) <= Decimal("0.05"):
+                item.verified = True
+            else:
+                item.verified = False
+                raise ValueError(
+                    f"Line item '{item.description}' arithmetic mismatch: claimed_rcv ({item_rcv}) "
+                    f"- depreciation ({item_dep}) = expected acv ({expected_acv}), "
+                    f"but acv was extracted as {item_acv}."
+                )
+                
+        # 4. Validate non-negative geometry measurements
+        geom = self.roof_geometry
+        for field_name in ["total_squares", "eaves_lf", "valleys_lf", "rakes_lf"]:
+            field_val = getattr(geom, field_name).value
+            if field_val < Decimal("0.00"):
+                raise ValueError(f"Roof geometry field '{field_name}' cannot be negative: {field_val}")
             
         return self

@@ -114,6 +114,14 @@ crew."** Double-check the crew name and date, then try again.
 
 ---
 
+## 5b. Material & Geometry Data Integrity
+
+To prevent construction errors and order mistakes, the CRM performs strict verification on all measurement data and material properties:
+- **Geometry Non-Negativity Checks**: All physical dimensions (squares, rakes, eaves, valleys) are strictly validated to be non-negative values. If a negative value is detected during parsing or triage, the system blocks the ingestion process to prevent downstream ordering errors.
+- **Zero-Math AI Ingestion**: The system forces the AI to only locate and extract written text, preventing the LLM from trying to compute or estimate physical counts itself. All materials calculations, waste factors, and bill of materials (BOM) logic are handled deterministically by the Python backend.
+
+---
+
 ## 6. What You Cannot Do (By Design)
 
 For security and role isolation, your access is intentionally limited:

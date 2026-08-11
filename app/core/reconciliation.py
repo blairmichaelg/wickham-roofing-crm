@@ -7,6 +7,7 @@ a DiscrepancyReport. This isolates all math from the LLM.
 """
 
 import math
+from typing import Any
 
 from app.core.supplement_models import (
     Discrepancy,
@@ -17,7 +18,18 @@ from app.core.supplement_models import (
 )
 
 
-def _get_item_qty(item) -> float:
+def _get_item_qty(item: Any) -> float:
+    """
+    Extract the quantity of a line item.
+
+    Handles different models dynamically (e.g. AST SourcedValue or plain Pydantic).
+
+    Args:
+        item: The line item object.
+
+    Returns:
+        float: The extracted quantity.
+    """
     if hasattr(item, "quantity"):
         q = item.quantity
         if hasattr(q, "value"):
@@ -26,7 +38,16 @@ def _get_item_qty(item) -> float:
             return float(q)
     return 0.0
 
-def _get_item_unit(item) -> str:
+def _get_item_unit(item: Any) -> str:
+    """
+    Extract the unit of measure of a line item, normalized to uppercase.
+
+    Args:
+        item: The line item object.
+
+    Returns:
+        str: The normalized unit of measure.
+    """
     if hasattr(item, "unit") and item.unit:
         u = item.unit
         if hasattr(u, "value"):
@@ -39,7 +60,16 @@ def _get_item_unit(item) -> str:
             return u.strip().upper()
     return ""
 
-def _get_item_desc(item) -> str:
+def _get_item_desc(item: Any) -> str:
+    """
+    Extract the description text of a line item.
+
+    Args:
+        item: The line item object.
+
+    Returns:
+        str: The description text.
+    """
     if hasattr(item, "description") and item.description:
         return str(item.description)
     return ""
@@ -47,7 +77,17 @@ def _get_item_desc(item) -> str:
 def reconcile(ev: EagleViewData, sol: StatementOfLoss, job_id: str, waste_factor: float = 0.15) -> DiscrepancyReport:
     """
     Deterministically reconcile EV measurements against SoL items.
+
     Accepts waste_factor dynamically (e.g. 0.15 for 15%).
+
+    Args:
+        ev: The extracted EagleView measurement data.
+        sol: The extracted Statement of Loss.
+        job_id: The unique ID of the job.
+        waste_factor: The waste percentage multiplier (default 15%).
+
+    Returns:
+        DiscrepancyReport: The generated discrepancy report.
     """
     discrepancies = []
 
