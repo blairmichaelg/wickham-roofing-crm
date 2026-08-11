@@ -26,6 +26,12 @@ dependencies = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "no_mock_ownership: marks tests that bypass field rep ownership mocking",
+]
+
 [tool.mypy]
 python_version = "3.11"
 strict = false

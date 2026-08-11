@@ -3,37 +3,65 @@ FastAPI HTTP surface for the Office Control Center Dashboard (V4 Strike 3).
 Handles job retrieval, EagleView uploads, and generated artifact downloads.
 """
 
-import json
 import asyncio
-from pathlib import Path
-import structlog
-import uuid
-from typing import List, Dict, Union, Any
-
-from fastapi import APIRouter, File, UploadFile, HTTPException, Depends, Form, Request, BackgroundTasks, Body
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
-from fastapi.templating import Jinja2Templates
-from app.api.auth import get_current_role, get_current_claims
-from pydantic import BaseModel
-
-from app.core.database import get_connection, update_job_status
-from app.core.pipeline import parse_measurement_pdf
-from app.services.hover_extractor import detect_pdf_format
-from app.services.pdf import PDFGenerator
-from app.api.field_routes import get_inspection_summary
-from app.config import FIELD_DOCS_DIR
-from app.core.job_costing import compute_job_profitability
-from app.core.database import insert_material_order, insert_schedule, JobStatus, upsert_financials, get_financials, insert_job_document, get_job_document_by_hash, _fetch_job_sync
-from app.core.backup import backup_database
-from app.core.pipeline import run_full_office_pipeline
-from app.api.auth import verify_admin, verify_accounting, verify_office_role, verify_field
-from app.core.upload_utils import stream_upload_safely
-from app.services.rate_limit import check_rate_limit
-from app.config import FIELD_DOCS_DIR
-from fastapi.responses import StreamingResponse
 import csv
 import io
-from app.core.database import atomic_qbo_export
+import json
+import uuid
+from pathlib import Path
+from typing import Any
+
+import structlog
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Body,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    UploadFile,
+)
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    JSONResponse,
+    StreamingResponse,
+)
+from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
+
+from app.api.auth import (
+    get_current_claims,
+    get_current_role,
+    verify_accounting,
+    verify_admin,
+    verify_field,
+    verify_office_role,
+)
+from app.api.field_routes import get_inspection_summary
+from app.config import FIELD_DOCS_DIR
+from app.core.backup import backup_database
+from app.core.database import (
+    JobStatus,
+    _fetch_job_sync,
+    atomic_qbo_export,
+    get_connection,
+    get_financials,
+    get_job_document_by_hash,
+    insert_job_document,
+    insert_material_order,
+    insert_schedule,
+    update_job_status,
+    upsert_financials,
+)
+from app.core.job_costing import compute_job_profitability
+from app.core.pipeline import run_full_office_pipeline, run_supplement_pipeline
+from app.core.upload_utils import stream_upload_safely
+from app.services.hover_extractor import detect_pdf_format
+from app.services.pdf import PDFGenerator
+from app.services.rate_limit import check_rate_limit
 
 templates = Jinja2Templates(directory="app/templates")
 logger = structlog.get_logger("app.api.office_routes")
@@ -105,7 +133,7 @@ class MaterialOrderPayload(BaseModel):
     delivery_date: str
 
 @router.get("/jobs", dependencies=[Depends(verify_admin)])
-def get_all_jobs() -> List[Dict[str, Union[str, float, int, list, None]]]:
+def get_all_jobs() -> list[dict[str, str | float | int | list | None]]:
     """
     Retrieve all jobs from the local CRM ordered by creation date.
     
@@ -136,7 +164,7 @@ def get_all_jobs() -> List[Dict[str, Union[str, float, int, list, None]]]:
         conn.close()
 
 @router.get("/jobs/{job_id}", dependencies=[Depends(verify_admin)])
-def get_job_details(job_id: str) -> Dict[str, Union[Dict[str, Union[str, float, int, list, None]], List[Dict[str, Union[str, float, int, None]]], None]]:
+def get_job_details(job_id: str) -> dict[str, dict[str, str | float | int | list | None] | list[dict[str, str | float | int | None]] | None]:
     """
     Retrieve unified job details across all production tables.
     
@@ -279,7 +307,7 @@ async def upload_eagleview(job_id: str, file: UploadFile = File(...)):
     except Exception as e:
         import traceback
         logger.error("master_pipeline_failed_route", job_id=job_id, error=traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Pipeline Orchestration Failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Pipeline Orchestration Failed: {e!s}")
 
     return {"status": "success", "message": "Master Pipeline complete, QBO CSV generated.", "pipeline_result": result}
 
@@ -350,18 +378,32 @@ async def upload_supplement_docs(
             insert_job_document, job_id, sol_path.name, "SOL_PDF", str(sol_path), sol_sha256, "office_only", "STATEMENT_OF_LOSS", True
         )
 
-        await request.app.state.redis_pool.enqueue_job(
-            "process_supplement_event",
-            job_id=job_id,
-            ev_pdf_path=str(ev_path),
-            sol_pdf_path=str(sol_path),
-            ev_sha256=ev_sha256,
-            ev_doc_id=ev_doc_id,
-            sol_sha256=sol_sha256,
-            sol_doc_id=sol_doc_id,
-            generate_pdf=False,
-            role=role
-        )
+        redis = getattr(request.app.state, "redis_pool", None)
+        if redis:
+            await redis.enqueue_job(
+                "process_supplement_event",
+                job_id=job_id,
+                ev_pdf_path=str(ev_path),
+                sol_pdf_path=str(sol_path),
+                ev_sha256=ev_sha256,
+                ev_doc_id=ev_doc_id,
+                sol_sha256=sol_sha256,
+                sol_doc_id=sol_doc_id,
+                generate_pdf=True,
+                role=role
+            )
+        else:
+            await run_supplement_pipeline(
+                job_id=job_id,
+                ev_pdf_path=str(ev_path),
+                sol_pdf_path=str(sol_path),
+                ev_sha256=ev_sha256,
+                ev_doc_id=ev_doc_id,
+                sol_sha256=sol_sha256,
+                sol_doc_id=sol_doc_id,
+                generate_pdf=True,
+                ctx={"role": role},
+            )
         
         logger.info("supplement_task_enqueued", job_id=job_id)
     except Exception as e:
@@ -392,22 +434,26 @@ async def download_evidence_grid(job_id: str):
         finally:
             conn.close()
 
-        # Construct the InspectionJob using the field_routes helper
+        # Build a fresh summary before serving from the vault so newly cached
+        # Gemini analyses and newly uploaded photos can invalidate old grids.
         job = await get_inspection_summary(job_id)
 
-        # Look for signature
-        sig_path_c = FIELD_DOCS_DIR / job_id / f"{job_id}_contingency_sig.png"
-        sig_path_r = FIELD_DOCS_DIR / job_id / f"{job_id}_retail_contract_sig.png"
-        if sig_path_c.exists():
-            signature_to_pass = str(sig_path_c)
-        elif sig_path_r.exists():
-            signature_to_pass = str(sig_path_r)
-        else:
-            signature_to_pass = None
-
-        # Generate PDF
-        pdf_gen = PDFGenerator()
-        pdf_path = await pdf_gen.generate_evidence_grid(job, signature_to_pass)
+        # Check if Evidence Grid is already in the document vault
+        conn = get_connection()
+        try:
+            existing_doc = conn.execute(
+                """SELECT storage_path FROM job_documents
+                   WHERE job_id = ? AND category = 'EVIDENCE_GRID'
+                   ORDER BY created_at DESC LIMIT 1""",
+                (job_id,)
+            ).fetchone()
+            if existing_doc and Path(existing_doc["storage_path"]).exists() and not job.analyses:
+                logger.info("evidence_grid_retrieved_from_vault", job_id=job_id, path=existing_doc["storage_path"])
+                pdf_path = existing_doc["storage_path"]
+            else:
+                pdf_path = None
+        finally:
+            conn.close()
 
         # Human-readable filename
         h_clean = "".join(c for c in homeowner_name if c.isalnum() or c in (" ", "_")).strip().replace(" ", "_")
@@ -418,6 +464,28 @@ async def download_evidence_grid(job_id: str):
             out_name = f"{h_clean}_Inspection_Evidence_Grid.pdf"
         else:
             out_name = f"Evidence_Grid_{job_id[:8]}.pdf"
+
+        if not pdf_path:
+            # Look for signature
+            sig_path_c = FIELD_DOCS_DIR / job_id / f"{job_id}_contingency_sig.png"
+            sig_path_r = FIELD_DOCS_DIR / job_id / f"{job_id}_retail_contract_sig.png"
+            if sig_path_c.exists():
+                signature_to_pass = str(sig_path_c)
+            elif sig_path_r.exists():
+                signature_to_pass = str(sig_path_r)
+            else:
+                signature_to_pass = None
+
+            # Generate PDF
+            pdf_gen = PDFGenerator()
+            pdf_path = await pdf_gen.generate_evidence_grid(job, signature_to_pass)
+
+            # Register/vault the generated document
+            await asyncio.to_thread(
+                insert_job_document,
+                job_id, out_name, "application/pdf",
+                str(pdf_path), None, "field_safe", "EVIDENCE_GRID", True
+            )
         
         return FileResponse(
             path=pdf_path,
@@ -566,6 +634,16 @@ async def update_claim_info_route(job_id: str, payload: JobClaimInfoPayload, bg_
             adjuster_phone=payload.adjuster_phone,
             adjuster_email=payload.adjuster_email,
         )
+        # Auto-advance to CLAIM_FILED if claim info provided for early stage lead
+        if payload.claim_number or payload.insurer_name:
+            from app.core.database import JobStatus, _fetch_job_sync, update_job_status
+            job = await asyncio.to_thread(_fetch_job_sync, job_id)
+            if job and job.get("status") in (JobStatus.LEAD_CAPTURED, JobStatus.CONTINGENCY_SIGNED):
+                try:
+                    await asyncio.to_thread(update_job_status, job_id, JobStatus.CLAIM_FILED, "Insurance claim info filed by user.")
+                except Exception:
+                    pass
+
         bg_tasks.add_task(backup_database)
         return res
     except ValueError as ve:
@@ -615,14 +693,38 @@ async def get_inspection_letter(job_id: str):
         raise HTTPException(status_code=400, detail="Invalid job_id format.")
 
     try:
-        from app.services.pdf.inspection_report import InspectionReportGenerator
-        summary_job = await get_inspection_summary(job_id)
-        
-        if not summary_job.photos:
-            raise HTTPException(status_code=404, detail="No photos uploaded for this job yet.")
+        # Check vault first for an existing Homeowner Inspection Report
+        conn = get_connection()
+        try:
+            existing_doc = conn.execute(
+                "SELECT storage_path FROM job_documents WHERE job_id = ? AND category IN ('HOMEOWNER_INSPECTION_REPORT', 'INSPECTION_REPORT') ORDER BY created_at DESC LIMIT 1",
+                (job_id,)
+            ).fetchone()
+            if existing_doc and Path(existing_doc["storage_path"]).exists():
+                logger.info("homeowner_report_retrieved_from_vault", job_id=job_id, path=existing_doc["storage_path"])
+                pdf_path = existing_doc["storage_path"]
+            else:
+                pdf_path = None
+        finally:
+            conn.close()
 
-        report_gen = InspectionReportGenerator()
-        pdf_path = await report_gen.generate_homeowner_report(summary_job)
+        if not pdf_path:
+            from app.services.pdf.inspection_report import InspectionReportGenerator
+            summary_job = await get_inspection_summary(job_id)
+            
+            if not summary_job.photos:
+                raise HTTPException(status_code=404, detail="No photos uploaded for this job yet.")
+
+            report_gen = InspectionReportGenerator()
+            pdf_path = await report_gen.generate_homeowner_report(summary_job)
+            
+            # Vault the document
+            hr_filename = Path(pdf_path).name
+            await asyncio.to_thread(
+                insert_job_document,
+                job_id, hr_filename, "application/pdf",
+                str(pdf_path), None, "field_safe", "HOMEOWNER_INSPECTION_REPORT", True
+            )
         
         filename = Path(pdf_path).name
         return FileResponse(path=pdf_path, filename=filename, media_type="application/pdf")
@@ -754,7 +856,7 @@ def _sync_update_job_claim_info(job_id: str, payload: JobClaimInfoPayload):
             updates["insurer_name"] = payload.insurer_name
             
         if updates:
-            set_clause = ", ".join(f"{k} = ?" for k in updates.keys())
+            set_clause = ", ".join(f"{k} = ?" for k in updates)
             values = list(updates.values()) + [job_id]
             conn.execute(f"UPDATE jobs SET {set_clause} WHERE id = ?", values)
             
@@ -914,7 +1016,7 @@ class OperationsBrief(BaseModel):
     """OperationsBrief definition."""
     deliveries_today: int
     crews_today: int
-    material_rows: List[MaterialRow]
+    material_rows: list[MaterialRow]
 
 @router.get("/operations/brief", response_model=OperationsBrief, dependencies=[Depends(verify_admin)])
 def get_operations_brief():
@@ -964,7 +1066,7 @@ class AccountingBrief(BaseModel):
     """AccountingBrief definition."""
     supplemented_rcv_added: str
     qbo_ready_count: int
-    rows: List[Dict[str, Any]]
+    rows: list[dict[str, Any]]
 
 @router.get("/accounting/brief", response_model=AccountingBrief, dependencies=[Depends(verify_accounting)])
 def get_accounting_brief():
@@ -1206,7 +1308,10 @@ async def admin_triage_resolve(request: Request, job_id: str, payload: dict = Bo
         conn.close()
 
     # Re-enqueue the ARQ worker for this job (resume=True)
-    await request.app.state.redis_pool.enqueue_job(
+    redis = getattr(request.app.state, "redis_pool", None)
+    if not redis:
+        raise HTTPException(status_code=503, detail="Redis unavailable — cannot re-queue job.")
+    await redis.enqueue_job(
         "process_supplement_event",
         job_id=job_id,
         resume=True,
@@ -1221,7 +1326,7 @@ async def admin_triage_resolve(request: Request, job_id: str, payload: dict = Bo
 )
 async def trigger_supplement_route(request: Request, job_id: str, claims: dict = Depends(get_current_claims)):
     """Manually trigger or regenerate supplement pipeline for a job."""
-    from app.core.pipeline import run_supplement_pipeline, _fetch_latest_report_sync
+    from app.core.pipeline import _fetch_latest_report_sync, run_supplement_pipeline
     role = claims.get("role", "admin")
 
     # Locate measurement and statement of loss documents for this job
@@ -1349,7 +1454,7 @@ async def approve_supplement(
     Triggers a WebSocket broadcast to alert Scott and Debi.
     """
     note = payload.get("note", "Approved by operator.")
-    from app.core.database import update_job_status, JobStatus
+    from app.core.database import JobStatus, update_job_status
     try:
         update_job_status(
             job_id, JobStatus.SUPPLEMENT_APPROVED, note
@@ -1385,7 +1490,7 @@ async def deny_supplement(request: Request, job_id: str,
             detail="Must provide denial_text or denial_pdf_doc_id."
         )
     note = f"Denied. Reason: {(denial_text or '')[:200]}"
-    from app.core.database import update_job_status, JobStatus
+    from app.core.database import JobStatus, update_job_status
     try:
         update_job_status(
             job_id, JobStatus.SUPPLEMENT_DENIED, note
@@ -1424,8 +1529,9 @@ async def download_rebuttal(job_id: str):
         job_id = str(uuid.UUID(job_id))
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid job_id format.")
-    from app.core.database import get_job_documents
     from fastapi.responses import FileResponse
+
+    from app.core.database import get_job_documents
     docs = get_job_documents(job_id,
                              file_type="REBUTTAL_PDF")
     if not docs:
@@ -1665,7 +1771,7 @@ async def create_invoice_route(job_id: str, bg_tasks: BackgroundTasks):
         return {"status": "success", "message": "Job transitioned to INVOICED status."}
     except Exception as e:
         logger.error("invoice_creation_failed", job_id=job_id, error=str(e))
-        raise HTTPException(status_code=500, detail=f"Failed to create invoice: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create invoice: {e!s}")
 
 @router.patch("/accounting/jobs/{job_id}/commission/paid", dependencies=[Depends(verify_accounting)])
 async def mark_commission_paid(job_id: str, bg_tasks: BackgroundTasks):
@@ -1696,5 +1802,5 @@ async def mark_commission_paid(job_id: str, bg_tasks: BackgroundTasks):
         return {"status": "success"}
     except Exception as e:
         logger.error("mark_commission_paid_status_failed", error=str(e))
-        raise HTTPException(status_code=500, detail=f"Failed to transition job status: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to transition job status: {e!s}")
 

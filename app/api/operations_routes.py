@@ -7,30 +7,29 @@ All routes require the ops-specific internal token.
 from __future__ import annotations
 
 import uuid
+
 import structlog
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi import APIRouter, HTTPException, Depends, Request, Body
-from typing import Optional
 from pydantic import BaseModel
 
+from app.api.auth import verify_office_role, verify_operations
+from app.api.office_routes import templates
 from app.core.database import (
-    transition_material_flags,
-    update_job_status,
-    insert_schedule,
     JobStatus,
     get_connection,
+    insert_schedule,
+    transition_material_flags,
+    update_job_status,
 )
-
-from app.api.auth import verify_operations, verify_office_role
-from app.api.office_routes import templates
 
 logger = structlog.get_logger("app.api.operations_routes")
 router = APIRouter(prefix="/api/operations", tags=["operations"])
 
 class MaterialFlagUpdate(BaseModel):
     """MaterialFlagUpdate definition."""
-    materials_ordered: Optional[bool] = None
-    materials_on_site: Optional[bool] = None
+    materials_ordered: bool | None = None
+    materials_on_site: bool | None = None
 
 
 @router.patch("/job/{job_id}/materials", dependencies=[Depends(verify_operations)])
@@ -155,7 +154,7 @@ async def operations_board(request: Request):
                    s.crew_name, s.install_date
             FROM jobs j
             LEFT JOIN schedule s ON j.id = s.job_id
-            WHERE j.status IN ('INSTALL_COMPLETED', 'FINAL_INSPECTION', 'FINAL_INSPECTION_COMPLETED')
+            WHERE j.status IN ('INSTALL_COMPLETED', 'INSPECTION_COMPLETED', 'FINAL_INSPECTION', 'FINAL_INSPECTION_COMPLETED')
             ORDER BY j.created_at ASC
         """).fetchall()]
 
@@ -216,7 +215,9 @@ async def assign_crew(
     return {"status": "scheduled", "job_id": job_id}
 
 from fastapi.responses import FileResponse
+
 from app.services.pdf.documents import DocumentsGenerator
+
 
 @router.get(
     "/jobs/{job_id}/bom/download",
@@ -243,12 +244,12 @@ async def download_bom(job_id: str):
             filename=filename
         )
     except Exception as e:
-        raise HTTPException(500, f"Failed to generate BoM PDF: {str(e)}")
+        raise HTTPException(500, f"Failed to generate BoM PDF: {e!s}")
 
 
 @router.patch(
     "/jobs/{job_id}/status",
-    dependencies=[Depends(verify_operations)]
+    dependencies=[Depends(verify_office_role)]
 )
 async def patch_job_status(job_id: str, payload: dict = Body(...)):
     new_status_str = payload.get("status")

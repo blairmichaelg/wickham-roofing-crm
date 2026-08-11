@@ -51,17 +51,21 @@
     </nav>
     
     <div class="flex-1 overflow-x-auto overflow-y-hidden p-6 flex space-x-6 bg-gray-950">
-        <!-- Kanban Columns defined dynamically based on jobs grouped by status -->
-        
+        <!-- Kanban Columns in real-life workflow order (left → right) -->
+
         {% set statuses = [
-            'LEAD_CAPTURED', 'CONTINGENCY_SIGNED', 'RETAIL_CONTRACT_SIGNED', 'CLAIM_FILED', 
-            'ADJUSTER_MEETING_COMPLETED', 'PHOTOS_UPLOADED', 'INSPECTION_COMPLETED', 'EV_ORDERED', 
-            'EV_PARSED', 'STATEMENT_OF_LOSS_RECEIVED', 'PENDING_OPERATOR_REVIEW', 
-            'SUPPLEMENT_GENERATED', 'SUPPLEMENT_SUBMITTED', 'AWAITING_CARRIER_RESPONSE', 
-            'SUPPLEMENT_APPROVED', 'SUPPLEMENT_DENIED', 'SCOPE_APPROVED', 'RETAIL_QUOTE_GENERATED', 
-            'RETAIL_QUOTE_ACCEPTED', 'RETAIL_QUOTE_DECLINED', 'MATERIAL_ORDERED', 'MATERIALS_ON_SITE', 
-            'INSTALL_SCHEDULED', 'INSTALL_COMPLETED', 'FINAL_INSPECTION', 'INVOICED', 
-            'PAYMENT_RECEIVED', 'CLOSED', 'CLAIM_DENIED', 'APPRAISAL_INVOKED', 'INSPECTION_FAILED', 'PIPELINE_FAILED'
+            'LEAD_CAPTURED', 'CONTINGENCY_SIGNED', 'RETAIL_CONTRACT_SIGNED',
+            'PHOTOS_UPLOADED', 'INSPECTION_COMPLETED',
+            'CLAIM_FILED',
+            'EV_PARSED', 'ADJUSTER_MEETING_COMPLETED', 'STATEMENT_OF_LOSS_RECEIVED',
+            'SUPPLEMENT_GENERATED', 'SUPPLEMENT_SUBMITTED', 'AWAITING_CARRIER_RESPONSE',
+            'SUPPLEMENT_APPROVED', 'SUPPLEMENT_DENIED', 'APPRAISAL_INVOKED',
+            'SCOPE_APPROVED', 'CLAIM_DENIED',
+            'RETAIL_QUOTE_GENERATED', 'RETAIL_QUOTE_ACCEPTED', 'RETAIL_QUOTE_DECLINED',
+            'MATERIAL_ORDERED', 'MATERIALS_ON_SITE',
+            'INSTALL_SCHEDULED', 'INSTALL_COMPLETED', 'FINAL_INSPECTION', 'FINAL_INSPECTION_COMPLETED',
+            'INVOICED', 'PAYMENT_RECEIVED', 'CLOSED',
+            'PENDING_OPERATOR_REVIEW', 'INSPECTION_FAILED', 'PIPELINE_FAILED'
         ] %}
         
         {% for status in statuses %}
@@ -133,7 +137,9 @@
     
     <script>
         // Simple auto-refresh on new events for Kanban
-        const ws = new WebSocket((window.location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + window.location.host + '/ws/office');
+        const AUTH_TOKEN = "{{ auth_token }}";
+
+        const ws = new WebSocket((window.location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + window.location.host + '/ws/office?token=' + encodeURIComponent(AUTH_TOKEN));
         ws.onmessage = function(event) {
             const data = JSON.parse(event.data);
             if (data.type === 'new_lead' || data.type === 'stale' || data.type === 'contingency_signed') {

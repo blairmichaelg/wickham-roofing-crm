@@ -196,8 +196,6 @@ STATUS_LABELS = {
     "CLAIM_FILED": "Claim Filed — Waiting on Adjuster",
     "ADJUSTER_MEETING_COMPLETED": "Adjuster Met — Waiting on Estimate",
     "PHOTOS_UPLOADED": "Photos Uploaded",
-    "EV_ORDERED": "Measurements Ordered",
-    "MEASUREMENT_ORDERED": "Measurements Ordered",
     "EV_PARSED": "Measurements Received",
     "MEASUREMENT_PARSED": "Measurements Received",
     "STATEMENT_OF_LOSS_RECEIVED": "Insurance Estimate Received",
@@ -213,7 +211,7 @@ STATUS_LABELS = {
     "MATERIALS_ON_SITE": "Materials On Site",
     "INSTALL_SCHEDULED": "Install Scheduled",
     "INSTALL_COMPLETED": "Install Completed",
-    "INSPECTION_COMPLETED": "Inspection Completed",
+    "INSPECTION_COMPLETED": "Initial Inspection Completed",
     "FINAL_INSPECTION": "Final Inspection",
     "FINAL_INSPECTION_COMPLETED": "Final Inspection Completed",
     "INVOICED": "Invoiced",
@@ -477,7 +475,8 @@ def _fetch_active_jobs_sync():
     conn = get_connection()
     try:
         cursor = conn.execute('''
-            SELECT id, homeowner_name, address_line1, city, state, status, created_at
+            SELECT id, invoice_id, homeowner_name, address_line1, city, state,
+                   status, created_at, canvasser_name, supplement_sent_at, carrier_sla_days
             FROM jobs
             WHERE status != 'CLOSED'
             ORDER BY created_at DESC

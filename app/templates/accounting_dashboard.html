@@ -345,7 +345,8 @@
         fetchAccounting();
 
         function connectWebSocket() {
-            const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/api/office/ws/office`);
+            const wsUrl = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws/office?token=${encodeURIComponent(AUTH_TOKEN)}`;
+            const ws = new WebSocket(wsUrl);
             ws.onmessage = e => { try { const d = JSON.parse(e.data); if (d.type === 'stale' || d.type === 'new_lead') fetchAccounting(); } catch {} };
             ws.onclose = () => setTimeout(connectWebSocket, 5000);
         }
