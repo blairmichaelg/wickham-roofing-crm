@@ -18,7 +18,7 @@ def test_parse_feet_inches():
 
 @pytest.mark.asyncio
 async def test_hover_extractor_real_file():
-    pdf_path = r"C:\Users\Michael\Downloads\182148217298587.pdf"
+    pdf_path = "samples/hover-sample.pdf"
     
     data, sha256 = await extract_hover_data(pdf_path)
     

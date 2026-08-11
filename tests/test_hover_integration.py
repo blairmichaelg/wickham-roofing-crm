@@ -10,20 +10,18 @@ client = TestClient(app)
 
 def test_eagleview_upload_endpoint_hover_file(setup_test_db):
     """Test upload endpoint with a Hover-format PDF.
-    
-    NOTE: This test requires a real Hover PDF file. It is skipped if
-    the file is not available, which is the expected behaviour in CI.
-    To run this locally, set HOVER_TEST_PDF to the path of a real
-    Hover measurement PDF.
     """
-    pdf_path = os.environ.get("HOVER_TEST_PDF")
+    pdf_path = "samples/hover-sample.pdf"
+    if not os.path.exists(pdf_path):
+        pdf_path = os.environ.get("HOVER_TEST_PDF")
     if not pdf_path or not os.path.exists(pdf_path):
         import pytest
-        pytest.skip("HOVER_TEST_PDF not set or file not found — skipping live Hover integration test")
+        pytest.skip("hover-sample.pdf or HOVER_TEST_PDF not set or file not found — skipping live Hover integration test")
     
+    job_id = "99999999-9999-9999-9999-999999999903"
     conn = get_connection()
     conn.execute("INSERT INTO jobs (id, homeowner_name, status, job_type, address_line1, city, state, postal_code, phone) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", 
-                 ("hover-integration-job", "Hover Test", "LEAD", "INSURANCE", "123", "City", "ST", "123", "123"))
+                 (job_id, "Hover Test", "LEAD", "INSURANCE", "123", "City", "ST", "123", "123"))
     conn.commit()
     conn.close()
 
@@ -32,7 +30,7 @@ def test_eagleview_upload_endpoint_hover_file(setup_test_db):
     with open(pdf_path, "rb") as f:
         files = {"file": ("hover_report.pdf", f, "application/pdf")}
         response = client.post(
-            "/api/office/jobs/hover-integration-job/eagleview",
+            f"/api/office/jobs/{job_id}/eagleview",
             files=files,
             cookies={"auth_token": admin_token}
         )
