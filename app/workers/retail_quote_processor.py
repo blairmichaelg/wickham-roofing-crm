@@ -3,6 +3,7 @@ ARQ Worker: Retail Quote Generator
 """
 
 import structlog
+
 from app.core.pipeline import run_retail_quote_pipeline
 
 logger = structlog.get_logger("app.workers.retail_quote_processor")

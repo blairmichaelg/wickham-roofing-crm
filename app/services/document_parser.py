@@ -10,14 +10,18 @@ The LLM is a LOCATOR, not a CALCULATOR.
 """
 from __future__ import annotations
 
-import asyncio
-import structlog
-from pathlib import Path
 from decimal import Decimal
+from pathlib import Path
+
+import structlog
 
 from app.core.ingestion_models import (
-    UniversalClaimAST, ClaimLineItem, RoofGeometry,
-    ClaimFinancials, SourcedValue, EvidenceRef
+    ClaimFinancials,
+    ClaimLineItem,
+    EvidenceRef,
+    RoofGeometry,
+    SourcedValue,
+    UniversalClaimAST,
 )
 from app.services.ai_service import get_ai_client
 
@@ -71,12 +75,12 @@ async def parse_statement_of_loss(
                 activity_code=item.code or "UNKNOWN",
                 description=item.description or "",
                 quantity=_sourced(
-                    Decimal(str(item.quantity)) if item.quantity is not None else Decimal("0"),
+                    Decimal(str(item.quantity)) if item.quantity is not None else Decimal(0),
                     page, str(item.quantity)
                 ),
                 unit=_sourced(item.unit_of_measure or "EA", page, str(item.unit_of_measure)),
                 unit_price=_sourced(
-                    Decimal(str(item.unit_price)) if item.unit_price is not None else Decimal("0"),
+                    Decimal(str(item.unit_price)) if item.unit_price is not None else Decimal(0),
                     page, str(item.unit_price)
                 ),
                 tax=_sourced(
@@ -84,7 +88,7 @@ async def parse_statement_of_loss(
                     page, str(item.tax)
                 ),
                 claimed_rcv=_sourced(
-                    Decimal(str(item.claimed_rcv)) if item.claimed_rcv is not None else Decimal("0"),
+                    Decimal(str(item.claimed_rcv)) if item.claimed_rcv is not None else Decimal(0),
                     page, str(item.claimed_rcv)
                 ),
                 depreciation=_sourced(

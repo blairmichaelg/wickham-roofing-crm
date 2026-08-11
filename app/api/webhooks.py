@@ -6,6 +6,7 @@ and enqueues valid events into the ARQ Redis queue for async processing.
 """
 
 import secrets
+
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field

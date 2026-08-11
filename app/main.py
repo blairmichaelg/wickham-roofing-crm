@@ -154,7 +154,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Wickham Roofing AI Orchestrator",
     description="Standalone CRM orchestrator and Google Gemini AI middleware.",
-    version="1.6.1",
+    version="2.1.1",
     lifespan=lifespan,
 )
 

@@ -15,20 +15,21 @@ SDK Migration: Moved from deprecated google-generativeai to google-genai.
 The new SDK uses a Client() pattern with client.models.generate_content().
 """
 
-import json
-import time
-import random
 import asyncio
+import json
+import random
+import time
+from typing import Literal
+
 import structlog
 from google import genai
 from google.genai import types as genai_types
 from pydantic import BaseModel, ValidationError
-from typing import Literal
 
 from app.config import get_settings
 from app.core.database import log_ai_usage
-from app.core.supplement_models import StatementOfLoss, DiscrepancyReport
 from app.core.inspection_models import PhotoAnalysis
+from app.core.supplement_models import DiscrepancyReport, StatementOfLoss
 
 logger = structlog.get_logger("app.services.ai_service")
 
@@ -52,6 +53,7 @@ class BatchPhotoAnalysis(BaseModel):
 
 
 from abc import ABC, abstractmethod
+
 
 class AiClient(ABC):
     @abstractmethod
@@ -245,14 +247,14 @@ Rules:
             )
             return {
                 "action": "error",
-                "reasoning": f"Schema Validation Error: {str(exc)}",
+                "reasoning": f"Schema Validation Error: {exc!s}",
                 "document_data": {},
             }
         except Exception as exc:
             log.error("ai_unexpected_error", error=str(exc))
             return {
                 "action": "error",
-                "reasoning": f"Unexpected error: {str(exc)}",
+                "reasoning": f"Unexpected error: {exc!s}",
                 "document_data": {},
             }
 
@@ -520,27 +522,34 @@ Rules:
         log = logger.bind(job_id=job_id, count=len(file_names))
         log.info("photo_analysis_batch_started")
         
+        # Build interleaved contents: label each image with its filename before the image data
+        # so Gemini can reliably map each analysis to the correct photo. Without this,
+        # Gemini receives unlabeled image blobs and produces identical/shuffled analyses.
         contents = []
-        for file_name in file_names:
+        for file_name, original_filename in zip(file_names, original_filenames):
             file_info = await asyncio.to_thread(self._call_with_backoff, self.client.files.get, name=file_name)
+            contents.append(f"[Photo: {original_filename}]")
             contents.append(file_info)
             
         prompt = (
-            "You are Wickham Roofing's senior forensic roofing inspector creating photographic documentation for an inspection report. "
-            "Here are multiple roof inspection photos from the same job. Analyze all of these photos. "
-            "Synthesize the overall condition based on the context of the entire roof.\n\n"
+            "You are Wickham Roofing's senior forensic roofing inspector creating photographic documentation for an insurance claim.\n\n"
+            "Above you have been provided with multiple roof inspection photos, each labeled with its filename in brackets (e.g. [Photo: img_001.jpg]).\n"
+            "Analyze EACH photo INDEPENDENTLY and produce a UNIQUE, ACCURATE assessment for that specific photo. "
+            "Do NOT copy or repeat an analysis — each photo must have its own distinct findings based on what is actually visible.\n\n"
             "For each photo, perform a Zero-Shot Chain of Thought analysis:\n"
-            "Let's think step by step.\n"
-            "1. First, describe the texture, color, and location of any visible anomalies in the photo. "
-            "Determine if it shows a roof slope, shingle close-up, valley, vent boot, chimneys, ridge cap, or general slope.\n"
-            "2. Second, compare those anomalies against standard hail impact signatures (e.g. circular bruising, exposed fiberglass, granule loss) or wind crease marks. "
-            "3. Third, classify the primary damage type ('hail', 'wind', 'mechanical', 'aging', 'none') and severity ('none', 'minor', 'moderate', 'severe').\n"
-            "4. Fourth, estimate your confidence score (0-100) and list any alternative explanations for the anomalies (e.g. manufacturer blistering, normal weathering, physical scraping) if confidence is not 100%.\n"
-            "5. Finally, write a 1-2 sentence 'forensic_narrative' caption that is 100% ACCURATE and grounded solely in visually verifiable data. "
-            "Do NOT interpolate, assume, or invent damage (such as leaks or unvisible hits) that is not clearly pictured.\n\n"
-            "You must map each analyzed photo to its correct original filename. The original filenames are:\n"
-            + ", ".join(original_filenames) + "\n\n"
-            "Ensure the output JSON matches the response schema with the array of PhotoAnalysis results."
+            "Step 1: Identify the photo type (slope overview, shingle close-up, ridge cap, valley, vent boot, flashing, etc.).\n"
+            "Step 2: Describe all visible anomalies — their texture, color, shape, and location. "
+            "Look for hail impact bruising (circular dark marks with granule displacement), wind crease lines, "
+            "exposed fiberglass mat, granule loss patterns, or missing/lifted shingles.\n"
+            "Step 3: Classify the primary damage type ('hail', 'wind', 'mechanical', 'aging', 'none') and severity ('none', 'minor', 'moderate', 'severe').\n"
+            "Step 4: Estimate your confidence (0-100). If not 100%, provide an alternative explanation "
+            "(e.g., manufacturer blistering, normal weathering, mechanical scraping).\n"
+            "Step 5: Write a 1-2 sentence 'forensic_narrative' that is 100% grounded in what is VISUALLY PRESENT. "
+            "Do NOT hallucinate, invent, or assume damage that is not clearly visible. "
+            "If a photo shows a clean or undamaged surface, state that clearly.\n\n"
+            "Set the 'filename' field for each result to the exact filename label shown before that photo.\n"
+            "Ensure the output JSON contains one PhotoAnalysis entry per photo, in the same order as presented.\n"
+            "Each entry MUST reflect that specific photo's actual condition — not a generalized or repeated assessment."
         )
         contents.append(prompt)
         

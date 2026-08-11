@@ -1,4 +1,5 @@
 import sqlite3
+
 import structlog
 from passlib.context import CryptContext
 

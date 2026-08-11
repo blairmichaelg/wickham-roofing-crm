@@ -9,11 +9,11 @@ a DiscrepancyReport. This isolates all math from the LLM.
 import math
 
 from app.core.supplement_models import (
-    EagleViewData,
-    StatementOfLoss,
     Discrepancy,
     DiscrepancyReport,
-    MaterialBOM
+    EagleViewData,
+    MaterialBOM,
+    StatementOfLoss,
 )
 
 
@@ -53,7 +53,7 @@ def reconcile(ev: EagleViewData, sol: StatementOfLoss, job_id: str, waste_factor
 
     # 1. Area Computation
     ev_normalized_squares = (ev.total_area_sf / 100.0) * (1.0 + waste_factor)
-    from app.core.complexity import compute_complexity_score, build_waste_explanation
+    from app.core.complexity import build_waste_explanation, compute_complexity_score
     score = compute_complexity_score(ev)
     waste_explanation = build_waste_explanation(ev, score, waste_factor)
     

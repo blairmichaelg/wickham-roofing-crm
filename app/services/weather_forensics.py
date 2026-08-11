@@ -3,12 +3,12 @@ Deterministic NOAA Weather Forensics Engine.
 Simulates parsing of the NCEI Storm Events Database for forensic roof claim validation.
 """
 from datetime import datetime
-from typing import Dict, Union
+
 
 class NOAAForensicsEngine:
     """NOAAForensicsEngine definition."""
     @staticmethod
-    def verify_storm(lat: float, lon: float, loss_date: datetime) -> Dict[str, Union[str, float]]:
+    def verify_storm(lat: float, lon: float, loss_date: datetime) -> dict[str, str | float]:
         """
         Verify if a historical storm event occurred near the given coordinates on the loss date.
         

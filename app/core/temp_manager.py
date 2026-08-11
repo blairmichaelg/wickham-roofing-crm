@@ -15,8 +15,9 @@ Usage:
 
 import atexit
 import tempfile
-import structlog
 from pathlib import Path
+
+import structlog
 
 logger = structlog.get_logger("app.core.temp_manager")
 

@@ -22,16 +22,16 @@ def prepare_demo_state():
         homeowner = row["homeowner_name"]
         print(f"Targeting demo job {job_id} ({homeowner})")
 
-        # 1. Update job status to CONTINGENCY_SIGNED
-        conn.execute("UPDATE jobs SET status = 'CONTINGENCY_SIGNED' WHERE id = ?", (job_id,))
+        # 1. Update job status to LEAD_CAPTURED (unsigned intake state)
+        conn.execute("UPDATE jobs SET status = 'LEAD_CAPTURED' WHERE id = ?", (job_id,))
 
-        # 2. Remove inspection report docs from job_documents
+        # 2. Remove generated report & grid docs from job_documents
         conn.execute(
-            "DELETE FROM job_documents WHERE job_id = ? AND category IN ('INSPECTION_REPORT', 'HOMEOWNER_INSPECTION_REPORT')",
+            "DELETE FROM job_documents WHERE job_id = ? AND category IN ('INSPECTION_REPORT', 'HOMEOWNER_INSPECTION_REPORT', 'EVIDENCE_GRID')",
             (job_id,)
         )
         conn.commit()
-        print("Job status updated to CONTINGENCY_SIGNED.")
+        print("Job status updated to LEAD_CAPTURED and generated report/grid docs removed.")
 
         # Print remaining docs
         docs = conn.execute("SELECT filename, category FROM job_documents WHERE job_id = ?", (job_id,)).fetchall()

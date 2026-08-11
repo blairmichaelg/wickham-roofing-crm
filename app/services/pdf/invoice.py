@@ -1,26 +1,24 @@
 import asyncio
-import structlog
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame, Paragraph, Spacer, KeepTogether
-from reportlab.platypus.flowables import HRFlowable
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib import colors
-from reportlab.platypus import Table, TableStyle, Image, PageBreak
 import datetime
-import html
-import hashlib
-
-from app.core.supplement_models import DiscrepancyReport, MaterialBOM
-from app.core.inspection_models import InspectionJob
 from pathlib import Path
 
+import structlog
+from reportlab.lib import colors
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.platypus import (
+    Paragraph,
+    Spacer,
+    Table,
+    TableStyle,
+)
+from reportlab.platypus.flowables import HRFlowable
+
+from app.core.supplement_models import MaterialBOM
+
 logger = structlog.get_logger("app.services.pdf")
-from app.services.pdf.constants import COMPANY_NAME, COMPANY_PHONE, COMPANY_EMAIL, FIELD_DOCS_DIR
-
-
-
-
+from app.services.pdf.constants import FIELD_DOCS_DIR
 from app.services.pdf.engine import PDFEngine
+
 
 class InvoiceGenerator(PDFEngine):
     async def generate_retail_quote(

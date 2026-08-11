@@ -6,8 +6,7 @@ import uuid
 # Add the project root to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from app.core.database import get_connection, create_field_rep, pwd_context
-from app.core.database import JobStatus
+from app.core.database import get_connection, create_field_rep
 
 def clear_directory_contents(dir_path):
     if not os.path.exists(dir_path):
@@ -68,6 +67,16 @@ def reset_demo_db():
     except Exception as e:
         print(f"Demo field rep 'Jerry Grubb' creation note: {e}")
 
+    try:
+        from app.core.cache import init_db as init_cache_db, _get_connection as get_cache_connection
+        init_cache_db()
+        with get_cache_connection() as cache_conn:
+            cache_conn.execute("DELETE FROM analysis_cache")
+            cache_conn.commit()
+        print("Successfully cleared AI photo analysis cache.")
+    except Exception as e:
+        print(f"AI photo analysis cache reset note: {e}")
+
     # No demo job seeded for a clean slate.
     pass
 
@@ -75,6 +84,7 @@ def reset_demo_db():
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     dirs_to_clear = [
         os.path.join(base_dir, 'data', 'field_docs'),
+        os.path.join(base_dir, 'field_docs'),
         os.path.join(base_dir, 'field_photos'),
         os.path.join(base_dir, 'generated_exports'),
         os.path.join(base_dir, 'signed_agreements')

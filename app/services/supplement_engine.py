@@ -3,7 +3,6 @@ Deterministic Xactimate & Geometric Engine.
 Handles exact mathematical evaluations and parses ESX archives.
 """
 import math
-from typing import List, Dict, Union
 
 # Constant for IRC IWS calculation
 ROLL_SQFT_YIELD = 66.7
@@ -13,7 +12,7 @@ TRADES = {"RFG", "SFG", "PNT", "SDG", "HVC"}
 class SupplementEngine:
     """SupplementEngine definition."""
     @staticmethod
-    def parse_esx(file_path: str) -> List[Dict[str, Union[str, float]]]:
+    def parse_esx(file_path: str) -> list[dict[str, str | float]]:
         """
         Extract code, category, and quantity from an Xactimate .ESX archive.
         ESX is a ZIP file containing an estimate.xml.
@@ -27,7 +26,7 @@ class SupplementEngine:
         )
         
     @staticmethod
-    def evaluate_multi_trade_op(items: List[Dict[str, Union[str, float]]]) -> bool:
+    def evaluate_multi_trade_op(items: list[dict[str, str | float]]) -> bool:
         """
         Evaluate if Overhead & Profit should be applied based on >= 3 distinct trades.
         """

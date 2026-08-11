@@ -12,24 +12,23 @@ Processes a batch of roof photos for a single InspectionJob by:
 This worker follows the same async-to-thread pattern as supplement_processor.py.
 """
 
-import io
 import asyncio
-import structlog
-from pathlib import Path
+import io
 import traceback
-from arq.worker import Retry
+from pathlib import Path
 
+import structlog
+from arq.worker import Retry
 from PIL import Image as PILImage
 
-from app.services.ai_service import get_ai_client
-from app.core.inspection_models import InspectionJob
-from app.core.cache import get_cached_analysis, set_cached_analysis
-from app.core.temp_manager import create_temp_file
 from app.api.field_routes import get_inspection_summary
-from app.config import FIELD_DOCS_DIR
+from app.config import FIELD_DOCS_DIR, get_settings
+from app.core.cache import get_cached_analysis, set_cached_analysis
+from app.core.database import JobStatus, insert_job_document, update_job_status
+from app.core.inspection_models import InspectionJob
+from app.core.temp_manager import create_temp_file
+from app.services.ai_service import get_ai_client
 from app.services.pdf import PDFGenerator
-from app.core.database import insert_job_document, update_job_status, JobStatus
-from app.config import get_settings
 
 logger = structlog.get_logger("app.workers.inspection_processor")
 
@@ -97,7 +96,7 @@ def resize_for_ai(src: Path, max_width: int = 1600) -> str:
         if img.width > max_width:
             ratio = max_width / img.width
             new_height = int(img.height * ratio)
-            img = img.resize((max_width, new_height), PILImage.LANCZOS)
+            img = img.resize((max_width, new_height), PILImage.Resampling.LANCZOS)
 
         temp_path = create_temp_file(suffix=".jpg")
         img.save(temp_path, format="JPEG", quality=85)

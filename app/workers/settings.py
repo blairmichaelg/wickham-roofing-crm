@@ -9,21 +9,22 @@ This module defines the WorkerSettings class that ARQ uses to
 discover tasks, configure Redis connections, and set job defaults.
 """
 
-import structlog
 import asyncio
+
+import structlog
 from arq.connections import RedisSettings
 from arq.cron import cron
 
 from app.config import get_settings
-from app.core.cleanup import cleanup_orphaned_artifacts
 from app.core.backup import backup_database
-from app.workers.supplement_processor import process_supplement_event
-from app.workers.inspection_processor import process_inspection
-from app.workers.rebuttal_processor import process_rebuttal
-from app.workers.retail_quote_processor import process_retail_quote
+from app.core.cleanup import cleanup_orphaned_artifacts
 from app.workers.commission_processor import process_commission
 from app.workers.escalation_processor import process_escalation
+from app.workers.inspection_processor import process_inspection
 from app.workers.photo_processor import process_photo_damage
+from app.workers.rebuttal_processor import process_rebuttal
+from app.workers.retail_quote_processor import process_retail_quote
+from app.workers.supplement_processor import process_supplement_event
 
 logger = structlog.get_logger("app.workers.settings")
 

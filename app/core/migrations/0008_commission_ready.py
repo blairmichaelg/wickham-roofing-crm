@@ -1,4 +1,5 @@
 import sqlite3
+
 import structlog
 
 logger = structlog.get_logger(__name__)

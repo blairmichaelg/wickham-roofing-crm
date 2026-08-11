@@ -2,7 +2,7 @@
 Unit tests for the Office Control Center API routes.
 """
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -152,6 +152,127 @@ class TestUploadIdempotency:
         
         # 5. Verify the pipeline was completely bypassed
         mock_run_pipeline.assert_not_called()
+
+
+class TestSupplementUploadRoute:
+    @patch("app.api.office_routes.insert_job_document")
+    @patch("app.api.office_routes.stream_upload_safely")
+    def test_supplement_upload_enqueues_full_generation(self, mock_stream, mock_insert):
+        mock_stream.side_effect = ["ev_hash", "sol_hash"]
+        mock_insert.side_effect = ["ev_doc_id", "sol_doc_id"]
+        app.state.redis_pool = AsyncMock()
+
+        response = client.post(
+            "/api/office/jobs/99999999-9999-9999-9999-999999999904/supplement_docs",
+            files={
+                "ev_file": ("hover.pdf", b"%PDF-1.4 hover", "application/pdf"),
+                "sol_file": ("sol.pdf", b"%PDF-1.4 sol", "application/pdf"),
+            },
+        )
+
+        assert response.status_code == 200
+        app.state.redis_pool.enqueue_job.assert_awaited_once()
+        _, kwargs = app.state.redis_pool.enqueue_job.await_args
+        assert kwargs["generate_pdf"] is True
+
+    @patch("app.api.office_routes.run_supplement_pipeline", new_callable=AsyncMock)
+    @patch("app.api.office_routes.insert_job_document")
+    @patch("app.api.office_routes.stream_upload_safely")
+    def test_supplement_upload_runs_inline_without_redis(self, mock_stream, mock_insert, mock_pipeline):
+        mock_stream.side_effect = ["ev_hash", "sol_hash"]
+        mock_insert.side_effect = ["ev_doc_id", "sol_doc_id"]
+        if hasattr(app.state, "redis_pool"):
+            app.state.redis_pool = None
+
+        response = client.post(
+            "/api/office/jobs/99999999-9999-9999-9999-999999999905/supplement_docs",
+            files={
+                "ev_file": ("eagleview.pdf", b"%PDF-1.4 ev", "application/pdf"),
+                "sol_file": ("sol.pdf", b"%PDF-1.4 sol", "application/pdf"),
+            },
+        )
+
+        assert response.status_code == 200
+        mock_pipeline.assert_awaited_once()
+        assert mock_pipeline.await_args.kwargs["generate_pdf"] is True
+
+
+class TestEvidenceGridRoute:
+    @patch("app.api.office_routes.PDFGenerator")
+    @patch("app.api.office_routes.get_inspection_summary", new_callable=AsyncMock)
+    def test_evidence_grid_regenerates_when_ai_analysis_exists(self, mock_summary, mock_pdf_generator, tmp_path):
+        from types import SimpleNamespace
+        import uuid
+
+        from app.core.database import get_connection, insert_job_document
+
+        job_id = str(uuid.uuid4())
+        conn = get_connection()
+        conn.execute(
+            "INSERT INTO jobs (id, homeowner_name, address_line1, city, state, postal_code, phone) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (job_id, "Grid Test", "123 Grid St", "City", "GA", "31792", "555-5555"),
+        )
+        conn.commit()
+        conn.close()
+
+        old_grid = tmp_path / "old_evidence_grid.pdf"
+        old_grid.write_bytes(b"%PDF-1.4 old")
+        new_grid = tmp_path / "new_evidence_grid.pdf"
+        new_grid.write_bytes(b"%PDF-1.4 new")
+
+        insert_job_document(
+            job_id,
+            "evidence_grid.pdf",
+            "application/pdf",
+            str(old_grid),
+            None,
+            "field_safe",
+            "EVIDENCE_GRID",
+            True,
+        )
+
+        mock_summary.return_value = SimpleNamespace(
+            job_id=job_id,
+            analyses=[SimpleNamespace(filename="roof.jpg")],
+            photos=[],
+        )
+        mock_pdf_generator.return_value.generate_evidence_grid = AsyncMock(return_value=str(new_grid))
+
+        response = client.get(f"/api/office/jobs/{job_id}/evidence_grid")
+
+        assert response.status_code == 200
+        mock_pdf_generator.return_value.generate_evidence_grid.assert_awaited_once()
+
+    def test_field_evidence_grid_namespace_exists(self, tmp_path):
+        import uuid
+
+        from app.core.database import get_connection, insert_job_document
+
+        job_id = str(uuid.uuid4())
+        conn = get_connection()
+        conn.execute(
+            "INSERT INTO jobs (id, homeowner_name, address_line1, city, state, postal_code, phone) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (job_id, "Field Grid", "124 Grid St", "City", "GA", "31792", "555-5555"),
+        )
+        conn.commit()
+        conn.close()
+
+        grid = tmp_path / "field_evidence_grid.pdf"
+        grid.write_bytes(b"%PDF-1.4 field")
+        insert_job_document(
+            job_id,
+            "evidence_grid.pdf",
+            "application/pdf",
+            str(grid),
+            None,
+            "field_safe",
+            "EVIDENCE_GRID",
+            True,
+        )
+
+        response = client.get(f"/api/field/jobs/{job_id}/evidence_grid")
+
+        assert response.status_code == 200
 
 class TestMaterialOrderIntegration:
     def test_material_order_route_integration(self):

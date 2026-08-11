@@ -1,7 +1,9 @@
 import re
 from pathlib import Path
+
 import structlog
-from app.core.supplement_models import DiscrepancyReport, CodeSection
+
+from app.core.supplement_models import CodeSection, DiscrepancyReport
 
 logger = structlog.get_logger("app.core.code_router")
 

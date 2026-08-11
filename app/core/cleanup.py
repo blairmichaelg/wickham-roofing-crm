@@ -6,8 +6,9 @@ securely referenced in the database.
 """
 
 import time
-import structlog
 from pathlib import Path
+
+import structlog
 
 from app.core.database import get_connection
 

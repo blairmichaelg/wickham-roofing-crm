@@ -8,9 +8,10 @@ we do not burn duplicate API tokens for images already processed.
 """
 
 import sqlite3
-import structlog
-from pathlib import Path
 from contextlib import contextmanager
+from pathlib import Path
+
+import structlog
 
 from app.core.inspection_models import PhotoAnalysis
 

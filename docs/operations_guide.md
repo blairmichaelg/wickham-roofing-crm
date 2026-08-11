@@ -171,6 +171,6 @@ already confirmed with a mistake, contact the Tech Admin to correct it.
 
 ---
 
-*This guide reflects the Operations workflow as of version `1.7.0` (commit `2107bb6`).
+*This guide reflects the Operations workflow as of version `2.1.1` (2026-08-11).
 If new panels, buttons, or workflows are added in future updates, this
 guide should be reviewed and updated to match.*

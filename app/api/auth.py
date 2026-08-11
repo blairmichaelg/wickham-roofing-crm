@@ -1,6 +1,8 @@
-import jwt
 import datetime
-from fastapi import HTTPException, Depends, Cookie, Header
+
+import jwt
+from fastapi import Cookie, Depends, Header, HTTPException
+
 from app.config import get_settings
 
 ALGORITHM = "HS256"
@@ -22,7 +24,7 @@ def create_access_token(
         str: The resulting output.
     """
     settings = get_settings()
-    expire = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=12)
+    expire = datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=12)
     to_encode: dict = {"sub": role, "role": role, "exp": expire}
     if rep_name:
         to_encode["rep_name"] = rep_name

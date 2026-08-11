@@ -9,6 +9,7 @@ These are written back from parse_statement_of_loss() after a successful SoL par
 Safe to run on existing DBs — uses ALTER TABLE with try/except per project convention.
 """
 import sqlite3
+
 import structlog
 
 logger = structlog.get_logger("app.core.migrations.0011_add_depreciation_net_claim")

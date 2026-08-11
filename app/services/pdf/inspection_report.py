@@ -15,23 +15,27 @@ Registered in job_documents with doc_type="HOMEOWNER_INSPECTION_REPORT",
 visibility="field_safe".
 """
 import asyncio
-import os
-import structlog
 from pathlib import Path
 
+import structlog
 from reportlab.lib import colors
+from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import inch
+from reportlab.platypus import Image as RLImage
 from reportlab.platypus import (
-    Paragraph, Spacer, Image as RLImage, PageBreak,
-    Table, TableStyle, KeepTogether
+    KeepTogether,
+    PageBreak,
+    Paragraph,
+    Spacer,
+    Table,
+    TableStyle,
 )
 from reportlab.platypus.flowables import HRFlowable
-from reportlab.lib.styles import ParagraphStyle
 
-from app.core.inspection_models import InspectionJob
-from app.services.pdf.engine import PDFEngine
 from app.config import FIELD_DOCS_DIR
 from app.core.database import get_connection
+from app.core.inspection_models import InspectionJob
+from app.services.pdf.engine import PDFEngine
 
 logger = structlog.get_logger("app.services.pdf.inspection_report")
 

@@ -3,6 +3,7 @@ ARQ Worker: Rebuttal Letter Generator
 """
 
 import structlog
+
 from app.core.pipeline import run_rebuttal_pipeline
 
 logger = structlog.get_logger("app.workers.rebuttal_processor")

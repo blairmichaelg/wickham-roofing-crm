@@ -1,4 +1,5 @@
 import sqlite3
+
 import structlog
 
 logger = structlog.get_logger("app.core.migrations.0005_add_document_visibility")

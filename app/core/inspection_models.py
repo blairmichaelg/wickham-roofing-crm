@@ -16,11 +16,11 @@ Key design decisions:
 import hashlib
 import os
 import time
-import structlog
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
 
+import structlog
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 logger = structlog.get_logger("app.core.inspection_models")

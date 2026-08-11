@@ -1,8 +1,9 @@
 import asyncio
-from fastapi import WebSocket
-from typing import Dict, Any
-import structlog
 import time
+from typing import Any
+
+import structlog
+from fastapi import WebSocket
 
 logger = structlog.get_logger("app.core.notifications")
 
@@ -10,7 +11,7 @@ class RobustConnectionManager:
     """RobustConnectionManager definition."""
     def __init__(self):
         # Maps websocket -> dict with 'client_id', 'role', 'last_pong'
-        self.active_connections: Dict[WebSocket, Dict[str, Any]] = {}
+        self.active_connections: dict[WebSocket, dict[str, Any]] = {}
         # Start the loop lazily on the first connection
         self._heartbeat_task = None
 

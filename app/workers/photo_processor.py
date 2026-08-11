@@ -1,11 +1,11 @@
 import asyncio
 import json
-import structlog
-from pathlib import Path
 
+import structlog
+
+from app.api.field_routes import FIELD_PHOTOS_DIR
 from app.core.database import get_connection
 from app.services.ai_service import get_ai_client
-from app.api.field_routes import FIELD_PHOTOS_DIR
 
 logger = structlog.get_logger("app.workers.photo_processor")
 
@@ -71,6 +71,12 @@ async def process_photo_damage(ctx: dict, job_id: str, filename: str) -> None:
             
         # Analyze
         analysis = await ai.analyze_roof_photo(uploaded_name, filename, job_id)
+        
+        # Save to SQLite cache so it is immediately available
+        from app.core.inspection_models import _compute_sha256
+        from app.core.cache import set_cached_analysis
+        sha = _compute_sha256(file_path)
+        await asyncio.to_thread(set_cached_analysis, job_id, sha, analysis)
         
         # Build damage signal
         confidence = analysis.confidence

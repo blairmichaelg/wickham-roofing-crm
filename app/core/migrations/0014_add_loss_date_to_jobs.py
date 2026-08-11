@@ -5,6 +5,7 @@ Adds loss_date column to jobs table to synchronize and ensure consistency
 between jobs and storm_verifications.
 """
 import sqlite3
+
 import structlog
 
 logger = structlog.get_logger("app.core.migrations.0014_add_loss_date_to_jobs")

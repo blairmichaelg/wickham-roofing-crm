@@ -1,5 +1,6 @@
-from fastapi import HTTPException
 import structlog
+from fastapi import HTTPException
+
 from app.core.database import get_connection
 
 logger = structlog.get_logger("app.services.field_access")

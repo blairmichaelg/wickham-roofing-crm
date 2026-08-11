@@ -5,15 +5,16 @@ Provides CRUD endpoints for managing field rep identities.
 All endpoints are admin-only.
 """
 
-from fastapi import APIRouter, Body, HTTPException, Depends
+import structlog
+from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi.responses import JSONResponse
+
 from app.api.auth import verify_admin
 from app.core.database import (
     create_field_rep,
     list_field_reps,
     update_field_rep,
 )
-import structlog
 
 logger = structlog.get_logger("app.api.admin_reps")
 router = APIRouter(

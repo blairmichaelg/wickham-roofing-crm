@@ -5,6 +5,7 @@ Pure Python domain logic for calculating job profitability and margins.
 
 from __future__ import annotations
 
+
 def compute_job_profitability(
     revenue_cents: int, 
     materials_cents: int, 

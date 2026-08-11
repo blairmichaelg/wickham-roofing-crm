@@ -1,4 +1,5 @@
 import sqlite3
+
 import structlog
 
 logger = structlog.get_logger("app.core.migrations.0010_drop_legacy_real_columns")

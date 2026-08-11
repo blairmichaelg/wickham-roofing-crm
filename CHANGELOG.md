@@ -1,7 +1,24 @@
 # Changelog
 
+## [2.1.1] - 2026-08-11
+### Fixed (Production Pipeline Hardening — Deep Workspace Audit)
+- **Admin Kanban Blank Fields (BLOCKER)**: `_fetch_active_jobs_sync` was only selecting 7 columns but the admin Kanban template required `invoice_id`, `canvasser_name`, `supplement_sent_at`, and `carrier_sla_days`. All four were missing, causing invoice badges to show raw UUIDs, ownership labels to be invisible, and the SLA-exceeded alert to never fire. Added all missing columns to the `SELECT`.
+- **Accounting Dashboard WebSocket Dead Connection (BLOCKER)**: `accounting_dashboard.html` was connecting its WebSocket to `/api/office/ws/office` — a route that does not exist. The real endpoint is `/ws/office`. Fixed URL on the accounting dashboard to match, restoring real-time push updates for the Accounting team.
+- **WebSocket Auth Token Passthrough**: Both admin and accounting dashboards now append `?token=<AUTH_TOKEN>` to WebSocket URLs, ensuring robust authentication alongside the existing cookie fallback path.
+- **Triage Resolve Redis Guard (BLOCKER)**: `admin_triage_resolve` was calling `request.app.state.redis_pool.enqueue_job()` without verifying `redis_pool` exists first. When Redis is unavailable, this threw an unhandled `AttributeError`. Now returns a clean `503 Service Unavailable`.
+- **Operations Board Missing Status**: `INSPECTION_COMPLETED` was absent from the "Inspections & Closeout" column query in `operations_routes.py`. Jobs at this status disappeared from the board entirely.
+- **Dead Kanban Columns Removed**: `EV_ORDERED` and `MEASUREMENT_ORDERED` were defined in `STATUS_LABELS` and the admin Kanban column list but have no corresponding `JobStatus` enum values. Removed both dead labels and phantom columns.
+- **Unregistered Pytest Mark Warning**: `@pytest.mark.no_mock_ownership` was not registered in `pyproject.toml`. Registered the mark to clean up test output (29 warnings, down from 30).
+
+### Verification
+- **Test suite: 274 passed, 2 skipped, 29 warnings** — all green.
+
 ## [2.1.0] - 2026-08-06
 ### Added & Remediated
+- **Admin Upload Pipeline Fix**: Updated HOVER/EagleView + Statement of Loss uploads to request full supplement PDF generation and added an inline fallback when Redis is unavailable, preventing dashboard upload dead-ends.
+- **Evidence Grid AI Freshness**: Added stale-vault protection so evidence grids regenerate once AI photo analyses are cached, and restored the `/api/field/jobs/{job_id}/evidence_grid` route used by field links.
+- **Pristine Demo Reset**: Expanded `scripts/db_demo_reset.py` to clear both active and legacy document vault paths plus cached AI photo analyses before reseeding core team users and Jerry Grubb.
+- **Verification Metadata**: Refreshed test-count documentation to the current `274 passed, 2 skipped` application suite.
 - **Pipeline Integrity Fixes**: Resolved FastAPI 500 error on suggested date updates by fixing shadowed `backup_database` imports in `office_routes.py`.
 - **Database Synchronization**: Added `loss_date` to the `jobs` table via migration `0014_add_loss_date_to_jobs.py` to synchronize tracking with `storm_verifications`.
 - **Accounting & Financial Calculations**: Overhauled `upsert_financials` to calculate and store `depreciation_cents` and `net_claim_cents`, preventing $0.00 accounting dashboard artifacts.

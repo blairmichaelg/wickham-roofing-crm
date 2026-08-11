@@ -1,5 +1,6 @@
 import sqlite3
 
+
 def up(conn):
     """Drop the legacy REAL columns from the financials table."""
     conn.execute("DROP VIEW IF EXISTS financial_delta_view;")

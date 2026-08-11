@@ -1,23 +1,29 @@
 from __future__ import annotations
 
-import structlog
+import asyncio
+import json as _json
+import uuid
 from pathlib import Path
 from typing import Any
 
-from app.services.pdf_extractor import extract_eagleview_data
-from app.services.hover_extractor import extract_hover_data, detect_pdf_format
+import structlog
+
+from app.core.code_router import get_relevant_codes, parse_code_files
+from app.core.database import (
+    JobStatus,
+    get_connection,
+    get_pricing_ledger,
+    insert_job_document,
+    update_job_status,
+)
 from app.core.reconciliation import reconcile
-from app.core.supplement_models import StatementOfLoss
-from app.services.qbo_export import generate_qbo_invoice
-from app.core.database import update_job_status, JobStatus, get_connection, insert_job_document, get_pricing_ledger
-import asyncio
-import uuid
-import json as _json
+from app.core.supplement_models import EagleViewData, StatementOfLoss
 from app.services.ai_service import get_ai_client
-from app.core.code_router import parse_code_files, get_relevant_codes
+from app.services.hover_extractor import detect_pdf_format, extract_hover_data
 from app.services.pdf import PDFGenerator
+from app.services.pdf_extractor import extract_eagleview_data
+from app.services.qbo_export import generate_qbo_invoice
 from app.services.supplement_engine import SupplementEngine
-from app.core.supplement_models import EagleViewData
 
 logger = structlog.get_logger("app.core.pipeline")
 
@@ -72,6 +78,7 @@ async def run_full_office_pipeline(job_id: str, ev_pdf_path: Path, customer_name
             conn.close()
 
         import asyncio
+
         from app.core.database import _fetch_job_sync
         job_dict = await asyncio.to_thread(_fetch_job_sync, job_id)
         if job_dict and job_dict.get("flashing_lf") is not None and job_dict.get("step_flashing_lf") is not None:
@@ -84,7 +91,10 @@ async def run_full_office_pipeline(job_id: str, ev_pdf_path: Path, customer_name
 
         
         # 2. Calculate BOM
-        from app.core.complexity import compute_complexity_score, calculate_dynamic_waste
+        from app.core.complexity import (
+            calculate_dynamic_waste,
+            compute_complexity_score,
+        )
         score = compute_complexity_score(ev_data)
         waste = calculate_dynamic_waste(score)
         empty_sol = StatementOfLoss(line_items=[], overhead_and_profit_included=True)
@@ -111,7 +121,7 @@ async def run_full_office_pipeline(job_id: str, ev_pdf_path: Path, customer_name
     except Exception as e:
         log.error("master_pipeline_failed", error=str(e))
         import asyncio
-        await asyncio.to_thread(update_job_status, job_id, JobStatus.PIPELINE_FAILED, f"Pipeline crashed: {str(e)}")
+        await asyncio.to_thread(update_job_status, job_id, JobStatus.PIPELINE_FAILED, f"Pipeline crashed: {e!s}")
         raise
 
 async def generate_material_order_pipeline(job_id: str, supplier_name: str, delivery_date: str) -> dict[str, Any]:
@@ -126,11 +136,12 @@ async def generate_material_order_pipeline(job_id: str, supplier_name: str, deli
     Returns:
         dict[str, Any]: The resulting output.
     """
+    import asyncio
+
+    from app.config import FIELD_DOCS_DIR
+    from app.core.database import _fetch_job_sync, insert_material_order
     from app.services.ai_service import get_ai_client
     from app.services.pdf import PDFGenerator
-    from app.core.database import _fetch_job_sync, insert_material_order
-    from app.config import FIELD_DOCS_DIR
-    import asyncio
     
     job_dir = FIELD_DOCS_DIR / job_id
     pdf_path = job_dir / "eagleview.pdf"
@@ -145,7 +156,7 @@ async def generate_material_order_pipeline(job_id: str, supplier_name: str, deli
     else:
         sol = StatementOfLoss(line_items=[], overhead_and_profit_included=True)
         
-    from app.core.complexity import compute_complexity_score, calculate_dynamic_waste
+    from app.core.complexity import calculate_dynamic_waste, compute_complexity_score
     score = compute_complexity_score(ev_data)
     dynamic_waste = calculate_dynamic_waste(score)
     report = await asyncio.to_thread(reconcile, ev_data, sol, job_id, dynamic_waste)
@@ -836,8 +847,9 @@ async def run_supplement_pipeline(job_id: str, ev_pdf_path: str, sol_pdf_path: s
 
 
             # 2. Extract SoL Data
-            from app.services.document_parser import parse_statement_of_loss
             from pathlib import Path
+
+            from app.services.document_parser import parse_statement_of_loss
             try:
                 sol_data = await parse_statement_of_loss(
                     Path(sol_pdf_path), 
@@ -845,7 +857,7 @@ async def run_supplement_pipeline(job_id: str, ev_pdf_path: str, sol_pdf_path: s
                     source_doc_id=sol_doc_id or "unknown"
                 )
             except ValueError as e:
-                await asyncio.to_thread(update_job_status, job_id, JobStatus.PENDING_OPERATOR_REVIEW, f"SoL Parse failed: {str(e)}")
+                await asyncio.to_thread(update_job_status, job_id, JobStatus.PENDING_OPERATOR_REVIEW, f"SoL Parse failed: {e!s}")
                 return {"status": "halted_for_review"}
 
             conn = get_connection()
@@ -922,7 +934,10 @@ async def run_supplement_pipeline(job_id: str, ev_pdf_path: str, sol_pdf_path: s
 
 
             # 3. Reconcile
-            from app.core.complexity import compute_complexity_score, calculate_dynamic_waste
+            from app.core.complexity import (
+                calculate_dynamic_waste,
+                compute_complexity_score,
+            )
             score = compute_complexity_score(ev_data)
             dynamic_waste = calculate_dynamic_waste(score)
             report = await asyncio.to_thread(reconcile, ev_data, sol_data, job_id, dynamic_waste)  # type: ignore

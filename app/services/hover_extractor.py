@@ -3,8 +3,8 @@ Hover PDF Extractor.
 Parses Hover measurements reports into EagleViewData formats.
 """
 
-import re
 import asyncio
+import re
 from pathlib import Path
 
 import pdfplumber

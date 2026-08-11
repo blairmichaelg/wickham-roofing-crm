@@ -19,15 +19,16 @@ Pipeline:
 
 import asyncio
 import hashlib
-import structlog
 from datetime import datetime as _dt
 from pathlib import Path
 
+import structlog
+
 from app.core.database import (
+    JobStatus,
     get_connection,
     insert_job_document,
     update_job_status,
-    JobStatus,
 )
 from app.services.ai_service import get_ai_client
 from app.services.pdf import PDFGenerator

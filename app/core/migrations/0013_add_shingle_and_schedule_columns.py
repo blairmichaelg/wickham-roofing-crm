@@ -9,6 +9,7 @@ for the completed-jobs archive lookup.
 Shingle info is OPTIONAL and nullable. Existing rows are unaffected.
 """
 import sqlite3
+
 import structlog
 
 logger = structlog.get_logger("app.core.migrations.0013_add_shingle_columns")

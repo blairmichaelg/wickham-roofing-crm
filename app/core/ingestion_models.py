@@ -1,6 +1,7 @@
-from pydantic import BaseModel, model_validator, Field
-from typing import TypeVar, Generic, List, Optional
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
+from typing import Generic, TypeVar
+
+from pydantic import BaseModel, Field, model_validator
 
 T = TypeVar('T')
 
@@ -8,14 +9,14 @@ class EvidenceRef(BaseModel):
     """EvidenceRef definition."""
     doc_id: str
     page: int
-    bounding_box: Optional[str] = None
+    bounding_box: str | None = None
     raw_text: str
     extraction_method: str
 
 class SourcedValue(BaseModel, Generic[T]):
     """SourcedValue definition."""
     value: T
-    evidence: List[EvidenceRef] = Field(default_factory=list)
+    evidence: list[EvidenceRef] = Field(default_factory=list)
     verified: bool = False
 
 class ClaimLineItem(BaseModel):
@@ -73,13 +74,13 @@ class ClaimFinancials(BaseModel):
 
 class UniversalClaimAST(BaseModel):
     """UniversalClaimAST definition."""
-    line_items: List[ClaimLineItem]
+    line_items: list[ClaimLineItem]
     roof_geometry: RoofGeometry
     financials: ClaimFinancials
-    claim_number: Optional[SourcedValue[str]] = None
-    insurer_name: Optional[SourcedValue[str]] = None
-    shingle_type: Optional[str] = None
-    shingle_color: Optional[str] = None
+    claim_number: SourcedValue[str] | None = None
+    insurer_name: SourcedValue[str] | None = None
+    shingle_type: str | None = None
+    shingle_color: str | None = None
     source_doc_sha256: str = Field(
         description="SHA256 hash of the source PDF that produced this AST. "
                     "Written at API boundary, passed through ARQ worker payload, "

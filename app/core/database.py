@@ -6,15 +6,15 @@ Manages the SQLite connection and state machine for the local pipeline.
 from __future__ import annotations
 
 import sqlite3
-import structlog
 import uuid
-from typing import Optional
 from datetime import datetime
-from pathlib import Path
 from enum import Enum
+from pathlib import Path
+
+import structlog
+from passlib.context import CryptContext
 
 from app.config import get_settings
-from passlib.context import CryptContext
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -72,7 +72,7 @@ class JobStatus(str, Enum):
     CLAIM_DENIED = "CLAIM_DENIED"  # Primary claim denied outright — no SoL issued
     
     @classmethod
-    def is_operator_gate(cls, status: "JobStatus") -> bool:
+    def is_operator_gate(cls, status: JobStatus) -> bool:
         """
         Is Operator Gate functionality.
         
@@ -674,7 +674,7 @@ def insert_schedule(job_id: str, crew_name: str, install_date: str, delivery_dat
         conn.close()
 
 
-def standardize_vault_filename(job_id: str, filename: str, category: str = "UNSPECIFIED", file_type: str = "", photo_index: Optional[int] = None) -> str:
+def standardize_vault_filename(job_id: str, filename: str, category: str = "UNSPECIFIED", file_type: str = "", photo_index: int | None = None) -> str:
     """
     Format raw filenames into clean, standardized, professional titles for the Document Vault.
     Converts generic names like 'inspection_report_homeowner.pdf' or 'IMG_20260721_182205.jpg'
@@ -719,9 +719,7 @@ def standardize_vault_filename(job_id: str, filename: str, category: str = "UNSP
     if ext == ".pdf":
         if "EVIDENCE" in cat_upper or "EVIDENCE" in fn_lower or "grid" in fn_lower or "evidence_grid" in fn_lower:
             return f"{prefix}Inspection_Evidence_Grid{ext}"
-        elif "HOMEOWNER" in cat_upper or "HOMEOWNER" in ft_upper or "homeowner" in fn_lower or "inspection_report_homeowner" in fn_lower:
-            return f"{prefix}Homeowner_Inspection_Report{ext}"
-        elif "INSPECTION_REPORT" in cat_upper or "inspection_report" in fn_lower:
+        elif "HOMEOWNER" in cat_upper or "HOMEOWNER" in ft_upper or "homeowner" in fn_lower or "inspection_report_homeowner" in fn_lower or "INSPECTION_REPORT" in cat_upper or "inspection_report" in fn_lower:
             return f"{prefix}Homeowner_Inspection_Report{ext}"
         elif "CONTINGENCY" in cat_upper or "contingency" in fn_lower:
             return f"{prefix}Contingency_Agreement{ext}"
@@ -764,7 +762,7 @@ def standardize_vault_filename(job_id: str, filename: str, category: str = "UNSP
     return filename
 
 
-def standardize_existing_job_documents(job_id: str | None = None):
+def standardize_existing_job_documents(job_id: str | None = None) -> None:
     """
     Update existing records in job_documents to use clean, standardized filenames.
     """
@@ -775,7 +773,7 @@ def standardize_existing_job_documents(job_id: str | None = None):
         else:
             docs = conn.execute("SELECT id, job_id, filename, file_type, category FROM job_documents ORDER BY created_at ASC, rowid ASC").fetchall()
         
-        photo_counters = {}
+        photo_counters: dict[str, int] = {}
         for d in docs:
             j_id = d["job_id"]
             cat = (d["category"] or "").upper()
@@ -889,7 +887,7 @@ def get_job_document_by_hash(job_id: str, sha256_hash: str) -> dict | None:
     finally:
         conn.close()
 
-def get_financials(job_id: str) -> Optional[dict]:
+def get_financials(job_id: str) -> dict | None:
     """Fetch the raw financial parameters for a given job."""
     conn = get_connection()
     try:

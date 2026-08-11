@@ -1,7 +1,6 @@
 """
 Climate Lookup utilities for determining regional code requirements.
 """
-from typing import Optional
 
 # Southern/coastal states where ice barriers are definitively NOT required
 # per general historic climate data and IRC R301.2(1) abstractions.
@@ -16,7 +15,7 @@ ICE_BARRIER_REQUIRED = {
     "VT", "WI", "WY"
 }
 
-def is_ice_barrier_required(state: str) -> Optional[bool]:
+def is_ice_barrier_required(state: str) -> bool | None:
     """
     Returns True if an ice barrier is required for the given US state abbreviation.
     Returns False if it is explicitly not required.

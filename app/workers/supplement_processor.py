@@ -2,11 +2,13 @@
 ARQ Worker: Supplement Pipeline orchestrator.
 """
 
-import structlog
 import traceback
+
+import structlog
 from arq.worker import Retry
+
+from app.core.database import JobStatus, get_connection
 from app.core.pipeline import run_supplement_pipeline
-from app.core.database import get_connection, JobStatus
 
 logger = structlog.get_logger("app.workers.supplement_processor")
 
@@ -64,7 +66,6 @@ async def process_supplement_event(
             _update_job_status_internal(conn, job_id, JobStatus.PENDING_OPERATOR_REVIEW, "Supplement drafting failed")
             
             # Insert trace into job_tasks for triage board
-            import uuid
             conn.execute(
                 "INSERT INTO job_tasks (job_id, task_type, phase, last_error) VALUES (?, ?, ?, ?)",
                 (job_id, "SUPPLEMENT_DRAFTING", "GENERATION", error_trace)

@@ -32,7 +32,7 @@ from app.api.auth import get_current_claims, get_current_role, verify_field
 from app.config import FIELD_DOCS_DIR
 from app.core.cache import get_cached_analyses_for_job
 from app.core.climate_lookup import is_ice_barrier_required
-from app.core.database import get_connection, update_job_status
+from app.core.database import get_connection, insert_job_document, update_job_status
 from app.core.inspection_models import InspectionJob, get_stable_photos
 from app.core.notifications import notifier
 from app.core.upload_utils import stream_upload_safely
@@ -596,6 +596,16 @@ async def update_field_claim_info(job_id: str, payload: FieldClaimInfoPayload, c
             adjuster_phone=payload.adjuster_phone,
             adjuster_email=payload.adjuster_email,
         )
+        # Auto-advance to CLAIM_FILED if claim info provided for early stage lead
+        if payload.claim_number or payload.insurer_name:
+            from app.core.database import JobStatus, _fetch_job_sync, update_job_status
+            job = await asyncio.to_thread(_fetch_job_sync, job_id)
+            if job and job.get("status") in (JobStatus.LEAD_CAPTURED, JobStatus.CONTINGENCY_SIGNED):
+                try:
+                    await asyncio.to_thread(update_job_status, job_id, JobStatus.CLAIM_FILED, "Insurance claim info filed by field rep.")
+                except Exception:
+                    pass
+
         return res
     except ValueError as ve:
         raise HTTPException(status_code=404, detail=str(ve))
@@ -618,14 +628,38 @@ async def get_field_inspection_report(job_id: str, claims: dict = Depends(get_cu
         raise HTTPException(status_code=400, detail="Invalid job_id format.")
 
     try:
-        from app.services.pdf.inspection_report import InspectionReportGenerator
-        summary_job = await get_inspection_summary(job_id)
-        
-        if not summary_job.photos:
-            raise HTTPException(status_code=404, detail="No photos uploaded for this job yet.")
+        # Check vault first for an existing Homeowner Inspection Report
+        conn = get_connection()
+        try:
+            existing_doc = conn.execute(
+                "SELECT storage_path FROM job_documents WHERE job_id = ? AND category IN ('HOMEOWNER_INSPECTION_REPORT', 'INSPECTION_REPORT') ORDER BY created_at DESC LIMIT 1",
+                (job_id,)
+            ).fetchone()
+            if existing_doc and Path(existing_doc["storage_path"]).exists():
+                logger.info("field_homeowner_report_retrieved_from_vault", job_id=job_id, path=existing_doc["storage_path"])
+                pdf_path = existing_doc["storage_path"]
+            else:
+                pdf_path = None
+        finally:
+            conn.close()
 
-        report_gen = InspectionReportGenerator()
-        pdf_path = await report_gen.generate_homeowner_report(summary_job)
+        if not pdf_path:
+            from app.services.pdf.inspection_report import InspectionReportGenerator
+            summary_job = await get_inspection_summary(job_id)
+            
+            if not summary_job.photos:
+                raise HTTPException(status_code=404, detail="No photos uploaded for this job yet.")
+
+            report_gen = InspectionReportGenerator()
+            pdf_path = await report_gen.generate_homeowner_report(summary_job)
+            
+            # Vault the document
+            hr_filename = Path(pdf_path).name
+            await asyncio.to_thread(
+                insert_job_document,
+                job_id, hr_filename, "application/pdf",
+                str(pdf_path), None, "field_safe", "HOMEOWNER_INSPECTION_REPORT", True
+            )
         
         filename = Path(pdf_path).name
         return FileResponse(path=pdf_path, filename=filename, media_type="application/pdf")
@@ -975,5 +1009,19 @@ async def download_field_job_document(job_id: str, doc_id: str, claims: dict = D
         )
     finally:
         conn.close()
+
+
+@router.get("/jobs/{job_id}/evidence_grid")
+async def download_field_evidence_grid(job_id: str, claims: dict = Depends(get_current_claims)):
+    """Download the field-safe Inspection Evidence Grid from the field API namespace."""
+    try:
+        job_id = str(uuid.UUID(job_id))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid job_id format.")
+
+    assert_field_rep_owns_job(claims, job_id)
+
+    from app.api.office_routes import download_evidence_grid
+    return await download_evidence_grid(job_id)
 
 

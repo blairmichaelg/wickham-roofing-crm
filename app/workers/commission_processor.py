@@ -14,11 +14,11 @@ Pipeline:
 
 import asyncio
 import hashlib
-import structlog
 from pathlib import Path
-from app.core.database import (
-    get_connection, insert_job_document
-)
+
+import structlog
+
+from app.core.database import get_connection, insert_job_document
 from app.services.pdf import PDFGenerator
 
 logger = structlog.get_logger(

@@ -4,6 +4,7 @@ Migration 0012: Add latitude and longitude columns to storm_events.
 Allows storing exact coordinates for ingested NOAA storm events to compute proximity to jobs.
 """
 import sqlite3
+
 import structlog
 
 logger = structlog.get_logger("app.core.migrations.0012_add_latitude_longitude_to_storm_events")

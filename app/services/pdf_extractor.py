@@ -4,8 +4,8 @@ Uses precise Regex patterns to extract exact metrics for QuickBooks math.
 Raises ValueError immediately if patterns fail due to layout changes.
 """
 
-import re
 import asyncio
+import re
 from pathlib import Path
 
 import pdfplumber

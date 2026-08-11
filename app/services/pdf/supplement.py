@@ -1,27 +1,28 @@
 import asyncio
-import structlog
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame, Paragraph, Spacer, KeepTogether
-from reportlab.platypus.flowables import HRFlowable
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib import colors
-from reportlab.platypus import Table, TableStyle, Image, PageBreak
 import datetime
 import html
-import hashlib
+from pathlib import Path
 from typing import Any
 
-from app.core.supplement_models import DiscrepancyReport, MaterialBOM
-from app.core.inspection_models import InspectionJob
-from pathlib import Path
+import structlog
+from reportlab.lib import colors
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.platypus import (
+    Image,
+    PageBreak,
+    Paragraph,
+    Spacer,
+    Table,
+    TableStyle,
+)
+from reportlab.platypus.flowables import HRFlowable
+
+from app.core.supplement_models import DiscrepancyReport
 
 logger = structlog.get_logger("app.services.pdf")
-from app.services.pdf.constants import COMPANY_NAME, COMPANY_PHONE, COMPANY_EMAIL, FIELD_DOCS_DIR
-
-
-
-
+from app.services.pdf.constants import FIELD_DOCS_DIR
 from app.services.pdf.engine import PDFEngine
+
 
 class SupplementGenerator(PDFEngine):
     async def generate_evidence_grid(self, job: Any, signature_path: str | None = None) -> str:
@@ -93,17 +94,19 @@ class SupplementGenerator(PDFEngine):
         except Exception:
             pass
 
-        # Map cached or default PhotoAnalysis for each photo file
-        from app.core.cache import get_cached_analyses_for_job
-        cached_analyses = get_cached_analyses_for_job(job_id)
-        cached_map = {getattr(a, "filename", ""): a for a in cached_analyses if getattr(a, "filename", None)}
+        # Look up each photo's analysis by its sha256 hash — the actual cache key.
+        # This is the only reliable mapping; filename-based lookup fails because
+        # Gemini may output a different filename than the disk name.
+        from app.core.cache import get_cached_analysis
+        from app.core.inspection_models import _compute_sha256
 
         photo_analysis_pairs = []
-        for idx, pf in enumerate(photo_files):
-            fn = pf.name
-            analysis = cached_map.get(fn)
-            if analysis:
-                setattr(analysis, "filepath", pf)
+        for pf in photo_files:
+            try:
+                sha = _compute_sha256(pf)
+                analysis = get_cached_analysis(job_id, sha)
+            except Exception:
+                analysis = None
             photo_analysis_pairs.append((pf, analysis))
 
         if not signature_path or not Path(signature_path).exists():
@@ -177,7 +180,7 @@ class SupplementGenerator(PDFEngine):
                 ],
                 [
                     Paragraph(f"<b>Claim / Policy #:</b> {claim_num}", body_style),
-                    Paragraph(f"<b>Building Code Standard:</b> 2021 IRC", body_style)
+                    Paragraph("<b>Building Code Standard:</b> 2021 IRC", body_style)
                 ]
             ]
             meta_table = Table(meta_data, colWidths=[270, 250])
@@ -202,8 +205,8 @@ class SupplementGenerator(PDFEngine):
                     photos_on_page = 0
 
                 try:
+
                     from app.workers.inspection_processor import resize_for_pdf
-                    from reportlab.lib.utils import ImageReader
                     
                     safe_image_buffer = resize_for_pdf(photo_path, max_width=800)
                     img = Image(safe_image_buffer, width=275, height=180, kind='proportional')
@@ -226,23 +229,32 @@ class SupplementGenerator(PDFEngine):
                         conf = getattr(analysis, "confidence", None)
                         conf_str = f"{conf * 100:.1f}%" if isinstance(conf, (int, float)) else "Verified"
                         
-                        note_text = (
-                            "<b>Objective Forensic Note:</b> AI Vision analysis detected structural anomaly "
-                            f"({dmg_type}, {severity} severity). Documented for carrier loss adjustment."
-                        )
+                        # Use the AI's forensic narrative if available
+                        raw_narrative = getattr(analysis, "forensic_narrative", None)
+                        alt_explanation = getattr(analysis, "alternative_explanation", None)
+                        if raw_narrative:
+                            note_text = f"<b>AI Forensic Note:</b> {html.escape(raw_narrative)}"
+                            if alt_explanation and conf and conf < 0.9:
+                                note_text += f" <i>Alternative: {html.escape(alt_explanation)}</i>"
+                        else:
+                            note_text = (
+                                "<b>Objective Forensic Note:</b> AI Vision analysis detected structural anomaly "
+                                f"({dmg_type}, {severity} severity). Documented for carrier loss adjustment."
+                            )
                     else:
-                        dmg_det = "Pending Audit"
+                        dmg_det = "Pending Analysis"
                         dmg_type = "Field Inspection Photo"
-                        severity = "Unclassified"
-                        hail = "N/A"
-                        creases = "N/A"
-                        granules = "N/A"
-                        fiberglass = "N/A"
-                        conf_str = "N/A (Recorded)"
+                        severity = "Not Classified"
+                        hail = "—"
+                        creases = "—"
+                        granules = "—"
+                        fiberglass = "—"
+                        conf_str = "Pending"
                         
                         note_text = (
-                            "<b>Objective Forensic Note:</b> Field inspection photo recorded on site during physical property inspection. "
-                            "Ingested into claim file; awaiting automated vision audit."
+                            "<b>Field Photo — Awaiting AI Audit:</b> This photo was captured on-site during the "
+                            f"physical property inspection of {address}. "
+                            "It has been ingested into the claim file and is pending automated vision analysis."
                         )
 
                     data_rows = [
@@ -281,7 +293,7 @@ class SupplementGenerator(PDFEngine):
                     ]))
 
                     info_column = [data_table, Spacer(1, 4), note_table]
-                    fig_title = f"FIGURE {idx + 1}: Inspection Evidence Detail — Photo #{idx + 1}"
+                    fig_title = f"FIGURE {idx + 1}: {photo_path.name}"
 
                     grid_table = Table(
                         [

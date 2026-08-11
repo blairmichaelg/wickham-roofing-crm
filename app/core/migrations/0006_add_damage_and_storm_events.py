@@ -1,4 +1,5 @@
 import sqlite3
+
 import structlog
 
 logger = structlog.get_logger("app.core.migrations.0006_add_damage_and_storm_events")

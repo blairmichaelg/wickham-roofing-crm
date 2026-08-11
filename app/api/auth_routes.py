@@ -7,8 +7,9 @@ Replaces the old token-based backdoors.
 
 from fastapi import APIRouter, Form, Request, Response
 from fastapi.responses import RedirectResponse
-from app.config import get_settings
+
 from app.api.auth import create_access_token
+from app.config import get_settings
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 

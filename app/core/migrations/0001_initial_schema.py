@@ -1,4 +1,5 @@
 import sqlite3
+
 import structlog
 
 logger = structlog.get_logger("app.core.migrations.0001_initial_schema")
@@ -17,7 +18,6 @@ def up(conn: sqlite3.Connection) -> None:
     """
     
     try:
-        pass
         conn.execute('''
             CREATE TABLE IF NOT EXISTS jobs (
                 id TEXT PRIMARY KEY,
