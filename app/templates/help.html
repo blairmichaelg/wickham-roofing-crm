@@ -7,18 +7,38 @@
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-900 text-gray-100 h-screen flex flex-col overflow-y-auto font-sans">
-    <div class="p-6 border-b border-gray-800 flex justify-between items-center bg-gray-900">
-        <div class="flex items-center">
+    <div class="p-6 border-b border-gray-800 flex flex-col md:flex-row justify-between items-center bg-gray-900 gap-4">
+        <div class="flex items-center gap-4">
             <h1 class="text-2xl font-bold text-white tracking-wide">Help & User Guides</h1>
         </div>
+        <!-- Tab Bar -->
+        <div class="flex flex-wrap gap-2" id="tab-container">
+            {% if role in ['admin', 'accounting', 'operations'] %}
+                <button onclick="switchTab('admin')" id="tab-btn-admin" class="px-3 py-1.5 rounded text-sm font-semibold transition-all border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500">Admin Guide</button>
+                <button onclick="switchTab('accounting')" id="tab-btn-accounting" class="px-3 py-1.5 rounded text-sm font-semibold transition-all border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500">Accounting Guide</button>
+                <button onclick="switchTab('debi')" id="tab-btn-debi" class="px-3 py-1.5 rounded text-sm font-semibold transition-all border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500">Debi's Onboarding</button>
+                <button onclick="switchTab('operations')" id="tab-btn-operations" class="px-3 py-1.5 rounded text-sm font-semibold transition-all border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500">Operations Guide</button>
+            {% endif %}
+            <button onclick="switchTab('field')" id="tab-btn-field" class="px-3 py-1.5 rounded text-sm font-semibold transition-all border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500">Field Guide</button>
+            <button onclick="switchTab('runbook')" id="tab-btn-runbook" class="px-3 py-1.5 rounded text-sm font-semibold transition-all border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500">Field Runbook</button>
+        </div>
         <div class="flex items-center gap-4">
+            {% if role == 'admin' %}
+                <a href="/admin" class="text-blue-400 hover:underline text-sm font-semibold mr-2">Back to Dashboard</a>
+            {% elif role == 'accounting' %}
+                <a href="/accounting" class="text-blue-400 hover:underline text-sm font-semibold mr-2">Back to Dashboard</a>
+            {% elif role == 'operations' %}
+                <a href="/api/operations/board" class="text-blue-400 hover:underline text-sm font-semibold mr-2">Back to Dashboard</a>
+            {% else %}
+                <a href="/field" class="text-blue-400 hover:underline text-sm font-semibold mr-2">Back to Dashboard</a>
+            {% endif %}
             <a href="/auth/logout" class="text-gray-400 hover:text-white px-4 py-2 border border-gray-700 rounded transition-colors">Logout</a>
         </div>
     </div>
     
     <div class="p-8 max-w-4xl mx-auto w-full">
-{% if role == 'admin' %}
-<div class="mb-12 bg-gray-800 p-8 rounded-lg shadow-lg border border-gray-700">
+{% if role in ['admin', 'accounting', 'operations'] %}
+<div id="content-admin" class="hidden mb-12 bg-gray-800 p-8 rounded-lg shadow-lg border border-gray-700">
 <h2 class="text-2xl font-black mt-8 mb-4 border-b border-gray-700 pb-2">Wickham Roofing — Admin (Tech Admin) Guide</h2>
 <strong>Wickham Roofing CRM v4 · Admin Role</strong>
 <p class="mb-4">This guide covers the full Admin workflow: the pipeline dashboard,
@@ -241,6 +261,21 @@ triggered along the way (notifications, document generation, etc.) will
 not happen automatically. Use this sparingly and document your reasoning
 clearly every time.</p>
 <p class="mb-4">---</p>
+<h3 class="text-xl font-bold mt-6 mb-3 text-blue-400">9. AI Ingestion Safety & Math Verification Protocols</h3>
+<p class="mb-4">To guarantee total data integrity, the system implements strict boundaries on Gemini's AI integration:</p>
+<ul class="list-disc pl-5 mb-4 space-y-1">
+  <li><strong>The "No-Math" Directive</strong>: Prompt templates command the model to only locate and transcribe raw text from documents. The AI is explicitly forbidden from calculating totals, adding/subtracting line items, or estimating measurements.</li>
+  <li><strong>Deterministic Verification Gate</strong>: All mathematical and geometric checks are coded in Python Pydantic validators.
+    <ul class="list-disc pl-5 mt-2 space-y-1">
+      <li><em>Financial Verification</em>: Validates that <code>gross_rcv - depreciation - deductible == net_claim</code> (within $0.05 tolerance).</li>
+      <li><em>Line Item Verification</em>: Validates that <code>claimed_rcv - depreciation == acv</code> (within $0.02 tolerance).</li>
+      <li><em>Geometric Verification</em>: Validates that all roof measurements (squares, rakes, eaves, ridges) are non-negative.</li>
+      <li><em>Visual Forensics Bounds</em>: Validates that damage confidence scores in PhotoAnalysis are strictly between 0 and 1.</li>
+    </ul>
+  </li>
+</ul>
+<p class="mb-4">If any validation fails, the system blocks the ingestion pipeline, preventing bad math or hallucinated totals from polluting the database. These jobs are routed to Triage for human review.</p>
+<p class="mb-4">---</p>
 <h3 class="text-xl font-bold mt-6 mb-3 text-blue-400">FAQ</h3>
 <strong>Q: A job is stuck in PENDING_OPERATOR_REVIEW. What do I do?</strong>
 Go to <strong>⚠ Triage</strong>, find the job, enter the missing measurement values
@@ -284,10 +319,7 @@ is field reps/canvassers, who can only see `field_safe` documents.</p>
 statuses, buttons, or workflows are added in future updates, this guide
 should be reviewed and updated to match.*</p>
 </div>
-<div class="mt-8 text-center"><a href="/admin" class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-colors text-lg">Back to Dashboard</a></div>
-{% endif %}
-{% if role == 'accounting' %}
-<div class="mb-12 bg-gray-800 p-8 rounded-lg shadow-lg border border-gray-700">
+<div id="content-accounting" class="hidden mb-12 bg-gray-800 p-8 rounded-lg shadow-lg border border-gray-700">
 <h2 class="text-2xl font-black mt-8 mb-4 border-b border-gray-700 pb-2">Wickham Roofing — Accounting Guide</h2>
 <strong>Wickham Roofing CRM v4 · Accounting Role</strong>
 <p class="mb-4">Welcome to the Wickham Roofing Accounting system! This guide explains how to use your Accounting Ledger. Your main tasks here are tracking checks (both ACV and Supplement) with real dollar amounts, managing canvasser commissions, exporting invoices to QuickBooks Online, and reviewing job details.</p>
@@ -358,6 +390,13 @@ When you are ready to pay a rep, click <strong>"Download PDF"</strong> next to t
 <p class="mb-4"><h4 class="text-lg font-bold mt-4 mb-2">Duplicate Export Protection</h4>
 Once a job is exported, the system permanently marks it as exported. It will <strong>never</strong> appear in future export batches, so you don't have to worry about accidentally double-billing a customer in QuickBooks.</p>
 <p class="mb-4">---</p>
+<h3 class="text-xl font-bold mt-6 mb-3 text-blue-400">5b. Financial Data Integrity & AI Ingestion Safety</h3>
+<p class="mb-4">To protect financial records and prevent accounting errors, the system implements a strict boundary between AI data location and deterministic financial mathematics:</p>
+<ul class="list-disc pl-5 mb-4 space-y-1">
+  <li><strong>Zero-Math AI Ingestion</strong>: The AI model is strictly prohibited from performing any arithmetic calculations, rounding, or estimating totals. It functions purely as a locator to pull raw data (e.g. Gross RCV, Depreciation, Deductible, Net Claim) from carrier PDFs.</li>
+  <li><strong>Python-Side Verification Gate</strong>: Once raw values are extracted, the CRM's Python backend performs all mathematical operations. The system enforces the fundamental financial balance: <code>Gross RCV - Total Depreciation - Deductible == Net Claim</code> (within a maximum rounding tolerance of $0.05). If the carrier's document contains mathematical discrepancies that violate this balance, the ingestion pipeline blocks the job and flags it for operator triage. This ensures that only mathematically validated financials are entered into the ledger.</li>
+</ul>
+<p class="mb-4">---</p>
 <h3 class="text-xl font-bold mt-6 mb-3 text-blue-400">6. System Permissions & Boundaries</h3>
 <p class="mb-4">To keep the system organized, certain tools are restricted based on your role.</p>
 <strong>Things you cannot do in the system:</strong>
@@ -382,7 +421,7 @@ Yes! Click the <strong>"View Details →"</strong> link on any job row. You will
 <p class="mb-4">---</p>
 <em>This guide reflects the latest production features for the Wickham Roofing Wickham Roofing CRM.</em>
 </div>
-<div class="mb-12 bg-gray-800 p-8 rounded-lg shadow-lg border border-gray-700">
+<div id="content-debi" class="hidden mb-12 bg-gray-800 p-8 rounded-lg shadow-lg border border-gray-700">
 <h2 class="text-2xl font-black mt-8 mb-4 border-b border-gray-700 pb-2">Wickham Roofing — Debi's Onboarding Guide (Accounting)</h2>
 <p class="mb-4">Welcome to the Wickham Roofing Wickham Roofing CRM v4!</p>
 <p class="mb-4">As the Accounting Lead, you have a critical role in tracking ACV/Supplement checks, managing canvasser commissions, and exporting invoices to QuickBooks Online. This guide contains everything you need to get started immediately.</p>
@@ -415,10 +454,7 @@ While you don't have access to the Admin controls or Operations scheduling, you 
 If you get a network error during export or see anything strange with the commission calculations, please reach out to Michael or the Tech Admin immediately. The server runs autonomously 24/7 on the Wickham Roofing CRM.</p>
 <p class="mb-4">Welcome aboard!</p>
 </div>
-<div class="mt-8 text-center"><a href="/accounting" class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-colors text-lg">Back to Dashboard</a></div>
-{% endif %}
-{% if role == 'operations' %}
-<div class="mb-12 bg-gray-800 p-8 rounded-lg shadow-lg border border-gray-700">
+<div id="content-operations" class="hidden mb-12 bg-gray-800 p-8 rounded-lg shadow-lg border border-gray-700">
 <h2 class="text-2xl font-black mt-8 mb-4 border-b border-gray-700 pb-2">Wickham Roofing — Operations Guide</h2>
 <strong>Wickham Roofing CRM v4 · Operations Role (Scott)</strong>
 <p class="mb-4">This guide covers the Operations Command board: tracking material
@@ -501,6 +537,13 @@ typos before committing.</p>
 <p class="mb-4">If something goes wrong, you'll see a popup: <em></em>"Error scheduling
 crew."<em></em> Double-check the crew name and date, then try again.</p>
 <p class="mb-4">---</p>
+<h3 class="text-xl font-bold mt-6 mb-3 text-blue-400">5b. Material & Geometry Data Integrity</h3>
+<p class="mb-4">To prevent construction errors and material ordering mistakes, the CRM performs strict, automated verification on all measurement data and material properties:</p>
+<ul class="list-disc pl-5 mb-4 space-y-1">
+  <li><strong>Geometry Non-Negativity Checks</strong>: All physical dimensions (squares, rakes, eaves, valleys) are strictly validated to be non-negative values. If a negative value is detected during parsing or triage, the system blocks the ingestion process to prevent downstream ordering errors.</li>
+  <li><strong>Zero-Math AI Ingestion</strong>: The system forces the AI to only locate and extract written text from PDF reports, preventing the AI from trying to compute or estimate physical counts itself. All materials calculations, waste factors, and bill of materials (BOM) logic are handled deterministically by the Python backend.</li>
+</ul>
+<p class="mb-4">---</p>
 <h3 class="text-xl font-bold mt-6 mb-3 text-blue-400">6. What You Cannot Do (By Design)</h3>
 <p class="mb-4">For security and role isolation, your access is intentionally limited:</p>
 <ul class="list-disc pl-5 mb-4 space-y-1"><li>You cannot access the Admin control panel, Triage, or the Emergency</li></ul>
@@ -548,10 +591,9 @@ already confirmed with a mistake, contact the Tech Admin to correct it.</p>
 If new panels, buttons, or workflows are added in future updates, this
 guide should be reviewed and updated to match.*</p>
 </div>
-<div class="mt-8 text-center"><a href="/api/operations/board" class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-colors text-lg">Back to Dashboard</a></div>
 {% endif %}
-{% if role == 'field' %}
-<div class="mb-12 bg-gray-800 p-8 rounded-lg shadow-lg border border-gray-700">
+
+<div id="content-field" class="hidden mb-12 bg-gray-800 p-8 rounded-lg shadow-lg border border-gray-700">
 <h2 class="text-2xl font-black mt-8 mb-4 border-b border-gray-700 pb-2">Wickham Roofing — Canvasser & Field Rep Guide</h2>
 <strong>Wickham Roofing CRM v4 · Field Role</strong>
 <p class="mb-4">This guide covers everything a canvasser or field sales rep needs to know
@@ -758,6 +800,14 @@ still waiting to reach the office.</p>
 | Red "FAILED — contact office" badge | An item is permanently stuck and needs help | Contact the office with the job details |
 | "Offline Mode: Lead, photos, and signature saved locally." | You were offline when you submitted | No action needed — it will sync when connected |</p>
 <p class="mb-4">---</p>
+<h3 class="text-xl font-bold mt-6 mb-3 text-blue-400">10b. Image Analysis & Structured Forensic Flags</h3>
+<p class="mb-4">To assist you in presenting storm findings to homeowners and carriers, the app processes your uploaded job photos using Gemini's advanced multimodal vision model:</p>
+<ul class="list-disc pl-5 mb-4 space-y-1">
+  <li><strong>No-Math Photo Auditing</strong>: The AI analysis focuses strictly on locating and identifying physical damage indicators. The model detects and logs forensic flags such as hail impact marks, wind crease marks, granule loss, and exposed fiberglass.</li>
+  <li><strong>Automated Evidence Grid</strong>: These forensic flags and narratives populate the Evidence Grid PDF that you can use to prove storm damage to homeowners and adjusters. The AI does not compute any pricing or material costs; those are calculated mathematically by the system.</li>
+  <li><strong>Image Bounds Check</strong>: The confidence score assigned to each detected damage classification is validated to be strictly between 0% and 100%, rejecting any out-of-bounds or non-deterministic AI behavior.</li>
+</ul>
+<p class="mb-4">---</p>
 <h3 class="text-xl font-bold mt-6 mb-3 text-blue-400">11. What You Cannot Do (By Design)</h3>
 <p class="mb-4">For security, the field app strictly limits what canvassers can access:
 <ul class="list-disc pl-5 mb-4 space-y-1"><li>You cannot see or open jobs that aren't yours. The system checks your</li></ul>
@@ -827,7 +877,7 @@ Contact the office/Tech Admin if:
 screens, buttons, or error messages change in a future update, this
 guide should be reviewed and updated to match.*</p>
 </div>
-<div class="mb-12 bg-gray-800 p-8 rounded-lg shadow-lg border border-gray-700">
+<div id="content-runbook" class="hidden mb-12 bg-gray-800 p-8 rounded-lg shadow-lg border border-gray-700">
 <h2 class="text-2xl font-black mt-8 mb-4 border-b border-gray-700 pb-2">Wickham Roofing V4 "Wickham Roofing CRM" - Field Runbook</h2>
 <p class="mb-4">This runbook provides emergency operational procedures for Scott during the first live dry run. If the V4 CRM behaves unexpectedly, execute the diagnostics below before escalating.</p>
 <p class="mb-4"><h3 class="text-xl font-bold mt-6 mb-3 text-blue-400">1. If the Upload Hangs (Mobile Field App)</h3>
@@ -864,8 +914,50 @@ guide should be reviewed and updated to match.*</p>
 <blockquote class="border-l-4 border-yellow-500 pl-4 py-2 my-4 bg-gray-800 italic">[!CAUTION]
 Never manually edit the `data/wickham.db` SQLite file with external viewers (like DBeaver) while Uvicorn is running. The Write-Ahead Log (WAL) mode requires FastAPI to maintain the file lock. Use `recover_job.py` instead.</blockquote>
 </div>
-<div class="mt-8 text-center"><a href="/field" class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-colors text-lg">Back to Dashboard</a></div>
-{% endif %}
+
+<script>
+    const userRole = "{{ role }}";
+    function switchTab(tabName) {
+        // All potential tabs
+        const allTabs = ['admin', 'accounting', 'debi', 'operations', 'field', 'runbook'];
+        
+        allTabs.forEach(name => {
+            const el = document.getElementById('content-' + name);
+            if (el) el.classList.add('hidden');
+            
+            const btn = document.getElementById('tab-btn-' + name);
+            if (btn) {
+                btn.classList.remove('bg-blue-600', 'text-white', 'border-blue-500');
+                btn.classList.add('text-gray-400', 'border-gray-700');
+            }
+        });
+        
+        // Show active content and set button styles
+        const activeEl = document.getElementById('content-' + tabName);
+        if (activeEl) activeEl.classList.remove('hidden');
+        
+        const activeBtn = document.getElementById('tab-btn-' + tabName);
+        if (activeBtn) {
+            activeBtn.classList.remove('text-gray-400', 'border-gray-700');
+            activeBtn.classList.add('bg-blue-600', 'text-white', 'border-blue-500');
+        }
+    }
+    
+    // Auto-select tab on load based on active role
+    window.addEventListener('DOMContentLoaded', () => {
+        if (userRole === 'admin') {
+            switchTab('admin');
+        } else if (userRole === 'accounting') {
+            switchTab('accounting');
+        } else if (userRole === 'operations') {
+            switchTab('operations');
+        } else if (userRole === 'field') {
+            switchTab('field');
+        } else {
+            switchTab('field');
+        }
+    });
+</script>
 
     </div>
 </body>

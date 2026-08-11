@@ -44,7 +44,7 @@ This runbook provides emergency operational procedures for Scott during the firs
   3. Refresh the office dashboard. The job will now be unlocked.
 
 > [!CAUTION]
-> Never manually edit the `data/truck_server.db` SQLite file with external viewers (like DBeaver) while Uvicorn is running. The Write-Ahead Log (WAL) mode requires FastAPI to maintain the file lock. Use `recover_job.py` instead.
+> Never manually edit the `data/wickham.db` SQLite file with external viewers (like DBeaver) while Uvicorn is running. The Write-Ahead Log (WAL) mode requires FastAPI to maintain the file lock. Use `recover_job.py` instead.
 
 ## 5. Naked Lead / Resume & Sign Issues (v2.0.0+)
 
