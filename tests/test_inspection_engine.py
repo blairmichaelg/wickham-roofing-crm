@@ -221,7 +221,7 @@ class TestInspectionProcessor:
     @patch("app.workers.inspection_processor.asyncio.sleep")
     @patch("app.workers.inspection_processor.get_ai_client")
     def test_full_lifecycle(self, mock_ai_class, mock_sleep, mock_get_cache, mock_set_cache, tmp_path, sample_analysis):
-        """Verify upload → poll → analyze → delete lifecycle for each photo."""
+        """Verify get_cache -> analyze_roof_photos_batch -> set_cache lifecycle for each photo."""
         mock_get_cache.return_value = None
         
         # Create a real image file
@@ -232,17 +232,9 @@ class TestInspectionProcessor:
         mock_ai = MagicMock()
         mock_ai_class.return_value = mock_ai
 
-        # Mock upload
-        mock_uploaded = MagicMock()
-        mock_uploaded.name = "files/test123"
-        mock_ai.upload_media_file = AsyncMock(return_value='files/test123')
-        mock_ai.delete_file = AsyncMock()
-        mock_ai.get_file_status = AsyncMock(return_value='ACTIVE')
-
         # Mock analysis
         sample_analysis.filename = "photo1.jpg"
         mock_ai.analyze_roof_photos_batch = AsyncMock(return_value=[sample_analysis])
-        mock_ai.analyze_roof_photo = AsyncMock(return_value=sample_analysis)
 
         job = InspectionJob(
             job_id="WR-TEST-001",
@@ -258,11 +250,8 @@ class TestInspectionProcessor:
 
         # Verify lifecycle
         mock_get_cache.assert_called_once_with("WR-TEST-001", "fake_hash")
-        mock_ai.upload_media_file.assert_called_once()
-        mock_ai.get_file_status.assert_called_with('files/test123')
         mock_ai.analyze_roof_photos_batch.assert_called_once()
         mock_set_cache.assert_called_once()
-        mock_ai.delete_file.assert_called_once_with('files/test123')
 
         assert len(result.analyses) == 1
         assert result.analyses[0].damage_detected is True
@@ -272,7 +261,7 @@ class TestInspectionProcessor:
     @patch("app.workers.inspection_processor.asyncio.sleep")
     @patch("app.workers.inspection_processor.get_ai_client")
     def test_failed_processing_skips_photo(self, mock_ai_class, mock_sleep, mock_get_cache, mock_set_cache, tmp_path):
-        """Photos that fail server-side processing should be skipped, not crash."""
+        """Photos that fail batch analysis or return empty results should be skipped, not crash."""
         mock_get_cache.return_value = None
         
         img_path = tmp_path / "bad_photo.jpg"
@@ -280,12 +269,7 @@ class TestInspectionProcessor:
 
         mock_ai = MagicMock()
         mock_ai_class.return_value = mock_ai
-
-        mock_uploaded = MagicMock()
-        mock_uploaded.name = "files/bad"
-        mock_ai.upload_media_file = AsyncMock(return_value='files/bad')
-        mock_ai.delete_file = AsyncMock()
-        mock_ai.get_file_status = AsyncMock(return_value='FAILED')
+        mock_ai.analyze_roof_photos_batch = AsyncMock(return_value=[])
 
         job = InspectionJob(
             job_id="WR-TEST-002",
@@ -300,8 +284,6 @@ class TestInspectionProcessor:
             result = asyncio.run(process_inspection({"is_test": True}, "WR-TEST-002"))
 
         assert len(result.analyses) == 0
-        # Cleanup should still happen
-        mock_ai.delete_file.assert_called_once_with('files/bad')
         mock_set_cache.assert_not_called()
 
     @patch("app.workers.inspection_processor.set_cached_analysis")
@@ -320,10 +302,6 @@ class TestInspectionProcessor:
 
         mock_ai = MagicMock()
         mock_ai_class.return_value = mock_ai
-
-        mock_ai.upload_media_file = AsyncMock(side_effect=['files/test0', 'files/test1', 'files/test2'])
-        mock_ai.delete_file = AsyncMock()
-        mock_ai.get_file_status = AsyncMock(return_value='ACTIVE')
 
         # Mock batch analysis
         analysis0 = sample_analysis.model_copy(update={"filename": "photo_0.jpg"})
@@ -344,8 +322,6 @@ class TestInspectionProcessor:
             result = asyncio.run(process_inspection({"is_test": True}, "WR-TEST-003"))
 
         assert len(result.analyses) == 3
-        assert mock_ai.upload_media_file.call_count == 3
-        assert mock_ai.delete_file.call_count == 3
         assert mock_set_cache.call_count == 3
         mock_ai.analyze_roof_photos_batch.assert_called_once()
 
@@ -354,7 +330,7 @@ class TestInspectionProcessor:
     @patch("app.workers.inspection_processor.asyncio.sleep")
     @patch("app.workers.inspection_processor.get_ai_client")
     def test_cleanup_runs_on_analysis_error(self, mock_ai_class, mock_sleep, mock_get_cache, mock_set_cache, tmp_path):
-        """Remote file should be deleted even if analysis throws an exception."""
+        """Processor should survive analysis throwing an exception and complete successfully."""
         mock_get_cache.return_value = None
         
         img_path = tmp_path / "error_photo.jpg"
@@ -363,13 +339,8 @@ class TestInspectionProcessor:
         mock_ai = MagicMock()
         mock_ai_class.return_value = mock_ai
 
-        mock_ai.upload_media_file = AsyncMock(return_value='files/test123')
-        mock_ai.delete_file = AsyncMock()
-        mock_ai.get_file_status = AsyncMock(return_value='ACTIVE')
-
-        # Mock batch to raise error, which triggers sequential fallback, which also raises error
+        # Mock batch to raise error
         mock_ai.analyze_roof_photos_batch = AsyncMock(side_effect=RuntimeError("Rate limit exhausted"))
-        mock_ai.analyze_roof_photo = AsyncMock(side_effect=RuntimeError("Rate limit exhausted"))
 
         job = InspectionJob(
             job_id="WR-TEST-004",
@@ -384,8 +355,6 @@ class TestInspectionProcessor:
             result = asyncio.run(process_inspection({"is_test": True}, "WR-TEST-004"))
 
         assert len(result.analyses) == 0
-        # Cleanup must still happen despite the error
-        assert mock_ai.delete_file.call_count >= 1
         mock_set_cache.assert_not_called()
 
     @patch("app.workers.inspection_processor.get_cached_analysis")
@@ -416,7 +385,7 @@ class TestInspectionProcessor:
         assert result.analyses[0] == sample_analysis
         
         # Verify API was bypassed entirely
-        mock_ai.upload_media_file.assert_not_called()
+        mock_ai.analyze_roof_photos_batch.assert_not_called()
 
 
 # ── Image Resizer Tests ───────────────────────────────────────────────────────

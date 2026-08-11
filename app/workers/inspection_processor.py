@@ -143,70 +143,38 @@ async def process_inspection(ctx: dict, job_id: str) -> InspectionJob:
         if non_cached_photos:
             log.info("batch_processing_non_cached_photos", count=len(non_cached_photos))
             
-            uploaded_names = []
             ai_file_paths = []
-            uploaded_to_photo = {}
-            photo_to_temp = {}
-            
             try:
-                # 1. Rescale and upload each photo
+                # 1. Rescale photos locally
                 for photo in non_cached_photos:
                     log.debug("downscaling_for_ai", photo=photo.filepath.name)
                     ai_file_path = await asyncio.to_thread(resize_for_ai, photo.filepath, max_width=1600)
                     ai_file_paths.append(ai_file_path)
-                    photo_to_temp[photo.sha256] = ai_file_path
-                    
-                    uploaded_name = await ai.upload_media_file(ai_file_path)
-                    assert uploaded_name is not None
-                    uploaded_names.append(uploaded_name)
-                    uploaded_to_photo[uploaded_name] = photo
-                    log.debug("photo_uploaded", photo=photo.filepath.name, remote_name=uploaded_name)
-                    
-                # 2. Poll until all uploads complete processing
-                valid_uploaded_names = []
-                valid_photos = []
-                for uploaded_name in uploaded_names:
-                    photo = uploaded_to_photo[uploaded_name]
-                    file_status = await ai.get_file_status(uploaded_name)
-                    while file_status == "PROCESSING":
-                        await asyncio.sleep(2)
-                        file_status = await ai.get_file_status(uploaded_name)
-                    if file_status == "FAILED":
-                        log.error("photo_processing_failed_on_server", photo=photo.filepath.name)
-                        try:
-                            await ai.delete_file(uploaded_name)
-                        except Exception:
-                            pass
-                        if uploaded_name in uploaded_names:
-                            uploaded_names.remove(uploaded_name)
-                        temp_path = photo_to_temp.get(photo.sha256)
-                        if temp_path:
-                            try:
-                                Path(temp_path).unlink(missing_ok=True)
-                            except Exception:
-                                pass
-                    else:
-                        valid_uploaded_names.append(uploaded_name)
-                        valid_photos.append(photo)
-
-                if not valid_uploaded_names:
-                    log.info("no_valid_photos_to_analyze")
-                    return job
-
-                # 3. Call batch analysis
-                log.info("calling_batch_photo_analysis", count=len(valid_uploaded_names))
+                
+                # 2. Call batch analysis
+                log.info("calling_batch_photo_analysis", count=len(ai_file_paths))
                 batch_analyses = await ai.analyze_roof_photos_batch(
-                    file_names=valid_uploaded_names,
-                    original_filenames=[p.filepath.name for p in valid_photos],
+                    file_paths=ai_file_paths,
+                    original_filenames=[p.filepath.name for p in non_cached_photos],
                     job_id=job.job_id
                 )
                 
-                # 4. Map results and cache
+                # 3. Map results and cache
                 analysis_by_filename = {a.filename: a for a in batch_analyses}
-                for photo in valid_photos:
+                for photo in non_cached_photos:
                     analysis = analysis_by_filename.get(photo.filepath.name)
                     if not analysis:
-                        raise ValueError(f"Batch analysis did not return result for {photo.filepath.name}")
+                        log.warning("batch_analysis_filename_mismatch", expected=photo.filepath.name)
+                        try:
+                            idx = non_cached_photos.index(photo)
+                            if idx < len(batch_analyses):
+                                analysis = batch_analyses[idx]
+                        except Exception:
+                            pass
+                    
+                    if not analysis:
+                        log.error("photo_analysis_result_missing", photo=photo.filepath.name)
+                        continue
                     
                     analysis.filename = photo.filepath.name
                     job.analyses.append(analysis)
@@ -218,66 +186,9 @@ async def process_inspection(ctx: dict, job_id: str) -> InspectionJob:
                         severity=analysis.severity.value,
                         confidence=analysis.confidence,
                     )
-                    
             except Exception as batch_err:
-                log.warning("batch_analysis_failed_falling_back_to_sequential", error=str(batch_err))
-                # Cleanup batch artifacts before sequential fallback if any files uploaded
-                for name in uploaded_names:
-                    try:
-                        await ai.delete_file(name)
-                    except Exception:
-                        pass
-                uploaded_names.clear()
-                uploaded_to_photo.clear()
-                
-                # Sequential Fallback:
-                for photo in non_cached_photos:
-                    photo_log = log.bind(photo=photo.filepath.name)
-                    photo_log.info("sequential_fallback_photo_started")
-                    
-                    uploaded_name = None
-                    ai_file_path = photo_to_temp.get(photo.sha256)
-                    try:
-                        if not ai_file_path:
-                            ai_file_path = await asyncio.to_thread(resize_for_ai, photo.filepath, max_width=1600)
-                            ai_file_paths.append(ai_file_path)
-                            photo_to_temp[photo.sha256] = ai_file_path
-                            
-                        uploaded_name = await ai.upload_media_file(ai_file_path)
-                        file_status = await ai.get_file_status(uploaded_name)
-                        while file_status == "PROCESSING":
-                            await asyncio.sleep(2)
-                            file_status = await ai.get_file_status(uploaded_name)
-                        if file_status == "FAILED":
-                            photo_log.error("photo_processing_failed_on_server")
-                            continue
-                            
-                        analysis = await ai.analyze_roof_photo(uploaded_name, photo.filepath.name, job.job_id)
-                        analysis.filename = photo.filepath.name
-                        job.analyses.append(analysis)
-                        await asyncio.to_thread(set_cached_analysis, job.job_id, photo.sha256, analysis)
-                        
-                        photo_log.info(
-                            "photo_analysis_complete_sequential",
-                            damage=analysis.damage_detected,
-                            severity=analysis.severity.value,
-                            confidence=analysis.confidence,
-                        )
-                    except Exception as seq_err:
-                        photo_log.error("photo_analysis_sequential_error", error=str(seq_err))
-                    finally:
-                        if uploaded_name:
-                            try:
-                                await ai.delete_file(uploaded_name)
-                            except Exception:
-                                pass
+                log.error("batch_photo_analysis_failed", error=str(batch_err))
             finally:
-                # Cleanup remote and local files for the batch path
-                for name in uploaded_names:
-                    try:
-                        await ai.delete_file(name)
-                    except Exception:
-                        pass
                 for path in ai_file_paths:
                     try:
                         Path(path).unlink(missing_ok=True)

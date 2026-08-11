@@ -19,7 +19,8 @@ import asyncio
 import json
 import random
 import time
-from typing import Literal
+from pathlib import Path
+from typing import Literal, Any
 
 import structlog
 from google import genai
@@ -60,19 +61,19 @@ class AiClient(ABC):
     async def analyze_job_data(self, payload: dict) -> dict: ...
     
     @abstractmethod
-    async def classify_carrier(self, file_name: str, job_id: str | None = None) -> str: ...
+    async def classify_carrier(self, file_name_or_part: str | genai_types.Part, job_id: str | None = None) -> str: ...
 
     @abstractmethod
-    async def extract_sol_from_pdf(self, pdf_path: str, job_id: str | None = None) -> StatementOfLoss: ...
+    async def extract_sol_from_pdf(self, pdf_path: str | Path, job_id: str | None = None) -> StatementOfLoss: ...
 
     @abstractmethod
     async def generate_supplement_narrative(self, report: DiscrepancyReport, codes: str) -> str: ...
     
     @abstractmethod
-    async def analyze_roof_photo(self, file_name: str, original_filename: str, job_id: str | None = None) -> PhotoAnalysis: ...
+    async def analyze_roof_photo(self, file_path: str | Path, original_filename: str | None = None, job_id: str | None = None) -> PhotoAnalysis: ...
     
     @abstractmethod
-    async def analyze_roof_photos_batch(self, file_names: list[str], original_filenames: list[str], job_id: str | None = None) -> list[PhotoAnalysis]: ...
+    async def analyze_roof_photos_batch(self, file_paths: list[str | Path], original_filenames: list[str] | None = None, job_id: str | None = None) -> list[PhotoAnalysis]: ...
 
     @abstractmethod
     async def generate_text(self, system_prompt: str, user_prompt: str, job_id: str | None = None, operation_type: str = "generate_text") -> str: ...
@@ -118,6 +119,13 @@ class GeminiClient(AiClient):
         self.client = genai.Client(api_key=self.settings.gemini_api_key)
         self.model_name = "gemini-2.5-flash"
         logger.info("ai_service_initialized", model=self.model_name)
+
+    def _get_file_size_and_bytes(self, file_path: str | Path) -> tuple[int, bytes]:
+        p = Path(file_path)
+        if not p.exists():
+            raise FileNotFoundError(f"File not found: {p}")
+        data = p.read_bytes()
+        return len(data), data
 
     async def upload_media_file(self, file_path: str) -> str:
         uploaded_file = await asyncio.to_thread(self._call_with_backoff, self.client.files.upload, file=file_path)
@@ -258,7 +266,7 @@ Rules:
                 "document_data": {},
             }
 
-    async def classify_carrier(self, file_name: str, job_id: str | None = None) -> str:
+    async def classify_carrier(self, file_name_or_part: str | genai_types.Part, job_id: str | None = None) -> str:
         """
         Classify the carrier estimating software from the PDF.
         """
@@ -267,13 +275,17 @@ Rules:
             "Return ONLY a single string: 'xactimate', 'symbility', or 'unknown'."
         )
         
-        file_info = await asyncio.to_thread(self._call_with_backoff, self.client.files.get, name=file_name)
+        if isinstance(file_name_or_part, str):
+            file_info = await asyncio.to_thread(self._call_with_backoff, self.client.files.get, name=file_name_or_part)
+            content_part = file_info
+        else:
+            content_part = file_name_or_part
         
         response = await asyncio.to_thread(
             self._call_with_backoff,
             self.client.models.generate_content,
             model=self.model_name,
-            contents=[file_info, prompt],
+            contents=[content_part, prompt],
             config=genai_types.GenerateContentConfig(
                 response_mime_type="text/plain",
                 temperature=0.0,
@@ -287,118 +299,159 @@ Rules:
             return result
         return "unknown"
 
-    async def extract_sol_from_pdf(self, pdf_path: str, job_id: str | None = None) -> StatementOfLoss:
+    def _get_sol_prompt(self, source_system: str) -> str:
+        if source_system == "xactimate":
+            return """
+            You are an expert Xactimate estimator. Analyze this Statement of Loss (SoL) document.
+            Extract ONLY the line items located under the "Roof" grouping (ignore any other rooms, general demolition, or recap tables).
+            Pay special attention to descriptions that wrap across multiple lines (e.g., "Remove 3 tab 25 yr. composition shingle roofing - incl. felt").
+            If a quantity, unit of measure, or price is blank or missing, you MUST return null, not guess or hallucinate.
+            DO NOT infer or calculate quantities. Extract the exact numerical value printed in the quantity column.
+            If Overhead and Profit (O&P) is not explicitly listed in the summaries, set overhead_and_profit_included to false.
+            
+            Also extract:
+            - claim_number and carrier_name.
+            - For each line item: trade, code, description, quantity, unit_of_measure, unit_price, tax, claimed_rcv, depreciation, acv, page.
+            - Roof geometry: pitch, total_squares, eaves_lf, valleys_lf, rakes_lf.
+            - Shingle details: shingle_type (e.g. "3-tab", "architectural", "laminated", "wood", etc.) and shingle_color (e.g. "Charcoal", "Weathered Wood", "Slate", etc.) if mentioned in the line items, material specifications, or document notes.
+            - Claim financials: gross_rcv, total_depreciation, deductible, net_claim.
+            """
+        elif source_system == "symbility":
+            return """
+            You are an expert Symbility estimator. Analyze this Statement of Loss (SoL) document.
+            Extract ONLY the line items located under the "Roof" grouping.
+            Symbility formats line items differently. Explicitly look for phrases like "Includes 10% waste on quantity" in the item notes.
+            If you find a waste percentage in the notes, map that float (e.g., 0.10) to the waste_percent_included field.
+            DO NOT infer or calculate quantities. Extract the exact numerical value printed in the quantity column.
+            If a quantity, unit of measure, or price is blank or missing, you MUST return null.
+            
+            Also extract:
+            - claim_number and carrier_name.
+            - For each line item: trade, code, description, quantity, unit_of_measure, unit_price, tax, claimed_rcv, depreciation, acv, page.
+            - Roof geometry: pitch, total_squares, eaves_lf, valleys_lf, rakes_lf.
+            - Shingle details: shingle_type (e.g. "3-tab", "architectural", "laminated", "wood", etc.) and shingle_color (e.g. "Charcoal", "Weathered Wood", "Slate", etc.) if mentioned in the line items, material specifications, or document notes.
+            - Claim financials: gross_rcv, total_depreciation, deductible, net_claim.
+            """
+        else:
+            return """
+            Analyze this roofing Statement of Loss document.
+            Extract ONLY the line items related to roof replacement.
+            DO NOT infer or calculate quantities. Extract the exact numerical value printed in the quantity column.
+            If a quantity, unit of measure, or price is blank or missing, you MUST return null.
+            
+            Also extract:
+            - claim_number and carrier_name.
+            - For each line item: trade, code, description, quantity, unit_of_measure, unit_price, tax, claimed_rcv, depreciation, acv, page.
+            - Roof geometry: pitch, total_squares, eaves_lf, valleys_lf, rakes_lf.
+            - Shingle details: shingle_type (e.g. "3-tab", "architectural", "laminated", "wood", etc.) and shingle_color (e.g. "Charcoal", "Weathered Wood", "Slate", etc.) if mentioned in the line items, material specifications, or document notes.
+            - Claim financials: gross_rcv, total_depreciation, deductible, net_claim.
+            """
+
+    async def extract_sol_from_pdf(self, pdf_path: str | Path, job_id: str | None = None) -> StatementOfLoss:
         """
-        Multimodal extraction of a Statement of Loss PDF using Gemini File API.
+        Multimodal extraction of a Statement of Loss PDF.
+        Supports both inline data (for files < 15MB) and Gemini File API (fallback for >= 15MB).
         Enforces structured extraction using the StatementOfLoss Pydantic schema.
         """
         log = logger.bind(pdf_path=str(pdf_path))
         log.info("sol_extraction_started")
 
-        # 1. Upload file
-        uploaded_file = await asyncio.to_thread(self._call_with_backoff, self.client.files.upload, file=pdf_path)
-
-        try:
-            # 2. Native Async Wait for processing
-            file_info = await asyncio.to_thread(self._call_with_backoff, self.client.files.get, name=uploaded_file.name)
-            max_wait = 60
-            elapsed = 0
-            while file_info.state.name == "PROCESSING":
-                if elapsed >= max_wait:
-                    raise TimeoutError("Gemini file processing timed out.")
-                await asyncio.sleep(2)
-                elapsed += 2
-                file_info = await asyncio.to_thread(self._call_with_backoff, self.client.files.get, name=uploaded_file.name)
-            
-            if file_info.state.name == "FAILED":
-                raise RuntimeError("File processing failed on Gemini servers.")
-
-            # 3. Classify the Carrier
-            source_system = await self.classify_carrier(uploaded_file.name, job_id)
-            
-            # 4. Set targeted prompt
-            if source_system == "xactimate":
-                prompt = """
-                You are an expert Xactimate estimator. Analyze this Statement of Loss (SoL) document.
-                Extract ONLY the line items located under the "Roof" grouping (ignore any other rooms, general demolition, or recap tables).
-                Pay special attention to descriptions that wrap across multiple lines (e.g., "Remove 3 tab 25 yr. composition shingle roofing - incl. felt").
-                If a quantity, unit of measure, or price is blank or missing, you MUST return null, not guess or hallucinate.
-                DO NOT infer or calculate quantities. Extract the exact numerical value printed in the quantity column.
-                If Overhead and Profit (O&P) is not explicitly listed in the summaries, set overhead_and_profit_included to false.
-                
-                Also extract:
-                - claim_number and carrier_name.
-                - For each line item: trade, code, description, quantity, unit_of_measure, unit_price, tax, claimed_rcv, depreciation, acv, page.
-                - Roof geometry: pitch, total_squares, eaves_lf, valleys_lf, rakes_lf.
-                - Shingle details: shingle_type (e.g. "3-tab", "architectural", "laminated", "wood", etc.) and shingle_color (e.g. "Charcoal", "Weathered Wood", "Slate", etc.) if mentioned in the line items, material specifications, or document notes.
-                - Claim financials: gross_rcv, total_depreciation, deductible, net_claim.
-                """
-            elif source_system == "symbility":
-                prompt = """
-                You are an expert Symbility estimator. Analyze this Statement of Loss (SoL) document.
-                Extract ONLY the line items located under the "Roof" grouping.
-                Symbility formats line items differently. Explicitly look for phrases like "Includes 10% waste on quantity" in the item notes.
-                If you find a waste percentage in the notes, map that float (e.g., 0.10) to the waste_percent_included field.
-                DO NOT infer or calculate quantities. Extract the exact numerical value printed in the quantity column.
-                If a quantity, unit of measure, or price is blank or missing, you MUST return null.
-                
-                Also extract:
-                - claim_number and carrier_name.
-                - For each line item: trade, code, description, quantity, unit_of_measure, unit_price, tax, claimed_rcv, depreciation, acv, page.
-                - Roof geometry: pitch, total_squares, eaves_lf, valleys_lf, rakes_lf.
-                - Shingle details: shingle_type (e.g. "3-tab", "architectural", "laminated", "wood", etc.) and shingle_color (e.g. "Charcoal", "Weathered Wood", "Slate", etc.) if mentioned in the line items, material specifications, or document notes.
-                - Claim financials: gross_rcv, total_depreciation, deductible, net_claim.
-                """
-            else:
-                logger.warning("WARNING: Unknown Carrier Format Detected")
-                prompt = """
-                Analyze this roofing Statement of Loss document.
-                Extract ONLY the line items related to roof replacement.
-                DO NOT infer or calculate quantities. Extract the exact numerical value printed in the quantity column.
-                If a quantity, unit of measure, or price is blank or missing, you MUST return null.
-                
-                Also extract:
-                - claim_number and carrier_name.
-                - For each line item: trade, code, description, quantity, unit_of_measure, unit_price, tax, claimed_rcv, depreciation, acv, page.
-                - Roof geometry: pitch, total_squares, eaves_lf, valleys_lf, rakes_lf.
-                - Shingle details: shingle_type (e.g. "3-tab", "architectural", "laminated", "wood", etc.) and shingle_color (e.g. "Charcoal", "Weathered Wood", "Slate", etc.) if mentioned in the line items, material specifications, or document notes.
-                - Claim financials: gross_rcv, total_depreciation, deductible, net_claim.
-                """
-
-            # 5. Generate content with structured output
-            response = await asyncio.to_thread(
-                self._call_with_backoff,
-                self.client.models.generate_content,
-                model=self.model_name,
-                contents=[file_info, prompt],
-                config=genai_types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=StatementOfLoss,
-                    temperature=0.1,
-                    max_output_tokens=8192,
-                ),
-            )
-            
-            parsed = response.parsed
-            parsed.source_system = source_system
-
-            usage = getattr(response.usage_metadata, "total_token_count", 0)
-            if usage > 0:
-                await asyncio.to_thread(log_ai_usage, job_id, usage, self.model_name, "sol_extraction")
-
-            log.info("sol_extraction_complete")
-            return parsed
-
-        except Exception as exc:
-            log.error("sol_extraction_failed", error=str(exc))
-            raise
-
-        finally:
-            # 6. Clean up the file (GUARANTEED)
+        p_path = Path(pdf_path)
+        is_local = p_path.exists()
+        file_size = 0
+        file_bytes = b""
+        
+        if is_local:
             try:
-                await asyncio.to_thread(self.client.files.delete, name=uploaded_file.name)
+                file_size, file_bytes = await asyncio.to_thread(self._get_file_size_and_bytes, p_path)
             except Exception as exc:
-                log.warning("sol_file_cleanup_failed", error=str(exc))
+                log.error("sol_file_not_readable", error=str(exc))
+                raise
+
+        if is_local and file_size < 15728640:
+            log.info("sol_extraction_inline_mode", size_bytes=file_size)
+            part = genai_types.Part.from_bytes(data=file_bytes, mime_type="application/pdf")
+            try:
+                source_system = await self.classify_carrier(part, job_id)
+                prompt = self._get_sol_prompt(source_system)
+
+                response = await asyncio.to_thread(
+                    self._call_with_backoff,
+                    self.client.models.generate_content,
+                    model=self.model_name,
+                    contents=[part, prompt],
+                    config=genai_types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=StatementOfLoss,
+                        temperature=0.1,
+                        max_output_tokens=8192,
+                    ),
+                )
+                
+                parsed = response.parsed
+                parsed.source_system = source_system
+
+                usage = getattr(response.usage_metadata, "total_token_count", 0)
+                if usage > 0:
+                    await asyncio.to_thread(log_ai_usage, job_id, usage, self.model_name, "sol_extraction")
+
+                log.info("sol_extraction_complete")
+                return parsed
+
+            except Exception as exc:
+                log.error("sol_extraction_failed", error=str(exc))
+                raise
+        else:
+            log.info("sol_extraction_files_api_mode", size_bytes=file_size)
+            uploaded_file = await asyncio.to_thread(self._call_with_backoff, self.client.files.upload, file=str(pdf_path))
+            try:
+                file_info = await asyncio.to_thread(self._call_with_backoff, self.client.files.get, name=uploaded_file.name)
+                max_wait = 60
+                elapsed = 0
+                while file_info.state.name == "PROCESSING":
+                    if elapsed >= max_wait:
+                        raise TimeoutError("Gemini file processing timed out.")
+                    await asyncio.sleep(2)
+                    elapsed += 2
+                    file_info = await asyncio.to_thread(self._call_with_backoff, self.client.files.get, name=uploaded_file.name)
+                
+                if file_info.state.name == "FAILED":
+                    raise RuntimeError("File processing failed on Gemini servers.")
+
+                source_system = await self.classify_carrier(uploaded_file.name, job_id)
+                prompt = self._get_sol_prompt(source_system)
+
+                response = await asyncio.to_thread(
+                    self._call_with_backoff,
+                    self.client.models.generate_content,
+                    model=self.model_name,
+                    contents=[file_info, prompt],
+                    config=genai_types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=StatementOfLoss,
+                        temperature=0.1,
+                        max_output_tokens=8192,
+                    ),
+                )
+                
+                parsed = response.parsed
+                parsed.source_system = source_system
+
+                usage = getattr(response.usage_metadata, "total_token_count", 0)
+                if usage > 0:
+                    await asyncio.to_thread(log_ai_usage, job_id, usage, self.model_name, "sol_extraction")
+
+                log.info("sol_extraction_complete")
+                return parsed
+
+            except Exception as exc:
+                log.error("sol_extraction_failed", error=str(exc))
+                raise
+            finally:
+                try:
+                    await asyncio.to_thread(self.client.files.delete, name=uploaded_file.name)
+                except Exception as exc:
+                    log.warning("sol_file_cleanup_failed", error=str(exc))
 
     async def generate_supplement_narrative(self, report: DiscrepancyReport, codes: str) -> str:
         """
@@ -457,28 +510,34 @@ Rules:
                     lines.append(f"• <b>{d.xactimate_code or 'RFG'} ({d.category}):</b> {d.description}")
             return "<br/>".join(lines)
 
-    async def analyze_roof_photo(self, file_name: str, original_filename: str, job_id: str | None = None) -> PhotoAnalysis:
-        file_info = await asyncio.to_thread(self._call_with_backoff, self.client.files.get, name=file_name)
+    async def analyze_roof_photo(self, file_path: Any, original_filename: str | None = None, job_id: str | None = None) -> PhotoAnalysis:
         """
-        Multimodal damage analysis of a single roof photo using Gemini 2.5 Flash.
-
-        Uses the flat PhotoAnalysis Pydantic schema via response_schema to enforce
-        structured JSON output. The schema is intentionally non-nested to avoid
-        400 Bad Request errors from Gemini's structured output API.
-
-        Called synchronously within the inspection_processor's sequential loop.
-        Wrapped by _call_with_backoff at the call site for rate-limit protection.
-
-        Args:
-            file_info: A Gemini File API file reference (from client.files.get()).
-            original_filename: Original filename of the photo to prevent LLM schema hallucinations.
-
-        Returns:
-            PhotoAnalysis: Validated forensic damage assessment.
+        Multimodal damage analysis of a single roof photo.
+        Supports:
+          1. Local file path (Path or str): uses inline mode (if < 15MB) or Files API (if >= 15MB).
+          2. Remote file name (str starting with "files/"): fetches and uses Files API directly.
+          3. Pre-fetched file object (e.g. MagicMock or genai_types.File): uses it directly in contents.
         """
+        log = logger.bind(job_id=job_id)
+        
+        is_local = False
+        is_remote_name = False
+        file_info = None
+        
+        if isinstance(file_path, (str, Path)):
+            p_path = Path(file_path)
+            if str(file_path).startswith("files/") or not p_path.exists():
+                is_remote_name = True
+            else:
+                is_local = True
+        else:
+            file_info = file_path
+
+        orig_name = original_filename or (Path(file_path).name if is_local or is_remote_name else "photo.jpg")
+
         prompt = (
             f"You are Wickham Roofing's senior forensic roofing inspector creating photographic documentation for an inspection report. "
-            f"Examine this photo (File: {original_filename}) carefully.\n\n"
+            f"Examine this photo (File: {orig_name}) carefully.\n\n"
             f"Zero-Shot Chain of Thought analysis:\n"
             f"Let's think step by step.\n"
             f"1. First, describe the texture and color of the anomalies in the photo. Identify if it shows a roof slope, shingle close-up, pipe vent boot, valley, etc.\n"
@@ -487,50 +546,125 @@ Rules:
             f"4. Finally, write a 1-2 sentence 'forensic_narrative' caption that is 100% ACCURATE and grounded solely in visually verifiable data. "
             f"Do NOT invent or hallucinate defects (such as pipe boot leaks or hail hits) if they are not visible in the image. "
             f"If the photo shows a clean slope or normal condition, state that clearly and professionally.\n\n"
-            f"For the 'filename' schema field, output exactly: {original_filename}"
+            f"For the 'filename' schema field, output exactly: {orig_name}"
         )
 
-        response = await asyncio.to_thread(
-            self._call_with_backoff,
-            self.client.models.generate_content,
-            model=self.model_name,
-            contents=[file_info, prompt],
-            config=genai_types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=PhotoAnalysis,
-                temperature=0.1,
-            ),
-        )
+        if is_local:
+            try:
+                file_size, file_bytes = await asyncio.to_thread(self._get_file_size_and_bytes, p_path)
+            except Exception as exc:
+                log.error("photo_file_not_readable", file_path=str(p_path), error=str(exc))
+                raise
 
-        usage = getattr(response.usage_metadata, "total_token_count", 0)
-        if usage > 0:
-            await asyncio.to_thread(log_ai_usage, job_id, usage, self.model_name, "photo_analysis")
+            if file_size < 15728640:
+                part = genai_types.Part.from_bytes(data=file_bytes, mime_type="image/jpeg")
+                response = await asyncio.to_thread(
+                    self._call_with_backoff,
+                    self.client.models.generate_content,
+                    model=self.model_name,
+                    contents=[part, prompt],
+                    config=genai_types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=PhotoAnalysis,
+                        temperature=0.1,
+                    ),
+                )
+                usage = getattr(response.usage_metadata, "total_token_count", 0)
+                if usage > 0:
+                    await asyncio.to_thread(log_ai_usage, job_id, usage, self.model_name, "photo_analysis")
+                return response.parsed  # type: ignore
+            else:
+                uploaded_name = await self.upload_media_file(str(p_path))
+                try:
+                    file_status = await self.get_file_status(uploaded_name)
+                    while file_status == "PROCESSING":
+                        await asyncio.sleep(2)
+                        file_status = await self.get_file_status(uploaded_name)
+                        
+                    if file_status == "FAILED":
+                        raise RuntimeError(f"Photo processing failed on Gemini servers: {p_path}")
 
-        return response.parsed  # type: ignore
+                    file_info = await asyncio.to_thread(self._call_with_backoff, self.client.files.get, name=uploaded_name)
+                    response = await asyncio.to_thread(
+                        self._call_with_backoff,
+                        self.client.models.generate_content,
+                        model=self.model_name,
+                        contents=[file_info, prompt],
+                        config=genai_types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                            response_schema=PhotoAnalysis,
+                            temperature=0.1,
+                        ),
+                    )
+                    usage = getattr(response.usage_metadata, "total_token_count", 0)
+                    if usage > 0:
+                        await asyncio.to_thread(log_ai_usage, job_id, usage, self.model_name, "photo_analysis")
+                    return response.parsed  # type: ignore
+                finally:
+                    try:
+                        await self.delete_file(uploaded_name)
+                    except Exception:
+                        pass
+        else:
+            if is_remote_name:
+                file_info = await asyncio.to_thread(self._call_with_backoff, self.client.files.get, name=str(file_path))
+            
+            response = await asyncio.to_thread(
+                self._call_with_backoff,
+                self.client.models.generate_content,
+                model=self.model_name,
+                contents=[file_info, prompt],
+                config=genai_types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=PhotoAnalysis,
+                    temperature=0.1,
+                ),
+            )
+            usage = getattr(response.usage_metadata, "total_token_count", 0)
+            if usage > 0:
+                await asyncio.to_thread(log_ai_usage, job_id, usage, self.model_name, "photo_analysis")
+            return response.parsed  # type: ignore
 
     async def analyze_roof_photos_batch(
         self,
-        file_names: list[str],
-        original_filenames: list[str],
+        file_paths: list[Any],
+        original_filenames: list[str] | None = None,
         job_id: str | None = None
     ) -> list[PhotoAnalysis]:
         """
-        Multimodal damage analysis of multiple roof photos in a single Gemini 2.5 Flash request.
-        
-        Enforces structured JSON output matching BatchPhotoAnalysis.
+        Multimodal damage analysis of multiple roof photos in a single Gemini request.
+        Supports:
+          1. List of local file paths: inline batching or Files API mode.
+          2. List of remote file names (strings starting with 'files/'): uses Files API.
+          3. List of pre-fetched file objects/mocks: uses them directly.
         """
-        log = logger.bind(job_id=job_id, count=len(file_names))
+        log = logger.bind(job_id=job_id, count=len(file_paths))
         log.info("photo_analysis_batch_started")
+
+        orig_names = original_filenames or []
+        if not orig_names:
+            for p in file_paths:
+                if isinstance(p, (str, Path)):
+                    orig_names.append(Path(p).name)
+                else:
+                    orig_names.append("photo.jpg")
+
+        all_local = True
+        all_remote_name = True
+        file_data_list = []
+        total_size = 0
         
-        # Build interleaved contents: label each image with its filename before the image data
-        # so Gemini can reliably map each analysis to the correct photo. Without this,
-        # Gemini receives unlabeled image blobs and produces identical/shuffled analyses.
-        contents = []
-        for file_name, original_filename in zip(file_names, original_filenames):
-            file_info = await asyncio.to_thread(self._call_with_backoff, self.client.files.get, name=file_name)
-            contents.append(f"[Photo: {original_filename}]")
-            contents.append(file_info)
-            
+        for p in file_paths:
+            if isinstance(p, (str, Path)):
+                p_path = Path(p)
+                if str(p).startswith("files/") or not p_path.exists():
+                    all_local = False
+                else:
+                    all_remote_name = False
+            else:
+                all_local = False
+                all_remote_name = False
+
         prompt = (
             "You are Wickham Roofing's senior forensic roofing inspector creating photographic documentation for an insurance claim.\n\n"
             "Above you have been provided with multiple roof inspection photos, each labeled with its filename in brackets (e.g. [Photo: img_001.jpg]).\n"
@@ -551,26 +685,140 @@ Rules:
             "Ensure the output JSON contains one PhotoAnalysis entry per photo, in the same order as presented.\n"
             "Each entry MUST reflect that specific photo's actual condition — not a generalized or repeated assessment."
         )
-        contents.append(prompt)
-        
-        response = await asyncio.to_thread(
-            self._call_with_backoff,
-            self.client.models.generate_content,
-            model=self.model_name,
-            contents=contents,
-            config=genai_types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=BatchPhotoAnalysis,
-                temperature=0.1,
-            ),
-        )
-        
-        usage = getattr(response.usage_metadata, "total_token_count", 0)
-        if usage > 0:
-            await asyncio.to_thread(log_ai_usage, job_id, usage, self.model_name, "photo_analysis_batch")
-            
-        batch_result = response.parsed  # type: ignore
-        return batch_result.analyses
+
+        if all_local:
+            inline_possible = True
+            for file_path in file_paths:
+                try:
+                    f_size, f_bytes = await asyncio.to_thread(self._get_file_size_and_bytes, Path(file_path))
+                    total_size += f_size
+                    if f_size >= 15728640 or total_size >= 20000000:
+                        inline_possible = False
+                    file_data_list.append((f_bytes, f_size))
+                except Exception as e:
+                    log.error("photo_batch_file_error", file_path=str(file_path), error=str(e))
+                    inline_possible = False
+                    break
+
+            if inline_possible and file_data_list:
+                log.info("photo_analysis_batch_inline_mode")
+                contents = []
+                for (f_bytes, _), orig_name in zip(file_data_list, orig_names):
+                    contents.append(f"[Photo: {orig_name}]")
+                    part = genai_types.Part.from_bytes(data=f_bytes, mime_type="image/jpeg")
+                    contents.append(part)
+                contents.append(prompt)
+
+                try:
+                    response = await asyncio.to_thread(
+                        self._call_with_backoff,
+                        self.client.models.generate_content,
+                        model=self.model_name,
+                        contents=contents,
+                        config=genai_types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                            response_schema=BatchPhotoAnalysis,
+                            temperature=0.1,
+                        ),
+                    )
+                    usage = getattr(response.usage_metadata, "total_token_count", 0)
+                    if usage > 0:
+                        await asyncio.to_thread(log_ai_usage, job_id, usage, self.model_name, "photo_analysis_batch")
+                    batch_result = response.parsed  # type: ignore
+                    return batch_result.analyses
+                except Exception as batch_err:
+                    log.warning("batch_inline_analysis_failed_falling_back_to_sequential", error=str(batch_err))
+                    results = []
+                    for file_path, orig_name in zip(file_paths, orig_names):
+                        try:
+                            res = await self.analyze_roof_photo(file_path, orig_name, job_id)
+                            results.append(res)
+                        except Exception as seq_err:
+                            log.error("photo_analysis_sequential_error", file_path=str(file_path), error=str(seq_err))
+                    return results
+            else:
+                log.info("photo_analysis_batch_files_api_mode")
+                uploaded_names = []
+                try:
+                    for file_path in file_paths:
+                        uploaded_name = await self.upload_media_file(str(file_path))
+                        uploaded_names.append(uploaded_name)
+                    
+                    for name in uploaded_names:
+                        file_status = await self.get_file_status(name)
+                        while file_status == "PROCESSING":
+                            await asyncio.sleep(2)
+                            file_status = await self.get_file_status(name)
+                        if file_status == "FAILED":
+                            raise RuntimeError(f"Processing failed for file {name}")
+
+                    contents = []
+                    for name, orig_name in zip(uploaded_names, orig_names):
+                        file_info = await asyncio.to_thread(self._call_with_backoff, self.client.files.get, name=name)
+                        contents.append(f"[Photo: {orig_name}]")
+                        contents.append(file_info)
+                    contents.append(prompt)
+
+                    response = await asyncio.to_thread(
+                        self._call_with_backoff,
+                        self.client.models.generate_content,
+                        model=self.model_name,
+                        contents=contents,
+                        config=genai_types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                            response_schema=BatchPhotoAnalysis,
+                            temperature=0.1,
+                        ),
+                    )
+                    usage = getattr(response.usage_metadata, "total_token_count", 0)
+                    if usage > 0:
+                        await asyncio.to_thread(log_ai_usage, job_id, usage, self.model_name, "photo_analysis_batch")
+                    batch_result = response.parsed  # type: ignore
+                    return batch_result.analyses
+                except Exception as batch_err:
+                    log.warning("batch_files_api_analysis_failed_falling_back_to_sequential", error=str(batch_err))
+                    results = []
+                    for file_path, orig_name in zip(file_paths, orig_names):
+                        try:
+                            res = await self.analyze_roof_photo(file_path, orig_name, job_id)
+                            results.append(res)
+                        except Exception as seq_err:
+                            log.error("photo_analysis_sequential_error", file_path=str(file_path), error=str(seq_err))
+                    return results
+                finally:
+                    for name in uploaded_names:
+                        try:
+                            await self.delete_file(name)
+                        except Exception:
+                            pass
+        else:
+            log.info("photo_analysis_batch_remote_or_objects_mode")
+            contents = []
+            for p, orig_name in zip(file_paths, orig_names):
+                contents.append(f"[Photo: {orig_name}]")
+                if isinstance(p, str) and p.startswith("files/"):
+                    file_info = await asyncio.to_thread(self._call_with_backoff, self.client.files.get, name=p)
+                else:
+                    file_info = p
+                contents.append(file_info)
+            contents.append(prompt)
+
+            response = await asyncio.to_thread(
+                self._call_with_backoff,
+                self.client.models.generate_content,
+                model=self.model_name,
+                contents=contents,
+                config=genai_types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=BatchPhotoAnalysis,
+                    temperature=0.1,
+                ),
+            )
+            usage = getattr(response.usage_metadata, "total_token_count", 0)
+            if usage > 0:
+                await asyncio.to_thread(log_ai_usage, job_id, usage, self.model_name, "photo_analysis_batch")
+            batch_result = response.parsed  # type: ignore
+            return batch_result.analyses
 
     async def generate_text(
         self,

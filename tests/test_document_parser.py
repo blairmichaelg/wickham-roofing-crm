@@ -141,9 +141,22 @@ async def test_process_inspection(tmp_path, monkeypatch):
         async def mock_delete(*args, **kwargs):
             pass
             
+        async def mock_batch_analyze(*args, **kwargs):
+            return [
+                PhotoAnalysis(
+                    filename="test_roof.jpg",
+                    damage_detected=True,
+                    damage_type=DamageType.HAIL,
+                    severity=Severity.SEVERE,
+                    confidence=0.95,
+                    forensic_narrative="Simulated hail damage."
+                )
+            ]
+            
         mock_ai_client.upload_media_file = mock_upload
         mock_ai_client.get_file_status = mock_status
         mock_ai_client.analyze_roof_photo = mock_analyze
+        mock_ai_client.analyze_roof_photos_batch = mock_batch_analyze
         mock_ai_client.delete_file = mock_delete
         
         mock_get_client.return_value = mock_ai_client

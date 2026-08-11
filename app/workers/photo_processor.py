@@ -53,24 +53,10 @@ async def process_photo_damage(ctx: dict, job_id: str, filename: str) -> None:
         return
         
     ai = get_ai_client()
-    uploaded_name = None
     
     try:
-        # Upload to Gemini directly
-        uploaded_name = await ai.upload_media_file(str(file_path))
-        
-        # Poll processing
-        file_status = await ai.get_file_status(uploaded_name)
-        while file_status == "PROCESSING":
-            await asyncio.sleep(2)
-            file_status = await ai.get_file_status(uploaded_name)
-            
-        if file_status == "FAILED":
-            log.error("gemini_processing_failed")
-            return
-            
-        # Analyze
-        analysis = await ai.analyze_roof_photo(uploaded_name, filename, job_id)
+        # Analyze using direct local file path
+        analysis = await ai.analyze_roof_photo(file_path, filename, job_id)
         
         # Save to SQLite cache so it is immediately available
         from app.core.inspection_models import _compute_sha256
@@ -101,9 +87,3 @@ async def process_photo_damage(ctx: dict, job_id: str, filename: str) -> None:
         
     except Exception as e:
         log.error("photo_damage_analysis_error", error=str(e))
-    finally:
-        if uploaded_name:
-            try:
-                await ai.delete_file(uploaded_name)
-            except Exception:
-                pass
