@@ -31,6 +31,12 @@ testpaths = ["tests"]
 markers = [
     "no_mock_ownership: marks tests that bypass field rep ownership mocking",
 ]
+filterwarnings = [
+    "ignore::DeprecationWarning:starlette.testclient.*",
+    "ignore::DeprecationWarning:fastapi.testclient.*",
+    "ignore::DeprecationWarning:httpx.*",
+    "ignore:.*Using `httpx` with `starlette.testclient` is deprecated.*"
+]
 
 [tool.mypy]
 python_version = "3.11"

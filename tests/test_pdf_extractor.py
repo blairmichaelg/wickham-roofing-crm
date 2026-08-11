@@ -85,10 +85,10 @@ class TestExtractEagleviewData:
 class TestRealPDFExtraction:
     """Integration test using the actual sample EagleView PDF."""
 
-    SAMPLE_PDF = Path("EagleView-Sample-Premium_Roof_Report.pdf")
+    SAMPLE_PDF = Path("samples/EagleView-Sample-Premium_Roof_Report.pdf")
 
     @pytest.mark.skipif(
-        not Path("EagleView-Sample-Premium_Roof_Report.pdf").exists(),
+        not Path("samples/EagleView-Sample-Premium_Roof_Report.pdf").exists(),
         reason="Sample EagleView PDF not available",
     )
     def test_extract_from_real_eagleview_pdf(self):
