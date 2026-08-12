@@ -1208,6 +1208,14 @@
                         <input type="email" id="modalAdjusterEmail" value="{{ job.adjuster_email or '' }}" placeholder="adjuster@carrier.com" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500">
                     </div>
                 </div>
+                <div class="border-t border-slate-800 pt-3 mb-3">
+                    <label class="block text-xs font-semibold text-gray-300 uppercase mb-1">Ice Barrier Required?</label>
+                    <select id="modalIceBarrierRequired" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500">
+                        <option value="none" {% if job.ice_barrier_required is none %}selected{% endif %}>-- Select / Climate Zone Review --</option>
+                        <option value="yes" {% if job.ice_barrier_required == true or job.ice_barrier_required == 1 %}selected{% endif %}>Yes</option>
+                        <option value="no" {% if job.ice_barrier_required == false or job.ice_barrier_required == 0 %}selected{% endif %}>No</option>
+                    </select>
+                </div>
                 <div class="flex justify-end gap-3 pt-3">
                     <button type="button" onclick="closeClaimModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-semibold rounded-lg">Cancel</button>
                     <button type="submit" id="saveClaimBtn" class="px-5 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-bold rounded-lg shadow-lg">Save Changes</button>
@@ -1232,6 +1240,11 @@
         btn.disabled = true;
         btn.textContent = 'Saving...';
         
+        const iceBarrierVal = document.getElementById('modalIceBarrierRequired').value;
+        let iceBarrier = null;
+        if (iceBarrierVal === 'yes') iceBarrier = true;
+        if (iceBarrierVal === 'no') iceBarrier = false;
+
         const payload = {
             insurer_name: document.getElementById('modalInsurerName').value || null,
             loss_date: document.getElementById('modalLossDate').value || null,
@@ -1239,7 +1252,8 @@
             policy_number: document.getElementById('modalPolicyNumber').value || null,
             adjuster_name: document.getElementById('modalAdjusterName').value || null,
             adjuster_phone: document.getElementById('modalAdjusterPhone').value || null,
-            adjuster_email: document.getElementById('modalAdjusterEmail').value || null
+            adjuster_email: document.getElementById('modalAdjusterEmail').value || null,
+            ice_barrier_required: iceBarrier
         };
 
         try {

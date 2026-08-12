@@ -39,10 +39,16 @@ async def login(request: Request, response: Response, pin: str = Form(...), redi
 
     if pin == settings.admin_pin:
         role = "admin"
+        rep_name = "Michael"
+        rep_id = "rep-michael"
     elif pin == settings.accounting_pin:
         role = "accounting"
+        rep_name = "Debi"
+        rep_id = "rep-debi"
     elif pin == settings.operations_pin:
         role = "operations"
+        rep_name = "Scott"
+        rep_id = "rep-scott"
     else:
         # Dynamic field rep lookup — field_reps table is the sole
         # source of truth for field identity (Phase 9).
@@ -67,8 +73,8 @@ async def login(request: Request, response: Response, pin: str = Form(...), redi
 
     token = create_access_token(
         role,
-        rep_name=rep_name if role == "field" else None,
-        rep_id=rep_id if role == "field" else None,
+        rep_name=rep_name,
+        rep_id=rep_id,
     )
 
     # Automatic role-to-dashboard routing when accessing via root login form

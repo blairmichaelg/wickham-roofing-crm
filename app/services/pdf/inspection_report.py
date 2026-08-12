@@ -112,14 +112,18 @@ class InspectionReportGenerator(PDFEngine):
         conn = get_connection()
         try:
             cursor = conn.execute(
-                "SELECT homeowner_name, address_line1, city, state, postal_code, inspector_name FROM jobs WHERE id = ?",
+                "SELECT homeowner_name, address_line1, city, state, postal_code, inspector_name, canvasser_name FROM jobs WHERE id = ?",
                 (job_id,)
             )
             row = cursor.fetchone()
             if row:
                 if row["homeowner_name"]:
                     homeowner_name = row["homeowner_name"]
-                if row["inspector_name"]:
+                if row["inspector_name"] and row["inspector_name"] != "Wickham Roofing LLC":
+                    inspector_name = row["inspector_name"]
+                elif row["canvasser_name"]:
+                    inspector_name = row["canvasser_name"]
+                elif row["inspector_name"]:
                     inspector_name = row["inspector_name"]
                 if row["address_line1"]:
                     full_address = f"{row['address_line1']}, {row['city'] or ''}, {row['state'] or ''} {row['postal_code'] or ''}".strip()

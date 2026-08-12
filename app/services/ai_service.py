@@ -117,7 +117,7 @@ class GeminiClient(AiClient):
     def __init__(self) -> None:
         self.settings = get_settings()
         self.client = genai.Client(api_key=self.settings.gemini_api_key)
-        self.model_name = "gemini-2.5-flash"
+        self.model_name = "gemini-3.5-flash"
         logger.info("ai_service_initialized", model=self.model_name)
 
     def _get_file_size_and_bytes(self, file_path: str | Path) -> tuple[int, bytes]:

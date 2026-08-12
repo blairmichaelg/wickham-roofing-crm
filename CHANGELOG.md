@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.1.5] - 2026-08-12
+### Added & Fixed (Field Operations & CRM Stabilization)
+- **Core Role JWT Claim Mapping**: Assigned names and rep IDs to core office roles (`admin` -> Michael/rep-michael, `accounting` -> Debi/rep-debi, `operations` -> Scott/rep-scott) inside JWT claims generated upon login. This ensures jobs created by these users are consistently visible to them in the field app.
+- **Ice Barrier Toggle**: Added an `ice_barrier_required` manual override toggle inside the Edit Claim Info modal UI, fully integrated with the database and PATCH endpoint. This resolves the climate zone warning.
+- **Salesperson Attribution**: Refactored both the inspection summary route and the PDF report generator to prioritize the `canvasser_name` field over generic placeholders.
+- **Status Progression Guard**: Updated the background photo processor to prevent early-stage (pre-build) jobs from incorrectly jumping to `INSPECTION_COMPLETED` status.
+- **Verification & Clean Slate**: Executed a full database demo reset via `scripts/db_demo_reset.py` and validated stability with the complete 298-test suite (100% pass rate).
+
 ## [2.1.4] - 2026-08-12
 ### Changed (Rebrand & Reference Cleanup)
 - **Repository Renamed**: GitHub repository renamed from `blairmichaelg/JobNimbus_controller` to `blairmichaelg/wickham-roofing-crm`. Local git remote updated accordingly.

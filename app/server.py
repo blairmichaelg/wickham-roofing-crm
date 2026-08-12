@@ -113,7 +113,7 @@ def create_app() -> FastAPI:
     application = FastAPI(
         title="Wickham Roofing AI Orchestrator",
         description="Standalone CRM orchestrator and Google Gemini AI middleware.",
-        version="2.1.4",
+        version="2.1.5",
         lifespan=lifespan,
     )
 

@@ -236,7 +236,42 @@ async def process_inspection(ctx: dict, job_id: str) -> InspectionJob:
                 log.error("homeowner_report_generation_failed", error=str(hr_err))
                 # Non-fatal — do not block INSPECTION_COMPLETED transition
 
-            await asyncio.to_thread(update_job_status, job_id, JobStatus.INSPECTION_COMPLETED)
+            # Fetch current status of the job from the DB
+            from app.core.database import get_connection
+            conn = get_connection()
+            current_status = None
+            try:
+                cursor = conn.execute("SELECT status FROM jobs WHERE id = ?", (job_id,))
+                row = cursor.fetchone()
+                if row:
+                    current_status = row["status"]
+            finally:
+                conn.close()
+
+            pre_build_statuses = {
+                JobStatus.LEAD_CAPTURED,
+                JobStatus.CONTINGENCY_SIGNED,
+                JobStatus.RETAIL_CONTRACT_SIGNED,
+                JobStatus.CLAIM_FILED,
+                JobStatus.PHOTOS_UPLOADED,
+                JobStatus.EV_PARSED,
+                JobStatus.STATEMENT_OF_LOSS_RECEIVED,
+                JobStatus.PENDING_OPERATOR_REVIEW,
+                JobStatus.SUPPLEMENT_GENERATED,
+                JobStatus.SUPPLEMENT_SUBMITTED,
+                JobStatus.SUPPLEMENT_DENIED,
+                JobStatus.SUPPLEMENT_APPROVED,
+                JobStatus.SCOPE_APPROVED,
+                JobStatus.MATERIAL_ORDERED,
+                JobStatus.MATERIALS_ON_SITE,
+                JobStatus.INSTALL_SCHEDULED,
+                JobStatus.AWAITING_CARRIER_RESPONSE,
+            }
+
+            if current_status not in pre_build_statuses:
+                await asyncio.to_thread(update_job_status, job_id, JobStatus.INSPECTION_COMPLETED)
+            else:
+                log.info("skipping_status_progression_for_pre_build_job", current_status=current_status)
 
         return job
     except Exception as e:

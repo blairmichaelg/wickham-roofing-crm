@@ -1457,6 +1457,7 @@ def update_job_claim_info(
     adjuster_name: str | None = None,
     adjuster_phone: str | None = None,
     adjuster_email: str | None = None,
+    ice_barrier_required: bool | None = None,
 ) -> dict:
     """
     Update insurance claim metadata on a job record.
@@ -1466,7 +1467,7 @@ def update_job_claim_info(
     conn = get_connection()
     try:
         conn.execute("BEGIN IMMEDIATE")
-        updates: dict[str, str | None] = {}
+        updates: dict[str, str | int | None] = {}
         if claim_number is not None:
             updates["claim_number"] = claim_number.strip()
         if insurer_name is not None:
@@ -1481,6 +1482,8 @@ def update_job_claim_info(
             updates["adjuster_email"] = adjuster_email.strip()
         if loss_date is not None:
             updates["loss_date"] = loss_date.strip() if loss_date else None
+        if ice_barrier_required is not None:
+            updates["ice_barrier_required"] = 1 if ice_barrier_required else 0
 
         if updates:
             set_clause = ", ".join(f"{k} = ?" for k in updates)

@@ -459,7 +459,7 @@ async def get_inspection_summary(job_id: str, claims: dict | None = Depends(get_
     conn = get_connection()
     try:
         cursor = conn.execute(
-            "SELECT address_line1, city, state, postal_code, inspector_name FROM jobs WHERE id = ?",
+            "SELECT address_line1, city, state, postal_code, inspector_name, canvasser_name FROM jobs WHERE id = ?",
             (job_id,)
         )
         row = cursor.fetchone()
@@ -467,6 +467,8 @@ async def get_inspection_summary(job_id: str, claims: dict | None = Depends(get_
             property_address = f"{row['address_line1']}, {row['city']}, {row['state']} {row['postal_code']}"
             if row["inspector_name"]:
                 inspector_name = row["inspector_name"]
+            elif row["canvasser_name"]:
+                inspector_name = row["canvasser_name"]
     finally:
         conn.close()
 

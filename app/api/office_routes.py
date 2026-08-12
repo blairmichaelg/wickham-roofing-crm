@@ -121,6 +121,7 @@ class JobClaimInfoPayload(BaseModel):
     adjuster_name: str | None = None
     adjuster_phone: str | None = None
     adjuster_email: str | None = None
+    ice_barrier_required: bool | None = None
 
 class ManualFlashingPayload(BaseModel):
     """ManualFlashingPayload definition."""
@@ -633,6 +634,7 @@ async def update_claim_info_route(job_id: str, payload: JobClaimInfoPayload, bg_
             adjuster_name=payload.adjuster_name,
             adjuster_phone=payload.adjuster_phone,
             adjuster_email=payload.adjuster_email,
+            ice_barrier_required=payload.ice_barrier_required,
         )
         # Auto-advance to CLAIM_FILED if claim info provided for early stage lead
         if payload.claim_number or payload.insurer_name:

@@ -66,12 +66,18 @@ async def process_login_form(
 
     if pin == settings.admin_pin:
         role = "admin"
+        rep_name = "Michael"
+        rep_id = "rep-michael"
         target_url = "/admin"
     elif pin == settings.accounting_pin:
         role = "accounting"
+        rep_name = "Debi"
+        rep_id = "rep-debi"
         target_url = "/accounting"
     elif pin == settings.operations_pin:
         role = "operations"
+        rep_name = "Scott"
+        rep_id = "rep-scott"
         target_url = "/api/operations/board"
     else:
         rep = get_field_rep_by_pin(pin)
@@ -84,8 +90,8 @@ async def process_login_form(
     if role:
         token = create_access_token(
             role,
-            rep_name=rep_name if role == "field" else None,
-            rep_id=rep_id if role == "field" else None,
+            rep_name=rep_name,
+            rep_id=rep_id,
         )
         response = RedirectResponse(url=target_url, status_code=303)
         response.set_cookie(
@@ -117,12 +123,18 @@ async def process_login(request: Request, access_code: str = Form(...)):
 
     if access_code == settings.admin_pin:
         role = "admin"
+        rep_name = "Michael"
+        rep_id = "rep-michael"
         redirect_url = "/admin"
     elif access_code == settings.accounting_pin:
         role = "accounting"
+        rep_name = "Debi"
+        rep_id = "rep-debi"
         redirect_url = "/accounting"
     elif access_code == settings.operations_pin:
         role = "operations"
+        rep_name = "Scott"
+        rep_id = "rep-scott"
         redirect_url = "/api/operations/board"
     else:
         rep = get_field_rep_by_pin(access_code)
@@ -135,8 +147,8 @@ async def process_login(request: Request, access_code: str = Form(...)):
     if role:
         token = create_access_token(
             role,
-            rep_name=rep_name if role == "field" else None,
-            rep_id=rep_id if role == "field" else None,
+            rep_name=rep_name,
+            rep_id=rep_id,
         )
         response = RedirectResponse(url=redirect_url, status_code=303)
         response.set_cookie(
