@@ -32,9 +32,12 @@ from app.api.admin_jobs_routes import router as admin_jobs_router
 from app.api.admin_reps_routes import router as admin_reps_router
 from app.api.auth_routes import router as auth_router
 from app.api.field_routes import router as field_router
+from app.api.frontend_routes import router as frontend_router
 from app.api.office_routes import router as office_router
 from app.api.operations_routes import router as operations_router
+from app.api.system_routes import router as system_router
 from app.api.webhooks import router as webhook_router
+from app.api.websockets import router as websockets_router
 from app.config import get_settings
 from app.core.cache import init_db as init_cache_db
 from app.core.database import run_migrations as init_crm_db
@@ -182,6 +185,9 @@ def create_app() -> FastAPI:
     application.include_router(auth_router)
     application.include_router(admin_reps_router)
     application.include_router(admin_jobs_router)
+    application.include_router(system_router)
+    application.include_router(websockets_router)
+    application.include_router(frontend_router)
 
     return application
 
