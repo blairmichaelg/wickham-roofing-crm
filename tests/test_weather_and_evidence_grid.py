@@ -107,3 +107,59 @@ def test_naked_lead_lifecycle_and_conversion():
     finally:
         conn.close()
 
+
+@pytest.mark.asyncio
+async def test_generate_evidence_grid_fallback_caption(tmp_path):
+    """Verify that a photo with NO cached AI analysis gets the correct fallback caption in the Evidence Grid."""
+    import uuid
+    from PIL import Image as PILImage
+    from pdfminer.high_level import extract_text
+    
+    job_id = str(uuid.uuid4())
+    
+    # Create fake job directory with a dummy photo
+    job_photos_dir = Path("data/field_photos") / job_id
+    job_photos_dir.mkdir(parents=True, exist_ok=True)
+    photo_file = job_photos_dir / "test_photo_01.jpg"
+    
+    # Save a valid dummy JPEG using PIL
+    img = PILImage.new("RGB", (100, 100), color="blue")
+    img.save(photo_file, format="JPEG")
+    
+    job_data = {
+        "job_id": job_id,
+        "homeowner_name": "Test Fallback Owner",
+        "property_address": "123 Main St, Valdosta, GA",
+        "inspector_name": "Test Fallback Inspector",
+        "photos": [],
+        "analyses": []
+    }
+    
+    pdf_gen = PDFGenerator()
+    out_path = await pdf_gen.generate_evidence_grid(job_data)
+    
+    assert Path(out_path).exists()
+    assert Path(out_path).stat().st_size > 0
+    
+    # Extract text from the generated PDF and assert the correct fallback caption/note
+    pdf_text = extract_text(out_path)
+    pdf_text_norm = " ".join(pdf_text.split())
+    
+    # Asserts the caption text is "No AI Analysis" (not "Pending Analysis")
+    assert "No AI Analysis" in pdf_text_norm
+    assert "Pending Analysis" not in pdf_text_norm
+    
+    # Asserts the note text contains "No AI vision analysis is currently available for this photo"
+    # (not "Awaiting AI Audit" / "pending automated vision analysis")
+    assert "No AI vision analysis is currently available for this photo" in pdf_text_norm
+    assert "Awaiting AI Audit" not in pdf_text_norm
+    assert "pending automated vision analysis" not in pdf_text_norm
+    
+    # Cleanup
+    try:
+        photo_file.unlink(missing_ok=True)
+        job_photos_dir.rmdir()
+        Path(out_path).unlink(missing_ok=True)
+    except Exception:
+        pass
+
