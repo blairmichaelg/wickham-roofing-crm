@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.2.0] - 2026-08-12
+### Added & Hardened (CRM Pipeline & Workflow Stabilization)
+- **Granular Payment Tracking & Milestone Automation**: Integrated detailed insurance and retail payment recording via the new `POST /api/office/accounting/jobs/{job_id}/mark-payment` endpoint. Added new job statuses: `ACV_PAYMENT_RECEIVED`, `DEPRECIATION_PAYMENT_RECEIVED`, `RETAIL_PAYMENT_RECEIVED`. The database state machine automatically transitions the job to `PAYMENT_RECEIVED` when both ACV and Depreciation check records are completed, triggering the commission calculation.
+- **New Claim Pipeline States & UI Milestones**: Added new job statuses `CLAIM_FILED`, `EV_ORDERED`, `ADJUSTER_MEETING_COMPLETED` alongside corresponding action buttons on the `job_detail.html` screen, allowing manual tracking of the early claim progression.
+- **Resolved Global Token Scoping Regression**: Centralized the declaration of `OFFICE_TOKEN` and `AUTH_TOKEN` in a top-level, unconditional script block in `job_detail.html`. This fixes a critical scoping regression that broke page actions (inspection report generation, document uploads, claim edits, financials saving, and admin overrides) for all logged-in roles.
+- **Kanban Column Reordering**: Adjusted the Kanban board column sequence on the Admin Dashboard so that `SCOPE_APPROVED` correctly follows `RETAIL_QUOTE_GENERATED` and `RETAIL_QUOTE_ACCEPTED`, reflecting the proper retail restoration progression.
+- **Read-Only Deductible Indicator**: Added a read-only payment indicator badge on the Financial Breakdown card of the job detail view, allowing instant visibility of `deductible_paid` and `deductible_paid_cents` statuses.
+- **Pre-Build Status Guard Hardening**: Added `JobStatus.EV_ORDERED` to the `pre_build_statuses` check in `inspection_processor.py`, preventing early-stage jobs from being force-advanced to completed status.
+- **Evidence Grid AI Caption Honesty Sweep**: Refactored PDF evidence grid generation to replace the misleading "Awaiting AI Audit" and "Pending Analysis" placeholders with honest `"No AI analysis available for this photo"` captions when no cached AI result exists. Updated fallback inspector names to `"Wickham Roofing Field Inspector"`.
+- **Test Suite Expansion**: Added focused test suite assertions in `tests/test_weather_and_evidence_grid.py` to verify PDF caption fallbacks, bringing total test count to 299 passed.
+
 ## [2.1.5] - 2026-08-12
 ### Added & Fixed (Field Operations & CRM Stabilization)
 - **Core Role JWT Claim Mapping**: Assigned names and rep IDs to core office roles (`admin` -> Michael/rep-michael, `accounting` -> Debi/rep-debi, `operations` -> Scott/rep-scott) inside JWT claims generated upon login. This ensures jobs created by these users are consistently visible to them in the field app.
