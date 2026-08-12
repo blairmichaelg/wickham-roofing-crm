@@ -1,6 +1,6 @@
 [project]
 name = "wickham-roofing-crm"
-version = "2.1.3"
+version = "2.1.4"
 description = "Local CRM and automated estimating engine."
 authors = [{name = "Wickham Roofing LLC"}]
 requires-python = ">=3.11"
@@ -28,6 +28,7 @@ build-backend = "hatchling.build"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+asyncio_mode = "strict"
 markers = [
     "no_mock_ownership: marks tests that bypass field rep ownership mocking",
 ]
@@ -42,13 +43,44 @@ filterwarnings = [
 python_version = "3.11"
 strict = false
 
+# Strict type-checking for the pure domain and service layers
 [[tool.mypy.overrides]]
 module = [
-    "app.core.pipeline",
-    "app.core.job_costing",
-    "app.core.database",
-    "app.services.qbo_export",
-    "app.services.pdf.documents",
-    "app.services.pdf.engine"
+    "app.core.*",
+    "app.services.*",
 ]
 disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+warn_return_any = true
+
+# Third-party stubs that are intentionally missing — suppress noise
+[[tool.mypy.overrides]]
+module = [
+    "arq.*",
+    "pdfplumber.*",
+    "reportlab.*",
+    "structlog.*",
+    "google.*",
+    "PIL.*",
+]
+ignore_missing_imports = true
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+ignore = ["E501"]
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["app/templates/*", "app/static/*"]
+
+[tool.coverage.report]
+# Target thresholds — enforced in CI
+fail_under = 75
+show_missing = true
+
+[tool.coverage.paths]
+source = ["app"]

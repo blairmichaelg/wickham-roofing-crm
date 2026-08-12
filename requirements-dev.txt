@@ -1,1 +1,23 @@
-locust>=2.30.0
+# Development and testing dependencies for the Wickham Roofing CRM.
+# Install with: pip install -r requirements-dev.txt
+
+# Testing
+pytest>=9.0
+pytest-asyncio>=1.0
+pytest-cov>=7.0
+coverage[toml]>=7.0
+
+# Property-based testing
+hypothesis>=6.100
+
+# Type checking
+mypy>=2.0
+types-Pillow>=10.0
+types-reportlab>=4.0
+types-requests>=2.0
+
+# Linting / formatting
+ruff>=0.15
+
+# Load testing
+locust>=2.30
