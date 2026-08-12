@@ -106,7 +106,7 @@ class InspectionReportGenerator(PDFEngine):
 
         # Fetch extra details from DB (homeowner name, inspector name, full address)
         homeowner_name = "Homeowner"
-        inspector_name = job.inspector_name or "Jerry Grubb"
+        inspector_name = job.inspector_name or None
         full_address = job.property_address
 
         conn = get_connection()
@@ -225,8 +225,8 @@ class InspectionReportGenerator(PDFEngine):
             story.append(Paragraph("INITIAL ROOF INSPECTION REPORT", style_title))
 
             disp_inspector = inspector_name
-            if not disp_inspector or disp_inspector in ("Wickham Roofing LLC", "Pending Assignment"):
-                disp_inspector = "Jerry Grubb"
+            if not disp_inspector or disp_inspector in ("Wickham Roofing LLC", "Pending Assignment", ""):
+                disp_inspector = "Wickham Roofing Field Inspector"
 
             prop_data = [
                 [
@@ -346,18 +346,38 @@ class InspectionReportGenerator(PDFEngine):
             # ── 6. SECTION 4: PROFESSIONAL RECOMMENDATION ───────────────────
             rec_story = []
             rec_story.append(Paragraph("4. Professional Recommendation", style_heading))
-            rec_body1 = (
-                f"Based on the physical evidence gathered, the roofing system at {full_address} has "
-                "sustained compromised functionality due to a combination of weather-related damage and "
-                "component deterioration. The wind-torn shingles and split pipe boots leave the property "
-                "exposed to imminent water damage."
-            )
-            rec_body2 = (
-                "<b>Action Required:</b> Wickham Roofing respectfully recommends that the insurance carrier "
-                "dispatch an adjuster to perform a full damage assessment. We advise full approval for roof "
-                "repairs and/or replacement to restore the property to a pre-loss condition and prevent "
-                "secondary interior water damages."
-            )
+            # Signal-driven copy: only state what the data actually shows
+            _signals = getattr(job, "damage_signals", None) or []
+            if _signals:
+                # Summarise damage types from signals
+                _type_counts: dict = {}
+                for _sig in _signals:
+                    _dt = getattr(_sig, "damage_type", None) or str(_sig)
+                    _type_counts[_dt] = _type_counts.get(_dt, 0) + 1
+                _summary_parts = [f"{v}× {k}" for k, v in _type_counts.items()]
+                _summary_str = ", ".join(_summary_parts)
+                rec_body1 = (
+                    f"Based on the physical evidence gathered at {full_address}, the following "
+                    f"damage indicators were documented: {_summary_str}. "
+                    "These findings are consistent with weather-related damage and may warrant "
+                    "a formal insurance carrier assessment."
+                )
+                rec_body2 = (
+                    "<b>Recommendation:</b> Wickham Roofing recommends that the insurance carrier "
+                    "dispatch a qualified adjuster to perform a full on-site damage assessment "
+                    "based on the documented evidence above."
+                )
+            else:
+                rec_body1 = (
+                    f"An initial roof inspection was performed at {full_address}. "
+                    "No qualifying storm damage was identified during this inspection. "
+                    "The roofing system has been visually documented for property records."
+                )
+                rec_body2 = (
+                    "No repair or replacement recommendation is made at this time based on the "
+                    "currently available evidence. Contact Wickham Roofing if conditions change "
+                    "or if additional documentation is required."
+                )
             rec_story.append(Paragraph(rec_body1, style_body))
             rec_story.append(Spacer(1, 0.05 * inch))
             rec_story.append(Paragraph(rec_body2, style_body))

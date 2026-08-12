@@ -38,6 +38,7 @@ class JobStatus(StrEnum):
     CLAIM_FILED = "CLAIM_FILED"
     ADJUSTER_MEETING_COMPLETED = "ADJUSTER_MEETING_COMPLETED"
     PHOTOS_UPLOADED = "PHOTOS_UPLOADED"
+    EV_ORDERED = "EV_ORDERED"
     EV_PARSED = "EV_PARSED"
     STATEMENT_OF_LOSS_RECEIVED = "STATEMENT_OF_LOSS_RECEIVED"
     PENDING_OPERATOR_REVIEW = "PENDING_OPERATOR_REVIEW"
@@ -70,6 +71,10 @@ class JobStatus(StrEnum):
     AWAITING_CARRIER_RESPONSE = "AWAITING_CARRIER_RESPONSE"
     APPRAISAL_INVOKED = "APPRAISAL_INVOKED"
     CLAIM_DENIED = "CLAIM_DENIED"  # Primary claim denied outright — no SoL issued
+    # Payment milestone statuses
+    ACV_PAYMENT_RECEIVED = "ACV_PAYMENT_RECEIVED"           # First check from carrier
+    DEPRECIATION_PAYMENT_RECEIVED = "DEPRECIATION_PAYMENT_RECEIVED"  # Recoverable depreciation released
+    RETAIL_PAYMENT_RECEIVED = "RETAIL_PAYMENT_RECEIVED"    # Single retail payment received
     
     @classmethod
     def is_operator_gate(cls, status: JobStatus) -> bool:
@@ -92,7 +97,9 @@ class JobStatus(StrEnum):
             cls.FINAL_INSPECTION, cls.FINAL_INSPECTION_COMPLETED,
             cls.INVOICED, cls.PAYMENT_RECEIVED, cls.CLOSED,
             cls.RETAIL_QUOTE_GENERATED, cls.RETAIL_QUOTE_ACCEPTED,
-            cls.RETAIL_QUOTE_DECLINED, cls.APPRAISAL_INVOKED
+            cls.RETAIL_QUOTE_DECLINED, cls.APPRAISAL_INVOKED,
+            cls.EV_ORDERED, cls.ACV_PAYMENT_RECEIVED,
+            cls.DEPRECIATION_PAYMENT_RECEIVED, cls.RETAIL_PAYMENT_RECEIVED
         }
         return status in _OPERATOR_GATES
 
@@ -247,8 +254,20 @@ def run_migrations() -> None:
             
             conn.execute("UPDATE schema_version SET version = 14, applied_at = CURRENT_TIMESTAMP WHERE id = 1")
 
+        if current_version < 15:
+            import importlib
+            m15 = importlib.import_module("app.core.migrations.0015_add_claim_pipeline_timestamps")
+            m15.up(conn)
+            conn.execute("UPDATE schema_version SET version = 15, applied_at = CURRENT_TIMESTAMP WHERE id = 1")
+
+        if current_version < 16:
+            import importlib
+            m16 = importlib.import_module("app.core.migrations.0016_add_payment_tracking")
+            m16.up(conn)
+            conn.execute("UPDATE schema_version SET version = 16, applied_at = CURRENT_TIMESTAMP WHERE id = 1")
+
         conn.execute("COMMIT")
-        logger.info("migrations_applied", current_version=current_version, target_version=14)
+        logger.info("migrations_applied", current_version=current_version, target_version=16)
         
         # Since seed logic was removed from up(), do it here outside the transaction
         if current_version < 1:
@@ -447,6 +466,15 @@ def _update_job_status_internal(conn: sqlite3.Connection, job_id: str, new_statu
         if current_status not in valid_priors:
             raise RuntimeError(f"ILLEGAL TRANSITION: Cannot invoice from state {current_status}.")
 
+    elif new_status in [JobStatus.ACV_PAYMENT_RECEIVED, JobStatus.DEPRECIATION_PAYMENT_RECEIVED, JobStatus.RETAIL_PAYMENT_RECEIVED]:
+        if current_status not in [
+            JobStatus.INVOICED,
+            JobStatus.ACV_PAYMENT_RECEIVED,
+            JobStatus.DEPRECIATION_PAYMENT_RECEIVED,
+            JobStatus.RETAIL_PAYMENT_RECEIVED
+        ]:
+            raise RuntimeError(f"ILLEGAL TRANSITION: Cannot receive payment in state {current_status}.")
+
     elif new_status == JobStatus.PAYMENT_RECEIVED:
         comm_cursor = conn.execute("SELECT commission_generated_at FROM jobs WHERE id = ?", (job_id,))
         comm_row = comm_cursor.fetchone()
@@ -458,7 +486,7 @@ def _update_job_status_internal(conn: sqlite3.Connection, job_id: str, new_statu
             )
 
     elif new_status == JobStatus.CLOSED:
-        if current_status != JobStatus.PAYMENT_RECEIVED:
+        if current_status not in [JobStatus.PAYMENT_RECEIVED, JobStatus.RETAIL_PAYMENT_RECEIVED, JobStatus.DEPRECIATION_PAYMENT_RECEIVED]:
             raise RuntimeError("ILLEGAL TRANSITION: Cannot close job before PAYMENT_RECEIVED.")
     # ---------------------------------------------------------
 
@@ -1158,23 +1186,141 @@ def atomic_qbo_export() -> list[dict]:
 
 def mark_supplement_sent(job_id: str) -> None:
     """
-    Transitions job from SUPPLEMENT_GENERATED to
+    Transitions job from SUPPLEMENT_GENERATED/SUPPLEMENT_SUBMITTED to
     AWAITING_CARRIER_RESPONSE and records the sent timestamp.
     Idempotent — safe to call multiple times.
     """
     conn = get_connection()
     try:
-        conn.execute("""
-            UPDATE jobs
-            SET status = 'AWAITING_CARRIER_RESPONSE',
-                supplement_sent_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-              AND status IN (
-                  'SUPPLEMENT_GENERATED',
-                  'SUPPLEMENT_SUBMITTED'
-              )
-        """, (job_id,))
+        cursor = conn.execute("SELECT status FROM jobs WHERE id = ?", (job_id,))
+        row = cursor.fetchone()
+        if row and row["status"] in ("SUPPLEMENT_GENERATED", "SUPPLEMENT_SUBMITTED"):
+            conn.execute("BEGIN IMMEDIATE")
+            _update_job_status_internal(conn, job_id, "AWAITING_CARRIER_RESPONSE", "Supplement marked as sent to carrier.")
+            conn.execute("UPDATE jobs SET supplement_sent_at = CURRENT_TIMESTAMP WHERE id = ?", (job_id,))
+            conn.commit()
+            logger.info("supplement_sent_and_status_updated", job_id=job_id)
+    except Exception as e:
+        try:
+            conn.execute("ROLLBACK")
+        except Exception:
+            pass
+        logger.error("mark_supplement_sent_failed", job_id=job_id, error=str(e))
+        raise
+    finally:
+        conn.close()
+
+def record_financial_payment(
+    job_id: str,
+    payment_type: str,  # 'acv', 'depreciation', 'retail', 'deductible'
+    amount: float | None = None,  # in dollars, optional
+    date_received: str | None = None,  # date string, optional
+    deductible_paid: bool | None = None
+) -> None:
+    """
+    Records granular payments (ACV, Depreciation, Retail) or deductible status
+    on the financials table and triggers the corresponding status transition.
+    """
+    conn = get_connection()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        # Ensure financials row exists
+        row = conn.execute("SELECT job_id FROM financials WHERE job_id = ?", (job_id,)).fetchone()
+        if not row:
+            conn.execute("INSERT INTO financials (job_id, revenue_cents, carrier_rcv_cents, material_cost_cents, labor_cost_cents, overhead_pct, canvasser_commission_pct) VALUES (?, 0, 0, 0, 0, 0.0, 0.0)", (job_id,))
+
+        amount_cents = int(round(amount * 100)) if amount is not None else None
+        
+        status_to_transition = None
+        note = ""
+
+        if payment_type == "acv":
+            if date_received:
+                conn.execute(
+                    "UPDATE financials SET acv_payment_received_at = ? WHERE job_id = ?",
+                    (date_received, job_id)
+                )
+            else:
+                conn.execute(
+                    "UPDATE financials SET acv_payment_received_at = CURRENT_TIMESTAMP WHERE job_id = ?",
+                    (job_id,)
+                )
+            if amount_cents is not None:
+                conn.execute(
+                    "UPDATE jobs SET acv_received = 1, acv_received_at = CURRENT_TIMESTAMP, acv_check_amount_cents = ?, acv_check_date = ? WHERE id = ?",
+                    (amount_cents, date_received or __import__('datetime').date.today().isoformat(), job_id)
+                )
+            status_to_transition = "ACV_PAYMENT_RECEIVED"
+            note = f"ACV payment recorded: ${amount or 0.0:.2f}"
+
+        elif payment_type == "depreciation":
+            if date_received:
+                conn.execute(
+                    "UPDATE financials SET depreciation_payment_received_at = ? WHERE job_id = ?",
+                    (date_received, job_id)
+                )
+            else:
+                conn.execute(
+                    "UPDATE financials SET depreciation_payment_received_at = CURRENT_TIMESTAMP WHERE job_id = ?",
+                    (job_id,)
+                )
+            if amount_cents is not None:
+                conn.execute(
+                    "UPDATE jobs SET supplement_received = 1, supplement_received_at = CURRENT_TIMESTAMP, supplement_check_amount_cents = ?, supplement_check_date = ? WHERE id = ?",
+                    (amount_cents, date_received or __import__('datetime').date.today().isoformat(), job_id)
+                )
+            status_to_transition = "DEPRECIATION_PAYMENT_RECEIVED"
+            note = f"Depreciation payment recorded: ${amount or 0.0:.2f}"
+
+        elif payment_type == "retail":
+            if date_received:
+                conn.execute(
+                    "UPDATE financials SET retail_payment_received_at = ? WHERE job_id = ?",
+                    (date_received, job_id)
+                )
+            else:
+                conn.execute(
+                    "UPDATE financials SET retail_payment_received_at = CURRENT_TIMESTAMP WHERE job_id = ?",
+                    (job_id,)
+                )
+            status_to_transition = "RETAIL_PAYMENT_RECEIVED"
+            note = f"Retail payment recorded: ${amount or 0.0:.2f}"
+
+        elif payment_type == "deductible":
+            dp_val = 1 if deductible_paid else 0
+            if amount_cents is not None:
+                conn.execute(
+                    "UPDATE financials SET deductible_paid = ?, deductible_paid_cents = ? WHERE job_id = ?",
+                    (dp_val, amount_cents, job_id)
+                )
+            else:
+                conn.execute(
+                    "UPDATE financials SET deductible_paid = ? WHERE job_id = ?",
+                    (dp_val, job_id)
+                )
+            conn.execute(
+                "UPDATE jobs SET deductible_paid_cents = ? WHERE id = ?",
+                (amount_cents or 0, job_id)
+            )
+
+        if payment_type in ("acv", "depreciation"):
+            fin_row = conn.execute("SELECT acv_payment_received_at, depreciation_payment_received_at FROM financials WHERE job_id = ?", (job_id,)).fetchone()
+            if fin_row and fin_row["acv_payment_received_at"] and fin_row["depreciation_payment_received_at"]:
+                status_to_transition = "PAYMENT_RECEIVED"
+                note = "Both ACV and Depreciation payments received."
+
+        if status_to_transition:
+            _update_job_status_internal(conn, job_id, status_to_transition, note)
+
         conn.commit()
+        logger.info("recorded_financial_payment", job_id=job_id, payment_type=payment_type)
+    except Exception as e:
+        try:
+            conn.execute("ROLLBACK")
+        except Exception:
+            pass
+        logger.error("recorded_financial_payment_failed", job_id=job_id, error=str(e))
+        raise
     finally:
         conn.close()
 

@@ -272,15 +272,27 @@ async def upload_field_photo(job_id: str, request: Request, file: UploadFile = F
 
 @router.get("/jobs")
 async def list_my_jobs(claims: dict = Depends(get_current_claims)):
-    """List jobs belonging to the current field rep with full intake fields for resumption."""
+    """List jobs for the current rep.
+
+    Matches canvasser_name OR canvasser_rep_id so admin/core-team leads
+    created via the dropdown always appear in their recent jobs list.
+    """
     rep_name = claims.get("rep_name")
-    if not rep_name:
+    rep_id = claims.get("rep_id")
+    if not rep_name and not rep_id:
         return []
     conn = get_connection()
     try:
         cursor = conn.execute(
-            "SELECT id, homeowner_name, address_line1, city, state, postal_code, phone, email, claim_number, insurer_name, job_type, loss_date, created_at, status FROM jobs WHERE canvasser_name = ? ORDER BY created_at DESC LIMIT 50",
-            (rep_name,)
+            """
+            SELECT id, homeowner_name, address_line1, city, state, postal_code,
+                   phone, email, claim_number, insurer_name, job_type, loss_date,
+                   created_at, status
+            FROM jobs
+            WHERE (canvasser_name = ? OR (canvasser_rep_id IS NOT NULL AND canvasser_rep_id = ?))
+            ORDER BY created_at DESC LIMIT 50
+            """,
+            (rep_name, rep_id)
         )
         return [dict(r) for r in cursor.fetchall()]
     finally:

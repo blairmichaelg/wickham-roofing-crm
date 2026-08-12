@@ -51,6 +51,14 @@ class SupplementGenerator(PDFEngine):
             job.get("analyses", [])
             photos = job.get("photos", [])
 
+        # Extract job status for conditional footer copy
+        if hasattr(job, "status"):
+            job_status = str(getattr(job, "status", "LEAD_CAPTURED") or "LEAD_CAPTURED")
+        elif isinstance(job, dict):
+            job_status = str(job.get("status", "LEAD_CAPTURED") or "LEAD_CAPTURED")
+        else:
+            job_status = "LEAD_CAPTURED"
+
         if isinstance(inspection_date_obj, datetime.date) or isinstance(inspection_date_obj, datetime.datetime):
             inspection_date = inspection_date_obj.strftime("%B %d, %Y")
         else:
@@ -324,17 +332,27 @@ class SupplementGenerator(PDFEngine):
                 textColor=NAVY,
                 spaceAfter=4
             )
-            story.append(Paragraph("EXECUTED CONTINGENCY & CLAIM AUTHORIZATION", auth_title_style))
-            
-            legal_attestation = (
-                "This Evidence Grid constitutes a technical appendix to the official homeowner inspection report. "
-                "The property owner has executed a Contingency Agreement authorizing Wickham Roofing LLC as their designated "
-                "contractor to perform forensic inspections, document physical loss, and present verified evidence to insurance carriers."
-            )
+            # Conditional footer — wording depends on whether agreement is signed
+            _is_signed = job_status not in ("LEAD_CAPTURED",)
+            if _is_signed:
+                auth_heading = "EXECUTED CONTINGENCY & CLAIM AUTHORIZATION"
+                legal_attestation = (
+                    "This Evidence Grid constitutes a technical appendix to the official homeowner inspection report. "
+                    "The property owner has executed a Contingency Agreement authorizing Wickham Roofing LLC as their designated "
+                    "contractor to perform forensic inspections, document physical loss, and present verified evidence to insurance carriers."
+                )
+            else:
+                auth_heading = "PRE-INSPECTION EVIDENCE PACK — CONTINGENCY AGREEMENT NOT YET SIGNED"
+                legal_attestation = (
+                    "This Evidence Pack is a pre-inspection storm history and photo documentation record assembled for "
+                    "presentation to the property owner. The Contingency Agreement has NOT yet been signed. "
+                    "This document is for informational purposes only and does not constitute an executed contractor authorization."
+                )
+            story.append(Paragraph(auth_heading, auth_title_style))
             
             auth_content = [Paragraph(legal_attestation, body_style)]
             
-            if signature_path and Path(signature_path).exists():
+            if _is_signed and signature_path and Path(signature_path).exists():
                 try:
                     sig_img = Image(str(signature_path), width=220, height=55, kind='proportional')
                     auth_content.append(Spacer(1, 4))

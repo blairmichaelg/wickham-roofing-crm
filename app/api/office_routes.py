@@ -1084,7 +1084,8 @@ def get_accounting_brief():
                 'SUPPLEMENT_GENERATED', 'SUPPLEMENT_SUBMITTED', 'AWAITING_CARRIER_RESPONSE',
                 'SUPPLEMENT_APPROVED', 'SUPPLEMENT_DENIED', 'MATERIAL_ORDERED', 'MATERIALS_ON_SITE',
                 'INSTALL_SCHEDULED', 'INSTALL_COMPLETED', 'FINAL_INSPECTION', 'INSPECTION_COMPLETED',
-                'FINAL_INSPECTION_COMPLETED', 'INVOICED', 'PAYMENT_RECEIVED'
+                'FINAL_INSPECTION_COMPLETED', 'INVOICED', 'PAYMENT_RECEIVED',
+                'EV_ORDERED', 'ACV_PAYMENT_RECEIVED', 'DEPRECIATION_PAYMENT_RECEIVED', 'RETAIL_PAYMENT_RECEIVED'
             )
         """)
         rcv_row = cursor.fetchone()
@@ -1095,25 +1096,27 @@ def get_accounting_brief():
             SELECT COUNT(*) as cnt
             FROM jobs j
             JOIN financials f ON j.id = f.job_id
-            WHERE j.status IN ('SUPPLEMENT_APPROVED', 'INVOICED')
+            WHERE j.status IN ('SUPPLEMENT_APPROVED', 'INVOICED', 'ACV_PAYMENT_RECEIVED', 'DEPRECIATION_PAYMENT_RECEIVED', 'RETAIL_PAYMENT_RECEIVED')
               AND f.qbo_exported = 0
         """)
         qbo_ready = cursor.fetchone()["cnt"]
 
         # Fetch active pipeline jobs
         cursor = conn.execute("""
-            SELECT j.id, j.invoice_id, j.homeowner_name, j.status,
+            SELECT j.id, j.invoice_id, j.homeowner_name, j.status, j.job_type,
                    j.acv_received, j.acv_received_at,
                    j.supplement_received, j.supplement_received_at,
                    f.carrier_rcv_cents, f.recoverable_depreciation_cents,
-                   f.qbo_exported
+                   f.qbo_exported, f.acv_payment_received_at, f.depreciation_payment_received_at,
+                   f.retail_payment_received_at, f.deductible_paid, f.deductible_paid_cents, f.deductible_cents
             FROM jobs j
             LEFT JOIN financials f ON j.id = f.job_id
             WHERE j.status IN (
                 'SUPPLEMENT_GENERATED', 'SUPPLEMENT_SUBMITTED', 'AWAITING_CARRIER_RESPONSE',
                 'SUPPLEMENT_APPROVED', 'SUPPLEMENT_DENIED', 'MATERIAL_ORDERED', 'MATERIALS_ON_SITE',
                 'INSTALL_SCHEDULED', 'INSTALL_COMPLETED', 'FINAL_INSPECTION', 'INSPECTION_COMPLETED',
-                'FINAL_INSPECTION_COMPLETED', 'INVOICED', 'PAYMENT_RECEIVED'
+                'FINAL_INSPECTION_COMPLETED', 'INVOICED', 'PAYMENT_RECEIVED',
+                'EV_ORDERED', 'ACV_PAYMENT_RECEIVED', 'DEPRECIATION_PAYMENT_RECEIVED', 'RETAIL_PAYMENT_RECEIVED'
             )
             ORDER BY j.created_at ASC
         """)
@@ -1121,11 +1124,12 @@ def get_accounting_brief():
         
         # Fetch last 5 completed jobs
         cursor = conn.execute("""
-            SELECT j.id, j.invoice_id, j.homeowner_name, j.status,
+            SELECT j.id, j.invoice_id, j.homeowner_name, j.status, j.job_type,
                    j.acv_received, j.acv_received_at,
                    j.supplement_received, j.supplement_received_at,
                    f.carrier_rcv_cents, f.recoverable_depreciation_cents,
-                   f.qbo_exported
+                   f.qbo_exported, f.acv_payment_received_at, f.depreciation_payment_received_at,
+                   f.retail_payment_received_at, f.deductible_paid, f.deductible_paid_cents, f.deductible_cents
             FROM jobs j
             LEFT JOIN financials f ON j.id = f.job_id
             WHERE j.status = 'CLOSED'
@@ -1152,6 +1156,7 @@ def get_accounting_brief():
                 "invoice_id": r["invoice_id"],
                 "name": r["homeowner_name"],
                 "status": r["status"],
+                "job_type": r["job_type"] or "insurance",
                 "acv_received": r["acv_received"],
                 "acv_received_at": r["acv_received_at"],
                 "supplement_received": r["supplement_received"],
@@ -1159,7 +1164,13 @@ def get_accounting_brief():
                 "acv_expected": acv_expected,
                 "supp_expected": supp_expected,
                 "carrier_rcv": carrier_rcv,
-                "qbo_exported": bool(r["qbo_exported"]) if r["qbo_exported"] is not None else False
+                "qbo_exported": bool(r["qbo_exported"]) if r["qbo_exported"] is not None else False,
+                "acv_payment_received_at": r["acv_payment_received_at"],
+                "depreciation_payment_received_at": r["depreciation_payment_received_at"],
+                "retail_payment_received_at": r["retail_payment_received_at"],
+                "deductible_paid": bool(r["deductible_paid"]) if r["deductible_paid"] is not None else False,
+                "deductible_paid_cents": r["deductible_paid_cents"] or 0,
+                "deductible_cents": r["deductible_cents"] or 0
             })
         
         return AccountingBrief(
@@ -1710,6 +1721,43 @@ async def toggle_payment_route(job_id: str, payload: TogglePaymentPayload, reque
         return {"status": "success"}
     except Exception as e:
         logger.error("toggle_payment_failed", error=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
+
+class MarkPaymentPayload(BaseModel):
+    payment_type: str
+    amount: float | None = None
+    date_received: str | None = None
+    deductible_paid: bool | None = None
+
+@router.post("/accounting/jobs/{job_id}/mark-payment", dependencies=[Depends(verify_accounting)])
+async def mark_payment_route(job_id: str, payload: MarkPaymentPayload, request: Request):
+    from app.core.database import record_financial_payment
+    try:
+        await asyncio.to_thread(
+            record_financial_payment,
+            job_id,
+            payload.payment_type,
+            payload.amount,
+            payload.date_received,
+            payload.deductible_paid
+        )
+        # Trigger commission job if both ACV and Depreciation payments are received
+        conn = get_connection()
+        try:
+            fin_row = conn.execute(
+                "SELECT acv_payment_received_at, depreciation_payment_received_at FROM financials WHERE job_id = ?",
+                (job_id,)
+            ).fetchone()
+            if fin_row and fin_row["acv_payment_received_at"] and fin_row["depreciation_payment_received_at"]:
+                await request.app.state.redis_pool.enqueue_job(
+                    "process_commission",
+                    job_id=job_id
+                )
+        finally:
+            conn.close()
+        return {"status": "success"}
+    except Exception as e:
+        logger.error("mark_payment_failed", error=str(e))
         raise HTTPException(status_code=400, detail=str(e))
 
 class CommissionOverridePayload(BaseModel):

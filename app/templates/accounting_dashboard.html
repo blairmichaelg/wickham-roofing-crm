@@ -63,14 +63,15 @@
                             <th class="py-3 px-4">Job / Homeowner</th>
                             <th class="py-3 px-4">Status</th>
                             <th class="py-3 px-4 text-right">Carrier RCV</th>
-                            <th class="py-3 px-4 text-center">ACV Check</th>
-                            <th class="py-3 px-4 text-center">Supplement Check</th>
+                            <th class="py-3 px-4 text-center">Deductible</th>
+                            <th class="py-3 px-4 text-center">ACV / Retail</th>
+                            <th class="py-3 px-4 text-center">Depr / Supp</th>
                             <th class="py-3 px-4 text-center">Invoice</th>
                             <th class="py-3 px-4 text-center">QBO</th>
                         </tr>
                     </thead>
                     <tbody id="acct-table" class="divide-y divide-gray-800">
-                        <tr><td colspan="7" class="text-center text-gray-500 py-8">Loading...</td></tr>
+                        <tr><td colspan="8" class="text-center text-gray-500 py-8">Loading...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -96,7 +97,7 @@
                         </tr>
                     </thead>
                     <tbody id="commissions-table" class="divide-y divide-gray-800">
-                        <tr><td colspan="7" class="text-center text-gray-500 py-4">Loading...</td></tr>
+                        <tr><td colspan="8" class="text-center text-gray-500 py-4">Loading...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -145,7 +146,7 @@
                 tbody.innerHTML = '';
 
                 if (data.rows.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-gray-500 py-8">No active jobs in the accounting pipeline yet.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="8" class="text-center text-gray-500 py-8">No active jobs in the accounting pipeline yet.</td></tr>`;
                 } else {
                     data.rows.forEach(row => {
                         const statusColors = {
@@ -157,16 +158,57 @@
                             'FINAL_INSPECTION_COMPLETED': 'text-green-400',
                             'INVOICED': 'text-purple-400',
                             'PAYMENT_RECEIVED': 'text-green-300',
+                            'EV_ORDERED': 'text-teal-400',
+                            'ACV_PAYMENT_RECEIVED': 'text-blue-300',
+                            'DEPRECIATION_PAYMENT_RECEIVED': 'text-emerald-300',
+                            'RETAIL_PAYMENT_RECEIVED': 'text-indigo-300',
                         };
                         const statusColor = statusColors[row.status] || 'text-gray-400';
-                        const acvBadge = row.acv_received
-                            ? `<span class="px-2 py-1 rounded bg-green-900 text-green-300 text-xs font-bold">✓ Received</span>`
-                            : `<button onclick="openCheckModal('${row.job_id}', 'acv_received', ${row.acv_expected !== null ? row.acv_expected : 'null'})"
-                                class="px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs font-bold transition-colors">+ Record ACV</button>`;
-                        const suppBadge = row.supplement_received
-                            ? `<span class="px-2 py-1 rounded bg-green-900 text-green-300 text-xs font-bold">✓ Received</span>`
-                            : `<button onclick="openCheckModal('${row.job_id}', 'supplement_received', ${row.supp_expected !== null ? row.supp_expected : 'null'})"
-                                class="px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs font-bold transition-colors">+ Record Supp</button>`;
+                        // Deductible Badge
+                        let deductibleBadge = '';
+                        if (row.job_type === 'retail') {
+                            deductibleBadge = `<span class="text-gray-500 text-xs">N/A (Retail)</span>`;
+                        } else {
+                            if (row.deductible_paid) {
+                                const dedAmt = row.deductible_paid_cents ? `$${(row.deductible_paid_cents / 100).toFixed(2)}` : 'Paid';
+                                deductibleBadge = `<span class="px-2 py-1 rounded bg-green-900 text-green-300 text-xs font-bold">✓ ${dedAmt}</span>`;
+                            } else {
+                                const expectedDed = row.deductible_cents ? row.deductible_cents / 100 : null;
+                                deductibleBadge = `<button onclick="openCheckModal('${row.job_id}', 'deductible', ${expectedDed !== null ? expectedDed : 'null'})"
+                                    class="px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs font-bold transition-colors">+ Record Ded</button>`;
+                            }
+                        }
+
+                        // ACV / Retail Badge
+                        let acvBadge = '';
+                        if (row.job_type === 'retail') {
+                            if (row.retail_payment_received_at) {
+                                acvBadge = `<span class="px-2 py-1 rounded bg-green-900 text-green-300 text-xs font-bold">✓ Paid</span>`;
+                            } else {
+                                acvBadge = `<button onclick="openCheckModal('${row.job_id}', 'retail', null)"
+                                    class="px-3 py-1.5 rounded-lg bg-indigo-900 hover:bg-indigo-800 text-white text-xs font-bold transition-colors">+ Record Retail</button>`;
+                            }
+                        } else {
+                            if (row.acv_payment_received_at || row.acv_received) {
+                                acvBadge = `<span class="px-2 py-1 rounded bg-green-900 text-green-300 text-xs font-bold">✓ Received</span>`;
+                            } else {
+                                acvBadge = `<button onclick="openCheckModal('${row.job_id}', 'acv', ${row.acv_expected !== null ? row.acv_expected : 'null'})"
+                                    class="px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs font-bold transition-colors">+ Record ACV</button>`;
+                            }
+                        }
+
+                        // Depreciation / Supplement Badge
+                        let suppBadge = '';
+                        if (row.job_type === 'retail') {
+                            suppBadge = `<span class="text-gray-500 text-xs">—</span>`;
+                        } else {
+                            if (row.depreciation_payment_received_at || row.supplement_received) {
+                                suppBadge = `<span class="px-2 py-1 rounded bg-green-900 text-green-300 text-xs font-bold">✓ Received</span>`;
+                            } else {
+                                suppBadge = `<button onclick="openCheckModal('${row.job_id}', 'depreciation', ${row.supp_expected !== null ? row.supp_expected : 'null'})"
+                                    class="px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs font-bold transition-colors">+ Record Depr</button>`;
+                            }
+                        }
 
                         const canInvoice = ['SUPPLEMENT_GENERATED','SUPPLEMENT_APPROVED','SCOPE_APPROVED','MATERIAL_ORDERED','MATERIALS_ON_SITE','INSTALL_SCHEDULED','INSTALL_COMPLETED','FINAL_INSPECTION','INSPECTION_COMPLETED','FINAL_INSPECTION_COMPLETED'].includes(row.status);
                         const invoiceBtn = row.status === 'INVOICED' || row.status === 'PAYMENT_RECEIVED'
@@ -191,6 +233,7 @@
                                 </td>
                                 <td class="py-4 px-4"><span class="font-bold text-sm ${statusColor}">${row.status.replace(/_/g,' ')}</span></td>
                                 <td class="py-4 px-4 text-right font-mono font-bold text-green-400">${rcv}</td>
+                                <td class="py-4 px-4 text-center">${deductibleBadge}</td>
                                 <td class="py-4 px-4 text-center">${acvBadge}</td>
                                 <td class="py-4 px-4 text-center">${suppBadge}</td>
                                 <td class="py-4 px-4 text-center">${invoiceBtn}</td>
@@ -206,7 +249,7 @@
                     const cdata = await cres.json();
                     ctbody.innerHTML = '';
                     if (cdata.length === 0) {
-                        ctbody.innerHTML = `<tr><td colspan="7" class="text-center text-gray-500 py-6">No commissions currently ready.<br><span class="text-xs">Commissions are triggered when a job reaches Payment Received status.</span></td></tr>`;
+                        ctbody.innerHTML = `<tr><td colspan="8" class="text-center text-gray-500 py-6">No commissions currently ready.<br><span class="text-xs">Commissions are triggered when a job reaches Payment Received status.</span></td></tr>`;
                     } else {
                         cdata.forEach(row => {
                             const commAmt = `$${Number(row.canvasser_commission || 0).toFixed(2)}`;
@@ -254,7 +297,13 @@
 
         function openCheckModal(jobId, flag, expected) {
             _checkJobId = jobId; _checkFlag = flag; _checkExpected = expected;
-            document.getElementById('checkModalTitle').textContent = flag === 'acv_received' ? 'Record ACV Check' : 'Record Supplement Check';
+            let title = 'Record Payment';
+            if (flag === 'acv') title = 'Record ACV Payment';
+            else if (flag === 'depreciation') title = 'Record Depreciation Payment';
+            else if (flag === 'retail') title = 'Record Retail Payment';
+            else if (flag === 'deductible') title = 'Record Deductible Payment';
+            
+            document.getElementById('checkModalTitle').textContent = title;
             document.getElementById('checkModalAmount').value = '';
             document.getElementById('checkModalDate').value = new Date().toISOString().split('T')[0];
             const expEl = document.getElementById('checkModalExpected');
@@ -266,15 +315,29 @@
         async function submitCheckModal() {
             const amount = parseFloat(document.getElementById('checkModalAmount').value);
             const date = document.getElementById('checkModalDate').value;
-            if (!amount || !date) { alert('Enter both amount and date.'); return; }
-            if (_checkExpected && amount < _checkExpected * 0.98) {
+            
+            // Allow amount to be optional/null for retail or deductible if not set, but date is required
+            if (!date) { alert('Enter date.'); return; }
+            if (_checkFlag !== 'deductible' && _checkFlag !== 'retail' && isNaN(amount)) {
+                alert('Enter amount.');
+                return;
+            }
+            if (_checkExpected && !isNaN(amount) && amount < _checkExpected * 0.98) {
                 if (!confirm(`Amount $${amount} is less than expected $${_checkExpected.toFixed(2)}. Short-pay? Continue?`)) return;
             }
             try {
-                const r = await fetch(`/api/office/accounting/jobs/${_checkJobId}/toggle-payment`, {
+                const payload = {
+                    payment_type: _checkFlag,
+                    amount: isNaN(amount) ? null : amount,
+                    date_received: date
+                };
+                if (_checkFlag === 'deductible') {
+                    payload.deductible_paid = true;
+                }
+                const r = await fetch(`/api/office/accounting/jobs/${_checkJobId}/mark-payment`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-Internal-Token': AUTH_TOKEN },
-                    body: JSON.stringify({ flag: _checkFlag, amount, date_received: date })
+                    body: JSON.stringify(payload)
                 });
                 if (r.ok) { closeCheckModal(); fetchAccounting(); }
                 else alert('Error recording payment: ' + await r.text());
@@ -345,7 +408,8 @@
         fetchAccounting();
 
         function connectWebSocket() {
-            const wsUrl = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws/office?token=${encodeURIComponent(AUTH_TOKEN)}`;
+            const wsUrl = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws/office?token=${encodeURIComponent(AUTH_TOKEN)}`;
+
             const ws = new WebSocket(wsUrl);
             ws.onmessage = e => { try { const d = JSON.parse(e.data); if (d.type === 'stale' || d.type === 'new_lead') fetchAccounting(); } catch {} };
             ws.onclose = () => setTimeout(connectWebSocket, 5000);

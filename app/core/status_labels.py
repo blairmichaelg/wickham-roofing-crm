@@ -40,4 +40,8 @@ STATUS_LABELS: dict[str, str] = {
     "AWAITING_CARRIER_RESPONSE": "Waiting on Insurance Company",
     "APPRAISAL_INVOKED": "Appraisal Process Started",
     "CLAIM_DENIED": "Claim Denied by Insurer",
+    "EV_ORDERED": "Measurement Report Ordered",
+    "ACV_PAYMENT_RECEIVED": "ACV Payment Received",
+    "DEPRECIATION_PAYMENT_RECEIVED": "Depreciation Payment Received",
+    "RETAIL_PAYMENT_RECEIVED": "Retail Payment Received",
 }
