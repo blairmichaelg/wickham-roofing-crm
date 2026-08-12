@@ -406,7 +406,7 @@ class SupplementGenerator(PDFEngine):
                 ["Job ID:", job.get("id", "N/A")],
                 ["Homeowner:", job.get("homeowner_name", "N/A")],
                 ["Property Address:", address],
-                ["Inspector:", job.get("inspector_name") or "Pending Assignment"],
+                ["Inspector:", job.get("inspector_name") or "Wickham Roofing Field Inspector"],
                 ["Inspection Date:", job.get("inspection_date") or "TBD"]
             ]
             
