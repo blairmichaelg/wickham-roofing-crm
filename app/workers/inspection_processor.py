@@ -253,6 +253,7 @@ async def process_inspection(ctx: dict, job_id: str) -> InspectionJob:
                 JobStatus.CONTINGENCY_SIGNED,
                 JobStatus.RETAIL_CONTRACT_SIGNED,
                 JobStatus.CLAIM_FILED,
+                JobStatus.EV_ORDERED,
                 JobStatus.PHOTOS_UPLOADED,
                 JobStatus.EV_PARSED,
                 JobStatus.STATEMENT_OF_LOSS_RECEIVED,
