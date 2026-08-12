@@ -786,6 +786,13 @@
                             <div>
                                 <p class="text-xs text-gray-400 uppercase font-semibold">Deductible</p>
                                 <p class="text-lg font-bold text-red-400">${{ "%.2f"|format(job.financials.deductible_cents / 100) if job.financials.deductible_cents is not none else '0.00' }}</p>
+                                {% if job.job_type != 'retail' %}
+                                    {% if job.financials.deductible_paid %}
+                                        <span class="text-xs text-green-400 font-bold block mt-1">✓ Deductible Paid: ${{ "%.2f"|format(job.financials.deductible_paid_cents / 100) if job.financials.deductible_paid_cents is not none else '0.00' }}</span>
+                                    {% else %}
+                                        <span class="text-xs text-slate-500 font-medium block mt-1">Deductible Unpaid</span>
+                                    {% endif %}
+                                {% endif %}
                             </div>
                             <div>
                                 <p class="text-xs text-gray-400 uppercase font-semibold">Depreciation</p>

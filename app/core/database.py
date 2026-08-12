@@ -936,7 +936,9 @@ def get_financials(job_id: str) -> dict | None:
                    carrier_initial_rcv_cents,
                    carrier_supplemented_rcv_cents,
                    qbo_exported,
-                   qbo_exported_at
+                   qbo_exported_at,
+                   deductible_paid,
+                   deductible_paid_cents
             FROM financials 
             WHERE job_id = ?
         """, (job_id,))
