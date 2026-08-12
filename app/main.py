@@ -36,21 +36,21 @@ from app.core.database import (
     _fetch_job_sync,
     get_completed_jobs,
     get_connection,
+    get_field_rep_by_pin,
     get_financials,
     get_job_documents,
     get_job_schedule,
-    get_field_rep_by_pin,
     list_field_reps,
     standardize_existing_job_documents,
 )
 from app.core.notifications import notifier
-
-# Re-export app + templates from server — `uvicorn app.main:app` works unchanged.
-from app.server import app, templates  # noqa: F401  (re-export)
+from app.core.status_labels import STATUS_LABELS  # noqa: F401  (re-export)
 
 # Backward-compatible re-exports — previously defined directly in this module.
 from app.core.utils import days_since  # noqa: F401  (re-export)
-from app.core.status_labels import STATUS_LABELS  # noqa: F401  (re-export)
+
+# Re-export app + templates from server — `uvicorn app.main:app` works unchanged.
+from app.server import app, templates  # noqa: F401  (re-export)
 
 logger = structlog.get_logger("app.main")
 
@@ -70,8 +70,9 @@ async def health_check(request: Request):
     """
     import subprocess
 
-    from app.config import get_settings
     from fastapi import HTTPException
+
+    from app.config import get_settings
 
     settings = get_settings()
 
@@ -188,8 +189,8 @@ async def process_login_form(
     redirect_url: str = Form(default="/"),
 ):
     """Process login form (used by test suite via /auth/login)."""
-    from app.config import get_settings
     from app.api.auth import create_access_token
+    from app.config import get_settings
 
     settings = get_settings()
     role = None
@@ -238,8 +239,8 @@ async def process_login_form(
 @app.post("/login", tags=["frontend"])
 async def process_login(request: Request, access_code: str = Form(...)):
     """Process login and route to persona dashboard based on PIN."""
-    from app.config import get_settings
     from app.api.auth import create_access_token
+    from app.config import get_settings
 
     settings = get_settings()
     role = None
@@ -585,7 +586,7 @@ async def serve_job_detail(
         zipcodes: dict = {}
         if zip_path.exists():
             try:
-                with open(zip_path, "r", encoding="utf-8") as zf:
+                with open(zip_path, encoding="utf-8") as zf:
                     zipcodes = json.load(zf)
             except Exception:
                 pass

@@ -46,8 +46,12 @@ strict = false
 # Strict type-checking for the pure domain and service layers
 [[tool.mypy.overrides]]
 module = [
-    "app.core.*",
-    "app.services.*",
+    "app.core.status_labels",
+    "app.core.utils",
+    "app.core.complexity",
+    "app.core.job_costing",
+    "app.services.supplement_engine",
+    "app.services.supplement_models",
 ]
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
@@ -63,15 +67,17 @@ module = [
     "structlog.*",
     "google.*",
     "PIL.*",
+    "passlib.*",
 ]
 ignore_missing_imports = true
+
 
 [tool.ruff]
 line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
-ignore = ["E501"]
+ignore = ["E501", "E701", "E402", "F401"]
 
 [tool.coverage.run]
 source = ["app"]

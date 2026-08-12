@@ -8,7 +8,7 @@ from __future__ import annotations
 import sqlite3
 import uuid
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 
 import structlog
@@ -29,7 +29,7 @@ def get_db_path() -> Path:
     """
     return Path(get_settings().get_db_path)
 
-class JobStatus(str, Enum):
+class JobStatus(StrEnum):
     # PROCESSING STATES (ARQ workers may write these autonomously)
     """JobStatus definition."""
     LEAD_CAPTURED = "LEAD_CAPTURED"
@@ -1466,7 +1466,7 @@ def update_job_claim_info(
     conn = get_connection()
     try:
         conn.execute("BEGIN IMMEDIATE")
-        updates: dict[str, str] = {}
+        updates: dict[str, str | None] = {}
         if claim_number is not None:
             updates["claim_number"] = claim_number.strip()
         if insurer_name is not None:

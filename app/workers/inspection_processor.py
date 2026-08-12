@@ -143,7 +143,7 @@ async def process_inspection(ctx: dict, job_id: str) -> InspectionJob:
         if non_cached_photos:
             log.info("batch_processing_non_cached_photos", count=len(non_cached_photos))
             
-            ai_file_paths = []
+            ai_file_paths: list[str | Path] = []
             try:
                 # 1. Rescale photos locally
                 for photo in non_cached_photos:

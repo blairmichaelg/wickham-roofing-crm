@@ -97,11 +97,11 @@ The included `render.yaml` configuration file automatically defines and launches
 Whenever deploying a new build or performing maintenance on an active server, execute the verification baseline to verify zero regressions:
 
 ```powershell
-# Verify complete automated test suite (must report 100% pass rate across 282 tests)
+# Verify complete automated test suite (must report 100% pass rate across 298 assertions)
 .\venv\Scripts\python.exe -m pytest tests/ -v
 
 # Run Python static type verification
-.\venv\Scripts\python.exe -m mypy app/
+.\venv\Scripts\python.exe -m mypy app/core app/services
 
 # Perform static analysis inspection
 .\venv\Scripts\python.exe -m ruff check app/

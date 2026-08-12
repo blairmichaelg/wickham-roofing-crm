@@ -59,8 +59,8 @@ async def process_photo_damage(ctx: dict, job_id: str, filename: str) -> None:
         analysis = await ai.analyze_roof_photo(file_path, filename, job_id)
         
         # Save to SQLite cache so it is immediately available
-        from app.core.inspection_models import _compute_sha256
         from app.core.cache import set_cached_analysis
+        from app.core.inspection_models import _compute_sha256
         sha = _compute_sha256(file_path)
         await asyncio.to_thread(set_cached_analysis, job_id, sha, analysis)
         

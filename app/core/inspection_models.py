@@ -17,7 +17,7 @@ import hashlib
 import os
 import time
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 
 import structlog
@@ -32,7 +32,7 @@ ALLOWED_IMAGE_EXTENSIONS: set[str] = {".jpg", ".jpeg", ".png", ".heic", ".webp"}
 # ── Enums ──────────────────────────────────────────────────────────────────────
 
 
-class DamageType(str, Enum):
+class DamageType(StrEnum):
     """Primary damage classification detected by Gemini vision analysis."""
     HAIL = "hail"
     WIND = "wind"
@@ -41,7 +41,7 @@ class DamageType(str, Enum):
     NONE = "none"
 
 
-class Severity(str, Enum):
+class Severity(StrEnum):
     """Damage severity scale used for claim triage."""
     NONE = "none"
     MINOR = "minor"

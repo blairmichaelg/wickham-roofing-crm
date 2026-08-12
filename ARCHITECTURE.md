@@ -140,3 +140,68 @@ wickham-roofing-crm/
 ├── pyproject.toml              # Tooling configuration (Ruff linter, Mypy typings, Pytest)
 └── requirements.txt            # Explicit Python package dependency bindings
 ```
+
+---
+
+## 7. Role → Route → Service → Domain → Persistence Layer Diagram
+
+The diagram below maps how requests from authenticated personas flow through routing, orchestration, core domain logic, and down to persistence.
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                        ROLE / ACCESS LAYER                             │
+│  [Field Canvasser]    [Operations Mgr]    [Accounting]     [Admin Rep] │
+└─────────┬───────────────────┬──────────────────┬───────────────┬───────┘
+          │ (REST/WS)         │ (REST/WS)        │ (REST/WS)     │ (REST)
+          ▼                   ▼                  ▼               ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                       ROUTING LAYER (FastAPI)                          │
+│                                                                        │
+│                      app/main.py (Re-export Shim)                      │
+│                                   │                                    │
+│                     app/server.py (App Factory)                        │
+│                                   │                                    │
+│  ┌───────────────────────┬────────┴──────────────┬──────────────────┐  │
+│  │ app/api/field_routes  │ app/api/office_routes │ app/api/auth     │  │
+│  │ app/api/operations    │ app/api/admin_jobs    │ app/api/webhooks │  │
+│  └───────────┬───────────┴───────────┬───────────┴────────┬─────────┘  │
+└──────────────┼───────────────────────┼────────────────────┼────────────┘
+               │                       │                    │
+               ▼                       ▼                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                     SERVICE / ORCHESTRATION LAYER                      │
+│                                                                        │
+│  ┌────────────────────────┐  ┌─────────────────────────┐  ┌─────────┐  │
+│  │ app/services/ai       │  │ app/services/pdf/       │  │ app/    │  │
+│  │ (Gemini File API/CoT)  │  │ (ReportLab Documents)   │  │ workers/│  │
+│  ├────────────────────────┤  ├─────────────────────────┤  │ (ARQ    │  │
+│  │ app/services/qbo_export│  │ app/services/document_  │  │ Task    │  │
+│  │ (QuickBooks Online)    │  │ parser (pdfplumber)     │  │ Queue)  │  │
+│  └───────────┬────────────┘  └───────────┬─────────────┘  └────┬────┘  │
+└──────────────┼───────────────────────────┼─────────────────────┼───────┘
+               │                           │                     │
+               ▼                           ▼                     ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                       DOMAIN / CORE LOGIC KERNEL                       │
+│                                                                        │
+│  ┌───────────────────────────────┐   ┌──────────────────────────────┐  │
+│  │ app/services/supplement_engine│   │ app/core/code_router         │  │
+│  │ (Pure Deterministic Math)     │   │ (Zero-Cost Local RAG)        │  │
+│  ├───────────────────────────────┤   ├──────────────────────────────┤  │
+│  │ app/core/job_costing          │   │ app/core/complexity          │  │
+│  │ (Margin & Commissions math)   │   │ (Complexity Rating formulas) │  │
+│  └───────────┬───────────────────┘   └──────────────┬───────────────┘  │
+└──────────────┼──────────────────────────────────────┼──────────────────┘
+               │                                      │
+               ▼                                      ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                       PERSISTENCE & STATE LAYER                        │
+│                                                                        │
+│  ┌────────────────────────┐  ┌─────────────────────────┐  ┌─────────┐  │
+│  │   SQLite Database      │  │      Redis DB Cache     │  │ Local   │  │
+│  │   (data/wickham.db)    │  │     (arq Job Queue)     │  │ Vault   │  │
+│  │   - Write-Ahead Log    │  │     - Session tokens    │  │ (PDFs/  │  │
+│  │   - BEGIN IMMEDIATE    │  │     - Task coordination │  │ photos) │  │
+│  └────────────────────────┘  └─────────────────────────┘  └─────────┘  │
+└────────────────────────────────────────────────────────────────────────┘
+```

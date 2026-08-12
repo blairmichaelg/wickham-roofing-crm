@@ -43,7 +43,6 @@ from app.core.status_labels import STATUS_LABELS
 from app.core.utils import days_since
 from app.infra import configure_logging, create_redis_pool
 
-
 # ---------------------------------------------------------------------------
 # Lifespan
 # ---------------------------------------------------------------------------

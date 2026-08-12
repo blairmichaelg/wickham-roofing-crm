@@ -32,7 +32,7 @@ class DocumentsGenerator(PDFEngine):
 
         def build_pdf() -> None:
             doc = self._get_doc_template(filepath, top_margin=120, job_id=job_id, doc_type="CONTINGENCY_SIGNED")
-            story = []
+            story: list = []
             
             story.append(Paragraph("INSURANCE CONTINGENCY & SCOPE AGREEMENT", self.custom_styles["Title"]))
             story.append(Spacer(1, 14))
@@ -121,7 +121,7 @@ class DocumentsGenerator(PDFEngine):
                 Any: The resulting output.
             """
             doc = self._get_doc_template(filepath, job_id=job["id"], doc_type="NOTICE_OF_CANCELLATION")
-            story = []
+            story: list = []
             
             for copy_type in ["Customer Copy", "Contractor Copy"]:
                 story.append(Paragraph(copy_type, self.custom_styles["DocControl"]))
@@ -173,7 +173,7 @@ class DocumentsGenerator(PDFEngine):
 
         def build_pdf() -> None:
             doc = self._get_doc_template(filepath, job_id=job_id, doc_type="RETAIL_CONTRACT_SIGNED")
-            story = []
+            story: list = []
             
             story.append(Paragraph("RESIDENTIAL ROOFING CONTRACT", self.custom_styles["Title"]))
             story.append(Spacer(1, 20))
@@ -266,7 +266,7 @@ class DocumentsGenerator(PDFEngine):
 
         def build_pdf() -> None:
             doc = self._get_doc_template(filepath, job_id=job["id"], doc_type="RETAIL_NOTICE_OF_CANCELLATION")
-            story = []
+            story: list = []
             
             for copy_type in ["Customer Copy", "Contractor Copy"]:
                 story.append(Paragraph(copy_type, self.custom_styles["DocControl"]))
@@ -321,7 +321,7 @@ class DocumentsGenerator(PDFEngine):
 
         def build_pdf() -> None:
             doc = self._get_doc_template(filepath, job_id=job["id"], doc_type="CERTIFICATE_OF_COMPLETION")
-            story = []
+            story: list = []
             
             story.append(Paragraph("CERTIFICATE OF COMPLETION & STATUTORY LIEN RELEASE", self.custom_styles["Title"]))
             story.append(Spacer(1, 12))
@@ -388,7 +388,7 @@ class DocumentsGenerator(PDFEngine):
 
         def build_pdf() -> None:
             doc = self._get_doc_template(filepath, top_margin=120, job_id=job["id"], doc_type="CONTINGENCY")
-            story = []
+            story: list = []
             
             story.append(Paragraph("INSURANCE CONTINGENCY & SCOPE AGREEMENT", self.custom_styles["Title"]))
             story.append(Spacer(1, 14))
@@ -460,7 +460,7 @@ class DocumentsGenerator(PDFEngine):
 
         def build_pdf() -> None:
             doc = self._get_doc_template(filepath, top_margin=120, job_id=job_id, doc_type="BILL_OF_MATERIALS")
-            story = []
+            story: list = []
 
             story.append(Paragraph("BILL OF MATERIALS (BoM) — MATERIAL ORDER SHEET", self.custom_styles["Title"]))
             story.append(Spacer(1, 14))

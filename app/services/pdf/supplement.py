@@ -39,7 +39,7 @@ class SupplementGenerator(PDFEngine):
             inspector = getattr(job, "inspector_name", "Wickham Roofing LLC")
             inspection_date_obj = getattr(job, "inspection_date", None)
             claim_num = getattr(job, "claim_number", None) or "Pending Assignment"
-            analyses = getattr(job, "analyses", [])
+            getattr(job, "analyses", [])
             photos = getattr(job, "photos", [])
         else:
             job_id = job.get("id") or job.get("job_id", "UNKNOWN")
@@ -48,7 +48,7 @@ class SupplementGenerator(PDFEngine):
             inspector = job.get("canvasser_name") or job.get("inspector_name") or "Wickham Roofing LLC"
             inspection_date_obj = job.get("created_at") or job.get("inspection_date")
             claim_num = job.get("claim_number") or "Pending Assignment"
-            analyses = job.get("analyses", [])
+            job.get("analyses", [])
             photos = job.get("photos", [])
 
         if isinstance(inspection_date_obj, datetime.date) or isinstance(inspection_date_obj, datetime.datetime):

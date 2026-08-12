@@ -20,7 +20,7 @@ import json
 import random
 import time
 from pathlib import Path
-from typing import Literal, Any
+from typing import Any, Literal
 
 import structlog
 from google import genai
@@ -572,7 +572,7 @@ Rules:
         else:
             file_info = file_path
 
-        orig_name = original_filename or (Path(file_path).name if is_local or is_remote_name else "photo.jpg")
+        orig_name = original_filename or (Path(file_path).name if (is_local or is_remote_name) and isinstance(file_path, (str, Path)) else "photo.jpg")
 
         prompt = (
             f"You are Wickham Roofing's senior forensic roofing inspector creating photographic documentation for an inspection report. "
@@ -689,7 +689,6 @@ Rules:
                     orig_names.append("photo.jpg")
 
         all_local = True
-        all_remote_name = True
         file_data_list = []
         total_size = 0
         
@@ -699,10 +698,9 @@ Rules:
                 if str(p).startswith("files/") or not p_path.exists():
                     all_local = False
                 else:
-                    all_remote_name = False
+                    pass
             else:
                 all_local = False
-                all_remote_name = False
 
         prompt = (
             "You are Wickham Roofing's senior forensic roofing inspector creating photographic documentation for an insurance claim.\n\n"
@@ -741,7 +739,7 @@ Rules:
 
             if inline_possible and file_data_list:
                 log.info("photo_analysis_batch_inline_mode")
-                contents = []
+                contents: list = []
                 for (f_bytes, _), orig_name in zip(file_data_list, orig_names):
                     contents.append(f"[Photo: {orig_name}]")
                     part = genai_types.Part.from_bytes(data=f_bytes, mime_type="image/jpeg")

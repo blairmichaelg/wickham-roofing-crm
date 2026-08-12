@@ -53,7 +53,7 @@ def configure_logging(log_level: str) -> None:
     )
 
 
-async def create_redis_pool() -> "ArqRedis":
+async def create_redis_pool() -> ArqRedis:
     """Create and return an ARQ Redis connection pool."""
     from app.workers.settings import get_redis_settings
 
