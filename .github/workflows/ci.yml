@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "develop"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  test:
+    name: Lint, Type-Check & Test
+    runs-on: ubuntu-latest
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # Minimal .env for test suite — no real secrets required
+      APP_ENV: test
+      LOG_LEVEL: WARNING
+      ADMIN_PIN: "8471"
+      ACCOUNTING_PIN: "5523"
+      OPERATIONS_PIN: "7791"
+      GEMINI_API_KEY: "ci-placeholder"
+      WEBHOOK_SECRET: "ci-placeholder-secret"
+      REDIS_URL: "redis://localhost:6379/0"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install runtime + dev dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Ruff lint
+        run: ruff check app/
+
+      - name: Mypy type-check (core + services)
+        run: mypy app/core app/services
+
+      - name: Run test suite with coverage
+        run: |
+          pytest tests/ -v \
+            --cov=app \
+            --cov-report=term-missing \
+            --cov-fail-under=75 \
+            -x
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: htmlcov/
+          retention-days: 7

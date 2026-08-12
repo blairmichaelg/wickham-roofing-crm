@@ -111,3 +111,81 @@ Whenever deploying a new build or performing maintenance on an active server, ex
 ```
 
 If all tests and linter checks pass cleanly, your local or cloud CRM deployment is completely hardened, mathematically proven, and operational for real-world production.
+
+---
+
+## Part 5: Database Backup & Restore
+
+### Critical Data Directories
+
+The following paths contain all persisted state and must be included in any backup strategy:
+
+| Path | Contents | Priority |
+| :--- | :--- | :--- |
+| `data/wickham.db` | Production SQLite WAL database (all jobs, financials, reps) | **CRITICAL** |
+| `data/wickham.db-shm` | WAL shared memory (auto-regenerated, but copy to be safe) | High |
+| `data/wickham.db-wal` | WAL write-ahead log (flush before backup) | High |
+| `data/backups/` | Automated `VACUUM INTO` database snapshots (managed by cron) | High |
+| `appendonlydir/` | Redis AOF persistence (queued background tasks) | Medium |
+| `data/field_docs/` | Generated PDF vault (contingency agreements, supplements, etc.) | Medium |
+| `signed_agreements/` | Signed contingency agreement signature images | Medium |
+| `field_photos/` | Uploaded roof inspection photos | Medium |
+| `generated_exports/` | QuickBooks Online (QBO) CSV exports | Low |
+
+### Manual Backup Procedure
+
+```powershell
+# 1. Stop the FastAPI server to ensure a clean snapshot
+Stop-Process -Name "python" -ErrorAction SilentlyContinue
+
+# 2. Force a WAL checkpoint to flush all pending writes to the main DB file
+.\venv\Scripts\python.exe -c "
+import sqlite3
+conn = sqlite3.connect('data/wickham.db')
+conn.execute('PRAGMA wal_checkpoint(FULL)')
+conn.close()
+print('WAL checkpoint complete.')
+"
+
+# 3. Copy all critical paths to your backup destination
+$backup_dest = "D:\Backups\WickhamCRM_$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+New-Item -ItemType Directory -Path $backup_dest -Force | Out-Null
+Copy-Item -Path "data\wickham.db*" -Destination $backup_dest -Force
+Copy-Item -Path "data\backups"    -Destination $backup_dest -Recurse -Force
+Copy-Item -Path "appendonlydir"   -Destination $backup_dest -Recurse -Force
+Copy-Item -Path "data\field_docs" -Destination $backup_dest -Recurse -Force
+Copy-Item -Path "signed_agreements" -Destination $backup_dest -Recurse -Force
+Write-Host "Backup complete: $backup_dest"
+```
+
+### Restore Procedure
+
+```powershell
+# 1. Stop all running CRM services before restoring
+Stop-Process -Name "python", "redis-server" -ErrorAction SilentlyContinue
+Start-Sleep -Seconds 2
+
+# 2. Remove the existing database files
+Remove-Item -Path "data\wickham.db*" -Force -ErrorAction SilentlyContinue
+
+# 3. Copy restored files from backup
+$restore_source = "D:\Backups\WickhamCRM_<TIMESTAMP>"
+Copy-Item -Path "$restore_source\wickham.db*" -Destination "data\" -Force
+Copy-Item -Path "$restore_source\field_docs"  -Destination "data\" -Recurse -Force
+Copy-Item -Path "$restore_source\signed_agreements" -Destination ".\" -Recurse -Force
+
+# 4. Verify the database is readable
+.\venv\Scripts\python.exe -c "
+from app.core.database import get_connection
+conn = get_connection()
+count = conn.execute('SELECT COUNT(*) FROM jobs').fetchone()[0]
+conn.close()
+print(f'Restore verified: {count} jobs found.')
+"
+
+# 5. Restart services (watchdog scripts will auto-heal)
+Start-Process powershell -ArgumentList "-File scripts\services\srv_fastapi.ps1"
+```
+
+> [!CAUTION]
+> Never restore a database backup while the FastAPI server is running. SQLite WAL mode does not support hot-swapping the database file under an active connection — doing so will corrupt the WAL state and may cause data loss.
