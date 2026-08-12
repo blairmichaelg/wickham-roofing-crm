@@ -1,7 +1,7 @@
 # Full System Security, Legal & Operations Audit Report
 
 **Date**: August 11, 2026  
-**Target**: Wickham Roofing CRM (JobNimbus_controller)  
+**Target**: Wickham Roofing CRM (wickham-roofing-crm)  
 **Version**: 2.1.1  
 
 ---

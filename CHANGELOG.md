@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.1.4] - 2026-08-12
+### Changed (Rebrand & Reference Cleanup)
+- **Repository Renamed**: GitHub repository renamed from `blairmichaelg/JobNimbus_controller` to `blairmichaelg/wickham-roofing-crm`. Local git remote updated accordingly.
+- **Legacy Reference Purge**: Removed all remaining `JobNimbus` references from live code and documentation. Specifically:
+  - `app/services/pdf/documents.py`: Replaced "File delivery confirmation photo to JobNimbus upon arrival" with a generic instruction referencing the job record.
+  - `AUDIT_REPORT.md`: Removed `(JobNimbus_controller)` from the target line.
+  - `README.md`, `CONTRIBUTING.md`, `DEPLOYMENT.md`, `ARCHITECTURE.md`: Fixed stale clone URLs (`wickham_crm` → `wickham-roofing-crm`), updated test counts to 282, updated badge links and repo references.
+  - `pyproject.toml`: `[project] name` aligned to `wickham-roofing-crm`.
+- **Historical CHANGELOG entries** describing the JobNimbus-to-local-CRM migration are preserved as-is; they document a real architectural decision.
+
 ## [2.1.3] - 2026-08-12
 ### Fixed
 - **PWA Offline Sync**: Fixed a reference error in `field_app.html` service worker online event listener where `record` was incorrectly used instead of `item` when updating the offline queue retry count.

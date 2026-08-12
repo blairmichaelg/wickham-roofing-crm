@@ -19,8 +19,8 @@ The "Wickham Roofing CRM" architecture natively converts an office Windows PC or
 ### 2. Workspace Initialization
 1. Open PowerShell and clone the official project repository:
    ```powershell
-   git clone https://github.com/blairmichaelg/wickham_crm.git
-   cd wickham_crm
+   git clone https://github.com/blairmichaelg/wickham-roofing-crm.git
+   cd wickham-roofing-crm
    ```
 2. Provision a dedicated isolated Python virtual environment:
    ```powershell
@@ -84,7 +84,7 @@ For hybrid deployments requiring hosting on remote cloud infrastructure, the rep
 ### 1. Render Infrastructure Blueprint
 The included `render.yaml` configuration file automatically defines and launches a fully orchestrated cloud cluster:
 1. Log into your [Render Cloud Dashboard](https://render.com) and navigate to **New + $\rightarrow$ Blueprint**.
-2. Connect your private GitHub repository (`wickham_crm`).
+2. Connect your private GitHub repository (`wickham-roofing-crm`).
 3. Render reads `render.yaml` automatically, provisioning:
    - **Web Service (`wickham-ai-controller`)**: Using the root `Dockerfile` and `entrypoint.sh` script to run both Uvicorn and ARQ worker processes within a unified high-efficiency container.
    - **Key-Value Service (`wickham-redis`)**: An isolated internal Redis cache cluster accessible strictly over private container networks.
@@ -97,7 +97,7 @@ The included `render.yaml` configuration file automatically defines and launches
 Whenever deploying a new build or performing maintenance on an active server, execute the verification baseline to verify zero regressions:
 
 ```powershell
-# Verify complete automated test suite (must report 100% pass rate across 229 tests)
+# Verify complete automated test suite (must report 100% pass rate across 282 tests)
 .\venv\Scripts\python.exe -m pytest tests/ -v
 
 # Run Python static type verification

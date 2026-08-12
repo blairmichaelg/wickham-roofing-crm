@@ -537,7 +537,7 @@ class DocumentsGenerator(PDFEngine):
                 "Verify shingle color preferences with the homeowner and check the retail contract or supplement "
                 "details for any upgrade options prior to placing order. Confirm delivery address and coordinate "
                 "loading schedule with Alpha/Beta teams to ensure materials are on-site exactly when needed. "
-                "File delivery confirmation photo to JobNimbus upon arrival."
+                "File delivery confirmation photo in the job record upon arrival."
             )
             story.append(Paragraph(instr_text, self.custom_styles["BodyText"]))
             story.append(Spacer(1, 20))

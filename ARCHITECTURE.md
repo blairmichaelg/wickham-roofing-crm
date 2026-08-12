@@ -106,7 +106,7 @@ Running multi-role web servers over standard SQLite files historically risked da
 ## 6. Authoritative Repository Directory Tree
 
 ```
-wickham_crm/
+wickham-roofing-crm/
 ├── app/                        # Application Source Code Kernel
 │   ├── api/                    # FastAPI Routers (office_routes, field_routes, auth)
 │   ├── core/                   # SQLite WAL Database, Schema Migrations & Ingestion Models
@@ -120,7 +120,7 @@ wickham_crm/
 │   ├── field_runbook.md        # Emergency operational diagnostics and incident mitigation
 │   ├── operations_guide.md     # Material orders, scheduled installations, and site flags
 │   └── security_tasks.md       # Technical audit specifications and security authorization limits
-├── tests/                      # 229+ Fully Asserted Integration & Unit Test Scripts
+├── tests/                      # 282+ Fully Asserted Integration & Unit Test Scripts
 ├── tools/                      # Networking & Tunneling Tools (cloudflared.exe binary isolate)
 ├── building_codes/             # Zero-Cost Local RAG Municipal Building Code Archives
 ├── data/                       # Local Storage Repository (SQLite Main DB & Hot WAL Backups)

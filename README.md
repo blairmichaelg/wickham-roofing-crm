@@ -1,13 +1,13 @@
-# Wickham Roofing AI Pipeline — V4 "Wickham Roofing CRM"
+# Wickham Roofing CRM — V4
 
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109%2B-00a393.svg)](https://fastapi.tiangolo.com/)
 [![SQLite WAL](https://img.shields.io/badge/Database-SQLite%20WAL-003B57.svg)](https://www.sqlite.org/wal.html)
 [![AI Engine: Gemini 2.5 Flash](https://img.shields.io/badge/AI%20Engine-Gemini%202.5%20Flash-8A2BE2.svg)](https://deepmind.google/technologies/gemini/)
-[![Tests: 274 Passing (100%)](https://img.shields.io/badge/Tests-274%20Passed%20(100%25)-brightgreen.svg)](https://pytest.org/)
-[![Version](https://img.shields.io/badge/Version-2.1.1-orange.svg)](https://github.com/blairmichaelg/JobNimbus_controller)
+[![Tests: 282 Passing (100%)](https://img.shields.io/badge/Tests-282%20Passed%20(100%25)-brightgreen.svg)](https://pytest.org/)
+[![Version](https://img.shields.io/badge/Version-2.1.3-orange.svg)](https://github.com/blairmichaelg/wickham-roofing-crm)
 
-The **Wickham Roofing AI Controller (V4 "Wickham Roofing CRM")** is a proprietary, local-first operational platform designed to automate insurance roofing production from field lead intake to financial ledger reconciliation.
+The **Wickham Roofing CRM (V4)** is a proprietary, local-first operational platform designed to automate insurance roofing production from field lead intake to financial ledger reconciliation.
 
 Engineered to operate entirely offline or via zero-cloud tunneling directly from field office hardware, V4 completely eliminates third-party SaaS dependency by orchestrating deterministic insurance math, forensic AI roof analysis, automated paperwork matrices, and QuickBooks Online (QBO) invoice exporting over a self-healing SQLite state machine.
 
@@ -17,7 +17,7 @@ Engineered to operate entirely offline or via zero-cloud tunneling directly from
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                       WICKHAM ROOFING "WICKHAM ROOFING CRM"                        │
+│                         WICKHAM ROOFING CRM V4                              │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │  FIELD OPERATIONS (Mobile SPA via Cloudflare/Ngrok Tunnel)                  │
@@ -66,7 +66,7 @@ The system isolates operational data across four distinct user roles, authentica
 | **Background Task Queue** | ARQ over Local Redis | Asynchronous background document parsing, PDF compilation, and building code RAG lookups without halting UI threads. |
 | **Document Vault Engine** | ReportLab + pdfplumber | Deterministic, precision-aligned generation of statutory legal notices, supplier POs, and evidence grids. |
 | **Frontend & UI** | Vanilla JS + Tailwind CSS | Zero-bundle bloat, offline Service Worker capabilities with IndexedDB persistence, and crisp reactive dashboards. |
-| **Quality & Assurance** | Pytest / Mypy / Ruff | **274 tests** passing at a 100% pass rate; strict static analysis zero-error compliance across all layers. |
+| **Quality & Assurance** | Pytest / Mypy / Ruff | **282 tests** passing at a 100% pass rate; strict static analysis zero-error compliance across all layers. |
 
 ---
 
@@ -86,7 +86,7 @@ To ensure real-world financial accuracy, the pipeline strictly separates mathema
 - **Self-Healing Realtime WebSockets**: Automated frontend reconnect logic coupled with server-side active background heartbeat loops instantly sweeps dead client sockets.
 - **Path Traversal & IDOR Defense**: All document download endpoints apply rigorous cryptographic hashing and filename sanitization (`sanitize_download_filename`).
 
-### 3. Non-Blocking "Naked Lead" Sales Workflow (v1.9.0)
+### 3. Non-Blocking "Naked Lead" Sales Workflow
 
 Field reps can now capture minimal lead data (name, address, phone) at the door **without requiring an immediate signature or photos**. The system stores the lead as `LEAD_CAPTURED`, keeping it visible to the core team without clogging the active production pipeline.
 
@@ -107,8 +107,8 @@ Field reps can now capture minimal lead data (name, address, phone) at the door 
 
 ```powershell
 # Clone repository
-git clone https://github.com/blairmichaelg/wickham_crm.git
-cd wickham_crm
+git clone https://github.com/blairmichaelg/wickham-roofing-crm.git
+cd wickham-roofing-crm
 
 # Provision virtual environment
 python -m venv venv
@@ -130,7 +130,7 @@ cp .env.example .env
 
 ### 3. Verification & Execution
 
-Validate system stability against the 274-test verification matrix before firing the application engines:
+Validate system stability against the 282-test verification matrix before firing the application engines:
 
 ```powershell
 # Execute comprehensive automated test matrix
@@ -167,6 +167,7 @@ Comprehensive operator manuals and operational runbooks are maintained directly 
 - **[Admin & Technical Guide](docs/admin_tech_guide.md)**: Master triage, rep administration, and emergency override procedures.
 - **[Field Runbook](docs/field_runbook.md)**: Emergency troubleshooting playbook for connectivity or state machine issues during live deployment.
 - **[Security Architecture](docs/security_tasks.md)**: Authorization boundaries and Phase 3 cryptographic security specifications.
+- **[Testing Guide](docs/testing.md)**: Test coverage map, thresholds, and how to run the full matrix with coverage reporting.
 
 ---
 
