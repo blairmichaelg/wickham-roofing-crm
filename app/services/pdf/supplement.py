@@ -250,19 +250,19 @@ class SupplementGenerator(PDFEngine):
                                 f"({dmg_type}, {severity} severity). Documented for carrier loss adjustment."
                             )
                     else:
-                        dmg_det = "Pending Analysis"
+                        dmg_det = "No AI Analysis"
                         dmg_type = "Field Inspection Photo"
                         severity = "Not Classified"
                         hail = "—"
                         creases = "—"
                         granules = "—"
                         fiberglass = "—"
-                        conf_str = "Pending"
+                        conf_str = "N/A"
                         
                         note_text = (
-                            "<b>Field Photo — Awaiting AI Audit:</b> This photo was captured on-site during the "
+                            "<b>Field Photo — No AI analysis available:</b> This photo was captured on-site during the "
                             f"physical property inspection of {address}. "
-                            "It has been ingested into the claim file and is pending automated vision analysis."
+                            "No AI vision analysis is currently available for this photo."
                         )
 
                     data_rows = [
