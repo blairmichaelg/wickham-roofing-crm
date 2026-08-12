@@ -728,7 +728,7 @@
                         await new Promise(r => { delTx.oncomplete = r; });
                         updatePendingSyncBadge();
                     } catch (err) {
-                        record.retry_count = (item.retry_count || 0) + 1;
+                        item.retry_count = (item.retry_count || 0) + 1;
                         if (err.isHttpError && err.status && err.status >= 400 && err.status < 500) {
                             item.status = 'failed_permanent'; // client errors won't fix themselves on retry
                         } else if (item.retry_count >= 5) {

@@ -1,4 +1,5 @@
 import re
+from functools import lru_cache
 from pathlib import Path
 
 import structlog
@@ -16,6 +17,7 @@ DISCREPANCY_TO_CODE_MAP = {
     "Missing O&P": []
 }
 
+@lru_cache(maxsize=16)
 def parse_code_files(directory_path: str = "building_codes") -> dict[str, CodeSection]:
     """
     Reads all .txt files in the directory and extracts XML tags and their contents.

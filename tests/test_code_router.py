@@ -24,6 +24,7 @@ class TestCodeRouter:
         mock_path_class.return_value = mock_path_instance
 
         code_index = parse_code_files("fake_dir")
+        parse_code_files.cache_clear()
         
         assert "SECTION_R100" in code_index
         assert code_index["SECTION_R100"].text == "Content for tag 1."

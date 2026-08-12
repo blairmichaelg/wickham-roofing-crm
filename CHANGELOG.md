@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.1.3] - 2026-08-12
+### Fixed
+- **PWA Offline Sync**: Fixed a reference error in `field_app.html` service worker online event listener where `record` was incorrectly used instead of `item` when updating the offline queue retry count.
+
+### Optimized
+- **Building Code RAG**: Integrated `functools.lru_cache` on `parse_code_files` in `app/core/code_router.py` to prevent redundant file system reads during supplement pipelines.
+- **Test Isolation**: Added `cache_clear()` calls in `tests/test_code_router.py` to preserve test environment hygiene.
+
 ## [2.1.2] - 2026-08-11
 ### Added & Hardened (AI Safety & Mathematical Verification Gates)
 - **AI Safety Prompts**: Hardened all Statement of Loss extraction prompt templates in `app/services/ai_service.py` with explicit, mandatory `CRITICAL NO-MATH DIRECTIVE` blocks, preventing the LLM from executing arithmetic or guessing values.
