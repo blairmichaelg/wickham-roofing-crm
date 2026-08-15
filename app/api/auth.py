@@ -1,7 +1,7 @@
 import datetime
 
 import jwt
-from fastapi import Cookie, Depends, Header, HTTPException
+from fastapi import Cookie, Depends, Header, HTTPException, Request
 
 from app.config import get_settings
 
@@ -52,7 +52,7 @@ def decode_token(token: str) -> dict:
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Invalid authentication credentials")
 
-CORE_TEAM_NAMES = {"michael", "scott", "debi"}
+CORE_TEAM_NAMES = {"michael", "scott", "debi", "alex wickham"}
 
 def is_core_user(claims: dict | None) -> bool:
     """
@@ -112,6 +112,7 @@ async def get_current_role(
     return payload["role"]
 
 async def get_current_claims(
+    request: Request,
     auth_token: str | None = Cookie(None),
     x_internal_token: str | None = Header(None, alias="x-internal-token")
 ) -> dict:
@@ -122,7 +123,17 @@ async def get_current_claims(
     token = x_internal_token or auth_token
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    return decode_token(token)
+    claims = decode_token(token)
+    
+    rep_name = (claims.get("rep_name") or "").strip().lower()
+    if rep_name == "alex wickham":
+        if request.method not in ("GET", "HEAD", "OPTIONS"):
+            raise HTTPException(
+                status_code=403,
+                detail="Alex Wickham has read-only privileges and cannot perform modifications."
+            )
+            
+    return claims
 
 async def verify_admin(claims: dict = Depends(get_current_claims)):
     if not is_admin_or_core(claims):

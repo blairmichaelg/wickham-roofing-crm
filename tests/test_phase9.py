@@ -300,3 +300,52 @@ def test_admin_reps_api_requires_admin_role(field_rep_and_cookie):
     assert res.status_code == 403, (
         f"Expected 403 for field role, got: {res.status_code}: {res.text}"
     )
+
+
+# ── Test 15: Alex Wickham Read-Only Verification ──────────────────────────────
+
+def test_alex_wickham_read_only():
+    """Verify that Alex Wickham (PIN 1999) has office read-only access and cannot perform mutations."""
+    # Ensure Alex Wickham is seeded in the test DB
+    from app.core.database import seed_core_team_reps
+    seed_core_team_reps()
+
+    # Login as Alex Wickham
+    login_res = client.post(
+        "/auth/login",
+        data={"pin": "1999", "redirect_url": "/"},
+        follow_redirects=False,
+    )
+    assert login_res.status_code == 303
+    alex_token = login_res.cookies.get("auth_token")
+    assert alex_token is not None
+
+    # Verify GET access to office views (e.g. /admin)
+    admin_view_res = client.get(
+        "/admin",
+        cookies={"auth_token": alex_token},
+    )
+    assert admin_view_res.status_code == 200
+
+    # Verify GET access to accounting views
+    accounting_view_res = client.get(
+        "/accounting",
+        cookies={"auth_token": alex_token},
+    )
+    assert accounting_view_res.status_code == 200
+
+    # Verify GET access to reps API
+    reps_res = client.get(
+        "/api/admin/reps/",
+        cookies={"auth_token": alex_token},
+    )
+    assert reps_res.status_code == 200
+
+    # Verify POST mutation is BLOCKED with 403 Forbidden
+    mutation_res = client.post(
+        "/api/admin/reps/",
+        json={"name": "Forbidden Rep", "pin": "2222"},
+        cookies={"auth_token": alex_token},
+    )
+    assert mutation_res.status_code == 403
+    assert "Alex Wickham has read-only privileges" in mutation_res.text
