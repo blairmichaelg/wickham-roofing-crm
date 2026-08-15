@@ -349,3 +349,15 @@ def test_alex_wickham_read_only():
     )
     assert mutation_res.status_code == 403
     assert "Alex Wickham has read-only privileges" in mutation_res.text
+
+    # Verify GET access to help guides and that he can see all guides
+    help_res = client.get(
+        "/help",
+        cookies={"auth_token": alex_token},
+    )
+    assert help_res.status_code == 200
+    assert "isCore = true" in help_res.text
+    assert "Admin Guide" in help_res.text
+    assert "Accounting Guide" in help_res.text
+    assert "Operations Guide" in help_res.text
+    assert "Field Guide" in help_res.text

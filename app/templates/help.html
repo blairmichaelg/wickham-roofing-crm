@@ -13,7 +13,7 @@
         </div>
         <!-- Tab Bar -->
         <div class="flex flex-wrap gap-2" id="tab-container">
-            {% if role in ['admin', 'accounting', 'operations'] %}
+            {% if role in ['admin', 'accounting', 'operations'] or is_core %}
                 <button onclick="switchTab('admin')" id="tab-btn-admin" class="px-3 py-1.5 rounded text-sm font-semibold transition-all border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500">Admin Guide</button>
                 <button onclick="switchTab('accounting')" id="tab-btn-accounting" class="px-3 py-1.5 rounded text-sm font-semibold transition-all border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500">Accounting Guide</button>
                 <button onclick="switchTab('debi')" id="tab-btn-debi" class="px-3 py-1.5 rounded text-sm font-semibold transition-all border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500">Debi's Onboarding</button>
@@ -37,7 +37,7 @@
     </div>
     
     <div class="p-8 max-w-4xl mx-auto w-full">
-{% if role in ['admin', 'accounting', 'operations'] %}
+{% if role in ['admin', 'accounting', 'operations'] or is_core %}
 <div id="content-admin" class="hidden mb-12 bg-gray-800 p-8 rounded-lg shadow-lg border border-gray-700">
 <h2 class="text-2xl font-black mt-8 mb-4 border-b border-gray-700 pb-2">Wickham Roofing — Admin (Tech Admin) Guide</h2>
 <strong>Wickham Roofing CRM v4 · Admin Role</strong>
@@ -917,6 +917,7 @@ Never manually edit the `data/wickham.db` SQLite file with external viewers (lik
 
 <script>
     const userRole = "{{ role }}";
+    const isCore = {{ 'true' if is_core else 'false' }};
     function switchTab(tabName) {
         // All potential tabs
         const allTabs = ['admin', 'accounting', 'debi', 'operations', 'field', 'runbook'];
@@ -945,7 +946,7 @@ Never manually edit the `data/wickham.db` SQLite file with external viewers (lik
     
     // Auto-select tab on load based on active role
     window.addEventListener('DOMContentLoaded', () => {
-        if (userRole === 'admin') {
+        if (isCore || userRole === 'admin') {
             switchTab('admin');
         } else if (userRole === 'accounting') {
             switchTab('accounting');

@@ -182,8 +182,16 @@ async def route_office_dashboard(role: str = Depends(get_current_role)):
 @router.get("/help", tags=["frontend"])
 async def help_page(request: Request, role: str = Depends(get_current_role)):
     templates = request.app.state.templates
+    token = request.cookies.get("auth_token", "")
+    is_core = False
+    if token:
+        try:
+            claims = decode_token(token)
+            is_core = is_core_user(claims)
+        except Exception:
+            pass
     return templates.TemplateResponse(
-        request, "help.html", {"request": request, "role": role}
+        request, "help.html", {"request": request, "role": role, "is_core": is_core}
     )
 
 
