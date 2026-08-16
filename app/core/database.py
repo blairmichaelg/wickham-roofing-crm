@@ -266,8 +266,14 @@ def run_migrations() -> None:
             m16.up(conn)
             conn.execute("UPDATE schema_version SET version = 16, applied_at = CURRENT_TIMESTAMP WHERE id = 1")
 
+        if current_version < 17:
+            import importlib
+            m17 = importlib.import_module("app.core.migrations.0017_add_county_and_report_time_to_storm_events")
+            m17.up(conn)
+            conn.execute("UPDATE schema_version SET version = 17, applied_at = CURRENT_TIMESTAMP WHERE id = 1")
+
         conn.execute("COMMIT")
-        logger.info("migrations_applied", current_version=current_version, target_version=16)
+        logger.info("migrations_applied", current_version=current_version, target_version=17)
         
         # Since seed logic was removed from up(), do it here outside the transaction
         if current_version < 1:

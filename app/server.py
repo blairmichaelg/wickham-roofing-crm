@@ -51,6 +51,52 @@ from app.infra import configure_logging, create_redis_pool
 # ---------------------------------------------------------------------------
 
 
+async def redis_pubsub_listener(app: FastAPI):
+    """
+    Listens for storm alerts on Redis pub/sub and broadcasts them via WebSocket.
+    """
+    import asyncio
+    import json
+    import structlog
+    from app.core.notifications import notifier
+    
+    logger = structlog.get_logger("app.redis_pubsub")
+    logger.info("redis_pubsub_listener_started")
+    
+    # Wait until redis_pool is attached to app state
+    while not getattr(app.state, "redis_pool", None):
+        await asyncio.sleep(0.1)
+        
+    redis_pool = app.state.redis_pool
+    pubsub = redis_pool.pubsub()
+    
+    try:
+        await pubsub.subscribe("channel:storm_alerts")
+        logger.info("subscribed_to_storm_alerts_channel")
+        
+        async for message in pubsub.listen():
+            if message and message.get("type") == "message":
+                try:
+                    data_str = message.get("data")
+                    if isinstance(data_str, bytes):
+                        data_str = data_str.decode("utf-8")
+                    alert_data = json.loads(data_str)
+                    logger.info("received_redis_pubsub_alert", alert=alert_data)
+                    await notifier.broadcast(alert_data)
+                except Exception as e:
+                    logger.error("failed_to_broadcast_pubsub_alert", error=str(e))
+    except asyncio.CancelledError:
+        logger.info("redis_pubsub_listener_cancelled")
+    except Exception as e:
+        logger.error("redis_pubsub_listener_error", error=str(e))
+    finally:
+        try:
+            await pubsub.unsubscribe("channel:storm_alerts")
+            await pubsub.aclose()
+        except Exception:
+            pass
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -65,6 +111,7 @@ async def lifespan(app: FastAPI):
     Shutdown:
     - Cleanly close connections
     """
+    import asyncio
     logger = structlog.get_logger("app.lifespan")
     settings = get_settings()
     configure_logging(settings.log_level)
@@ -93,11 +140,22 @@ async def lifespan(app: FastAPI):
     app.state.redis_pool = redis_pool
     logger.info("arq_redis_pool_attached_to_app_state")
 
+    # Start Redis Pub/Sub listener for storm alerts
+    app.state.pubsub_listener_task = asyncio.create_task(redis_pubsub_listener(app))
+    logger.info("redis_pubsub_listener_task_started")
+
     logger.info("application_ready")
     yield
 
     # Shutdown
     logger.info("application_shutting_down")
+    if hasattr(app.state, "pubsub_listener_task"):
+        app.state.pubsub_listener_task.cancel()
+        try:
+            await app.state.pubsub_listener_task
+        except asyncio.CancelledError:
+            pass
+
     if hasattr(app.state, "redis_pool"):
         await app.state.redis_pool.close()
     logger.info("application_stopped")

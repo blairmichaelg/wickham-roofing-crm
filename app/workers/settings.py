@@ -25,6 +25,7 @@ from app.workers.photo_processor import process_photo_damage
 from app.workers.rebuttal_processor import process_rebuttal
 from app.workers.retail_quote_processor import process_retail_quote
 from app.workers.supplement_processor import process_supplement_event
+from app.workers.storm_worker import ingest_storm_events
 
 logger = structlog.get_logger("app.workers.settings")
 
@@ -75,6 +76,9 @@ async def startup(ctx: dict) -> None:
     else:
         logger.info("[DEV MODE] Worker connected to Redis DB 1")
     logger.info("worker_starting_up")
+    
+    # Run storm ingestion on startup in the background
+    asyncio.create_task(ingest_storm_events(ctx))
 
 
 async def shutdown(ctx: dict) -> None:
@@ -120,6 +124,7 @@ class WorkerSettings:
         process_commission,
         process_escalation,
         process_photo_damage,
+        ingest_storm_events,
     ]
 
     redis_settings = get_redis_settings()
@@ -130,7 +135,13 @@ class WorkerSettings:
     on_startup = startup
     on_shutdown = shutdown
 
+    # Dynamic minutes set based on storm_ingest_interval_minutes
+    _settings = get_settings()
+    _interval = _settings.storm_ingest_interval_minutes or 15
+    _minutes_set = set(range(0, 60, _interval))
+
     cron_jobs = [
         cron(run_cleanup, hour=2, minute=0),
         cron(run_backup, hour={0, 4, 8, 12, 16, 20}, minute=0),
+        cron(ingest_storm_events, minute=_minutes_set),
     ]

@@ -133,6 +133,39 @@
         </div>
         {% endif %}
         
+    <!-- Toast Container -->
+    <div id="toastContainer" class="fixed top-4 right-4 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+    <!-- Floating Storm Radar Widget -->
+    <div id="adminStormRadar" class="fixed bottom-4 right-4 z-40 w-80 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl overflow-hidden transition-all duration-300">
+        <!-- Header -->
+        <button onclick="toggleStormRadar()" class="w-full flex justify-between items-center p-4 bg-gray-950 border-b border-gray-800 font-bold hover:bg-gray-900 transition-colors">
+            <span class="flex items-center gap-2 text-white">
+                <span class="animate-pulse">⚡</span> Storm Radar
+            </span>
+            <div class="flex items-center gap-2">
+                <span class="text-[10px] bg-red-900/80 text-red-300 border border-red-700 px-2 py-0.5 rounded-full font-bold">NWS Live</span>
+                <span id="stormRadarArrow" class="text-xs text-gray-400">&darr;</span>
+            </div>
+        </button>
+        <!-- Content -->
+        <div id="stormRadarContent" class="hidden p-4 space-y-4 max-h-96 overflow-y-auto">
+            <!-- Stats -->
+            <div class="grid grid-cols-2 gap-2 text-center text-xs">
+                <div class="p-2 bg-gray-950/60 rounded border border-gray-800">
+                    <div class="text-lg font-extrabold text-amber-400" id="adminHailCount">0</div>
+                    <div class="text-[9px] text-gray-500 uppercase font-bold">Hail</div>
+                </div>
+                <div class="p-2 bg-gray-950/60 rounded border border-gray-800">
+                    <div class="text-lg font-extrabold text-blue-400" id="adminWindCount">0</div>
+                    <div class="text-[9px] text-gray-500 uppercase font-bold">Wind</div>
+                </div>
+            </div>
+            <!-- List -->
+            <div id="adminStormList" class="space-y-2">
+                <p class="text-gray-500 text-xs text-center py-2">No storms in the last 72 hours.</p>
+            </div>
+        </div>
     </div>
     
     <script>
@@ -144,8 +177,135 @@
             const data = JSON.parse(event.data);
             if (data.type === 'new_lead' || data.type === 'stale' || data.type === 'contingency_signed') {
                 window.location.reload();
+            } else if (data.type === 'storm_alert') {
+                handleAdminIncomingStormAlert(data);
             }
         };
+
+        let isRadarOpen = false;
+        function toggleStormRadar() {
+            const content = document.getElementById('stormRadarContent');
+            const arrow = document.getElementById('stormRadarArrow');
+            isRadarOpen = !isRadarOpen;
+            if (isRadarOpen) {
+                content.classList.remove('hidden');
+                arrow.innerHTML = '&uarr;';
+                loadAdminStormRadar();
+            } else {
+                content.classList.add('hidden');
+                arrow.innerHTML = '&darr;';
+            }
+        }
+        
+        async function loadAdminStormRadar() {
+            try {
+                const recentResp = await fetch('/api/storms/recent');
+                const recent = recentResp.ok ? await recentResp.json() : [];
+                
+                const summaryResp = await fetch('/api/storms/summary');
+                const summary = summaryResp.ok ? await summaryResp.json() : {};
+                
+                let totalHail = 0;
+                let totalWind = 0;
+                for (const county in summary) {
+                    totalHail += summary[county].hail_count || 0;
+                    totalWind += summary[county].wind_count || 0;
+                }
+                document.getElementById('adminHailCount').innerText = totalHail;
+                document.getElementById('adminWindCount').innerText = totalWind;
+                
+                const listEl = document.getElementById('adminStormList');
+                if (recent.length === 0) {
+                    listEl.innerHTML = '<p class="text-gray-500 text-xs text-center py-2">No storms in the last 72 hours.</p>';
+                    return;
+                }
+                
+                listEl.innerHTML = recent.map(alert => renderAdminAlertItem(alert)).join('');
+            } catch (err) {
+                console.error("Failed to load storm radar data:", err);
+            }
+        }
+        
+        function renderAdminAlertItem(alert) {
+            const timeStr = new Date(alert.report_time_utc).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            
+            let detailStr = '';
+            let badgeColor = 'bg-red-900/80 text-red-300 border-red-700';
+            if (alert.event_type === 'HAIL') {
+                badgeColor = 'bg-amber-900/80 text-amber-300 border-amber-600';
+                detailStr = `${alert.hail_size_inches.toFixed(2)}" Hail`;
+            } else if (alert.event_type === 'WIND') {
+                badgeColor = 'bg-blue-900/80 text-blue-300 border-blue-600';
+                detailStr = `${alert.wind_speed_mph} mph Wind`;
+            } else if (alert.event_type === 'TORNADO') {
+                badgeColor = 'bg-red-950/80 text-red-400 border-red-600 animate-pulse';
+                detailStr = `Tornado`;
+            }
+            
+            return `
+                <div class="bg-gray-950/80 border border-gray-800 p-2 rounded text-xs text-left">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="font-bold text-purple-400">${alert.county || 'Unknown'}</span>
+                        <span class="text-[9px] text-gray-500">${timeStr}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-white font-medium">${detailStr}</span>
+                        <span class="text-[9px] px-1 py-0.2 rounded border ${badgeColor}">${alert.event_type}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function handleAdminIncomingStormAlert(alert) {
+            let title = 'Severe Weather Alert';
+            let msg = '';
+            if (alert.event_type === 'HAIL') {
+                title = '☄️ Severe Hail Alert';
+                msg = `${alert.hail_size_inches.toFixed(2)}" Hail reported in ${alert.county}.`;
+            } else if (alert.event_type === 'WIND') {
+                title = '💨 High Wind Alert';
+                msg = `${alert.wind_speed_mph} mph Winds reported in ${alert.county}.`;
+            } else if (alert.event_type === 'TORNADO') {
+                title = '🌪️ TORNADO WARNING';
+                msg = `Tornado reported in ${alert.county}! Take shelter!`;
+            }
+            
+            showAdminToastHTML(`
+                <div class="flex flex-col gap-1 w-full pointer-events-auto">
+                    <div class="font-extrabold text-white text-sm uppercase tracking-wider flex justify-between items-center">
+                        <span>${title}</span>
+                        <span class="text-[9px] bg-black/40 px-2 py-0.5 rounded-full border border-white/20">${alert.event_type}</span>
+                    </div>
+                    <p class="text-xs text-white/95 font-medium">${msg}</p>
+                    ${alert.loc_desc ? `<p class="text-[9px] text-white/70 italic">Location: ${alert.loc_desc}</p>` : ''}
+                </div>
+            `);
+
+            // If the radar is open, reload/prepend it
+            if (isRadarOpen) {
+                loadAdminStormRadar();
+            }
+        }
+
+        function showAdminToastHTML(htmlContent) {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `bg-red-950 border border-red-700 text-white px-4 py-3 rounded-xl shadow-2xl transform transition-all duration-300 opacity-0 translate-y-[-20px] pointer-events-auto flex justify-between items-start max-w-sm w-full`;
+            toast.innerHTML = `
+                <div class="flex-1 mr-2 text-left">${htmlContent}</div>
+                <button onclick="this.parentElement.remove()" class="text-white/80 hover:text-white font-extrabold text-lg line-height-1">&times;</button>
+            `;
+            container.appendChild(toast);
+            
+            requestAnimationFrame(() => {
+                toast.classList.remove('opacity-0', 'translate-y-[-20px]');
+            });
+            
+            setTimeout(() => {
+                toast.classList.add('opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 8000);
+        }
     </script>
 </body>
 </html>

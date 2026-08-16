@@ -548,3 +548,79 @@ async def serve_job_detail(
             "office_token": request.cookies.get("auth_token", ""),
         },
     )
+
+
+@router.get("/api/storms/recent", tags=["storms"])
+async def get_recent_storms(role: str = Depends(get_current_role)):
+    """Fetch storm events in the last 72 hours, ordered by most recent."""
+    from datetime import datetime, timedelta, timezone
+    from app.core.database import get_connection
+    
+    threshold = (datetime.now(timezone.utc) - timedelta(hours=72)).isoformat()
+    conn = get_connection()
+    try:
+        cursor = conn.execute(
+            """
+            SELECT id, event_type, hail_size_inches, wind_speed_mph, latitude, longitude, county, report_time_utc
+            FROM storm_events
+            WHERE report_time_utc >= ?
+            ORDER BY report_time_utc DESC
+            """,
+            (threshold,)
+        )
+        return [dict(r) for r in cursor.fetchall()]
+    finally:
+        conn.close()
+
+
+@router.get("/api/storms/summary", tags=["storms"])
+async def get_storms_summary(role: str = Depends(get_current_role)):
+    """Fetch summary of storm activity in the last 72 hours, grouped by county and type."""
+    from datetime import datetime, timedelta, timezone
+    from app.core.database import get_connection
+    
+    threshold = (datetime.now(timezone.utc) - timedelta(hours=72)).isoformat()
+    conn = get_connection()
+    try:
+        cursor = conn.execute(
+            """
+            SELECT county, event_type, hail_size_inches, wind_speed_mph
+            FROM storm_events
+            WHERE report_time_utc >= ? AND county IS NOT NULL AND county != ''
+            """,
+            (threshold,)
+        )
+        rows = cursor.fetchall()
+    finally:
+        conn.close()
+        
+    summary = {}
+    for r in rows:
+        county = r["county"]
+        etype = r["event_type"]
+        hail = r["hail_size_inches"] or 0.0
+        wind = r["wind_speed_mph"] or 0.0
+        
+        if county not in summary:
+            summary[county] = {
+                "hail_count": 0,
+                "wind_count": 0,
+                "tornado_count": 0,
+                "max_hail_size": 0.0,
+                "max_wind_speed": 0.0
+            }
+            
+        stats = summary[county]
+        
+        if etype == "HAIL":
+            stats["hail_count"] += 1
+            if hail > stats["max_hail_size"]:
+                stats["max_hail_size"] = hail
+        elif etype == "WIND":
+            stats["wind_count"] += 1
+            if wind > stats["max_wind_speed"]:
+                stats["max_wind_speed"] = wind
+        elif etype == "TORNADO":
+            stats["tornado_count"] += 1
+            
+    return summary

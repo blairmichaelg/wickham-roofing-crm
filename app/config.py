@@ -86,7 +86,36 @@ class Settings(BaseSettings):
         description="CRM status name used to filter test jobs. Only webhooks with this status are processed.",
     )
 
-    
+    # --- Storm Ingestion & Alerting ---
+    storm_office_lat: float = Field(
+        default=30.8766,
+        description="Latitude of the office center for storm monitoring."
+    )
+    storm_office_lon: float = Field(
+        default=-84.1994,
+        description="Longitude of the office center for storm monitoring."
+    )
+    storm_ingest_radius_miles: float = Field(
+        default=50.0,
+        description="Radius in miles around the office to ingest storm data."
+    )
+    storm_alert_radius_miles: float = Field(
+        default=30.0,
+        description="Radius in miles around the office to trigger active alerts."
+    )
+    storm_alert_min_hail_inches: float = Field(
+        default=1.0,
+        description="Minimum hail size in inches to trigger a storm alert."
+    )
+    storm_alert_min_wind_mph: float = Field(
+        default=58.0,
+        description="Minimum wind speed in mph to trigger a storm alert."
+    )
+    storm_ingest_interval_minutes: int = Field(
+        default=15,
+        description="Interval in minutes at which to run the storm ingestion task."
+    )
+
     @property
     def get_db_path(self) -> str:
         """

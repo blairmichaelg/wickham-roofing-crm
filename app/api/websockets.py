@@ -48,3 +48,39 @@ async def office_ws(websocket: WebSocket):
                 notifier.update_pong(websocket)
     except WebSocketDisconnect:
         notifier.disconnect(websocket)
+
+
+@router.websocket("/ws/field")
+async def field_ws(websocket: WebSocket):
+    """
+    WebSocket endpoint for field representatives real-time notifications.
+    """
+    token = (
+        websocket.query_params.get("token") or websocket.cookies.get("auth_token")
+    )
+    if not token:
+        await websocket.close(
+            code=1008, reason="Unauthorized: Missing authentication token"
+        )
+        return
+    try:
+        payload = decode_token(token)
+        if payload.get("role") not in ["field", "admin"]:
+            await websocket.close(
+                code=1008, reason="Forbidden: Unauthorized role for field feed"
+            )
+            return
+    except Exception:
+        await websocket.close(code=1008, reason="Unauthorized: Invalid token")
+        return
+
+    await notifier.connect(
+        websocket, client_id=f"field_client_{payload.get('rep_id', 'unknown')}", role=payload.get("role", "field")
+    )
+    try:
+        while True:
+            data = await websocket.receive_text()
+            if data == "pong":
+                notifier.update_pong(websocket)
+    except WebSocketDisconnect:
+        notifier.disconnect(websocket)
