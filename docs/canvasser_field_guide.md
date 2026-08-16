@@ -37,12 +37,7 @@ When you're with a homeowner and ready to start a job, you'll fill out the
    - **Insurance Restoration (Contingency)** — for storm/insurance claims.
    - **Retail Cash** — for out-of-pocket jobs.
 2. **Homeowner Name** — Use their legal or billing name.
-3. **Address Line 1, City, State, Zip** — Enter manually, or tap
-   **📍 Auto-Fill Address from GPS** to have the app fill it in automatically.
-   - ⚠️ **Always double-check the GPS address.** Rural addresses in Thomas
-     County can come back slightly wrong or incomplete. If you see
-     **"Failed to reverse geocode"** or a **GPS Error**, just type the
-     address manually.
+3. **Address Line 1, City, State, Zip** — Enter the property address manually. Ensure all street details, city names, and zip codes are typed correctly.
 4. **Phone** — Required.
 5. **Date of Loss (Optional)** — If the homeowner knows when the storm
    damage happened, enter it here.
@@ -250,7 +245,6 @@ still waiting to reach the office.
 | What you see | What it means | What to do |
 | --- | --- | --- |
 | "✕ Incorrect PIN. Try again." | Wrong PIN entered | Re-enter your PIN carefully |
-| "Failed to reverse geocode." | GPS couldn't find an address | Type the address manually |
 | "Photo X failed: [error] — Tap Submit Lead again to retry" | A server error stopped the submission | Tap Submit Lead again — it's safe, skips completed photos, and won't duplicate the job |
 | "Maximum of 15 photos allowed..." toast + red "X rejected!" counter | You selected more than 15 photos | Remove a less important photo, then re-add the one you need |
 | "Please draw a signature before locking." | Signature canvas is empty | Have the homeowner draw their signature |
@@ -325,10 +319,6 @@ means something needs office attention — it won't resolve itself.
 Only for Retail Cash jobs. Insurance Restoration jobs require a locked
 signature before you can submit.
 
-**Q: What happens if GPS gives me the wrong address?**
-Just overwrite the address fields manually — GPS is a shortcut, not a
-guarantee, especially in rural areas.
-
 **Q: Can I see my old jobs and their documents?**
 Yes — scroll down past the New Lead form to the **"My Recent Jobs"**
 section. You'll see your most recent jobs with the ability to load and
@@ -355,6 +345,6 @@ Contact the office/Tech Admin if:
 
 ---
 
-*This guide reflects the field app as of version `1.7.0` (commit `2107bb6`). If the app's
+*This guide reflects the field app as of version `2.3.0`. If the app's
 screens, buttons, or error messages change in a future update, this
 guide should be reviewed and updated to match.*
