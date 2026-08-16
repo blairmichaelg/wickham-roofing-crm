@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.3.0] - 2026-08-16
+### Refined & Remediated (Storm Ingestion Pipeline & Dashboard Restructuring)
+- **High-Performance Bounding-Box Ingestion**: Replaced inefficient, state-wide data fetching with spatial bounding-box geometry queries centered on the office coordinate system on the NWS 72-hour layer (Layer 2).
+- **Eliminated Third-Party Geocoding Dependency**: Removed all Nominatim OpenStreetMap reverse geocoding integrations client-side and server-side. Location descriptions are now natively constructed from NWS `loc_desc` and `state` attributes to ensure usage compliance.
+- **Deduplication Key & SQLite Unique Constraint**: Hardened database schema and ingestion flow with `dedup_key` (event type, rounded latitude/longitude, and time) along with a SQLite `UNIQUE` index constraint to guarantee ingestion idempotency across multiple runs.
+- **Admin Dashboard Layout Update**: Repositioned the Storm Radar widget from a fixed bottom-right floating panel to a static, collapsible card at the top of the dashboard content area.
+- **UI Label Terminology Alignment**: Renamed all dashboard columns and list badges referring to "County" to "Location" to match the new location descriptions.
+- **Unit Test Overhaul**: Re-wrote tests in `test_storm_radar.py` to target layer 2 mock queries, exclude Nominatim dependencies, and verify API query parameters (`since_hours`, `radius_miles`, `event_types`).
+
 ## [2.2.0] - 2026-08-12
 ### Added & Hardened (CRM Pipeline & Workflow Stabilization)
 - **Granular Payment Tracking & Milestone Automation**: Integrated detailed insurance and retail payment recording via the new `POST /api/office/accounting/jobs/{job_id}/mark-payment` endpoint. Added new job statuses: `ACV_PAYMENT_RECEIVED`, `DEPRECIATION_PAYMENT_RECEIVED`, `RETAIL_PAYMENT_RECEIVED`. The database state machine automatically transitions the job to `PAYMENT_RECEIVED` when both ACV and Depreciation check records are completed, triggering the commission calculation.

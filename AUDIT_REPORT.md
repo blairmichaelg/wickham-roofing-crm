@@ -1,14 +1,14 @@
 # Full System Security, Legal & Operations Audit Report
 
-**Date**: August 12, 2026  
+**Date**: August 16, 2026  
 **Target**: Wickham Roofing CRM (wickham-roofing-crm)  
-**Version**: 2.2.0  
+**Version**: 2.3.0  
 
 ---
 
 ## 1. FULL TEST SUITE AUDIT
 - **What was tested**: Execution of `pytest` across the full tracked application suite (`tests/`).
-- **Pass Rate**: **100% Pass** (274 Passed, 2 Skipped, 0 Failed).
+- **Pass Rate**: **100% Pass** (304 Passed, 0 Skipped, 0 Failed).
 - **Warnings**: 29 warnings (down from 30 — unregistered pytest mark resolved).
 - **Smoke Test Matrix**: Verified 10/10 generated PDF document types (`contingency_agreement`, `contingency_agreement_signed`, `notice_of_cancellation`, `retail_contract_signed`, `certificate_of_completion`, `Supplement_Request`, `inspection_report_homeowner`, `Retail_Quote`, `PO_ABC_Supply`, `Commission_Statement`).
 - **Coverage**: 67% total codebase coverage. Critical business path math and document generators tested 100%.
@@ -62,11 +62,18 @@ A comprehensive rebrand, architectural refactor, and testing/DevOps hardening pa
 - **Property-Based Testing Integration**: Deployed property-based testing utilizing `hypothesis`. Added 16 automated properties in `tests/test_property_supplement.py` testing the deterministic math correctness of the `SupplementEngine` across the complete range of valid/invalid inputs (eaves, valleys, pitches, waste percentages, and multi-trade conditions). Created `docs/testing.md` to map all 48 test modules to distinct business guarantees.
 - **CI/CD Pipeline & Recovery Hardening**: Created a GitHub Actions pipeline (`ci.yml`) to automatically run ruff linting, mypy type-checking, and the full pytest suite using a Redis service container on every commit/PR. Documented database Backup & Restore procedures under WAL mode, including directory mapping and checkpoint requirements.
 
+## 9. STORM INGESTION PIPELINE & DASHBOARD AUDIT (2026-08-16)
+- **High-Performance Ingestion**: Integrated NOAA Layer 2 (72-hour Local Storm Reports) MapServer queries, restricting ingestion to a spatial bounding box centered on office coordinates.
+- **Nominatim Geocoding Elimination**: Removed client-side reverse-geocoding Nominatim calls and all Nominatim dependencies. Location names are now dynamically populated from NWS attributes.
+- **Ingestion Deduplication**: Configured a compound `dedup_key` (event type, rounded latitude/longitude, and event time) backed by a SQLite UNIQUE index to ensure ingestion runs are completely idempotent.
+- **Admin Dashboard Layout Update**: Refactored the Storm Radar floating widget into a top-level, collapsible card integrated directly into the Kanban layout content flow.
+- **UI Nomenclature Realignment**: Standardized labels from "County" to "Location" to match NWS data structures.
+
 ---
 
 ### Final Summary & Metrics
-- **Test Count**: 299 Passed (283 Integration/Unit Tests + 16 Property-Based Tests)
+- **Test Count**: 304 Passed (288 Integration/Unit Tests + 16 Property-Based Tests)
 - **PDF Engine Document Types Verified**: 10 / 10
 - **CVEs Detected**: 0
-- **System Health**: Hardened, Modular, Production-Grade (v2.2.0)
+- **System Health**: Hardened, Modular, Production-Grade (v2.3.0)
 

@@ -29,8 +29,8 @@ def clean_storm_events():
 @pytest.mark.asyncio
 @patch("app.services.storm_feed.httpx.AsyncClient.get")
 async def test_nws_live_storm_feed_fetch_and_parse(mock_get):
-    """Test NWSLiveStormFeed fetches and parses correctly from NWS/Nominatim."""
-    # 1. Mock ArcGIS REST response
+    """Test NWSLiveStormFeed fetches and parses correctly from NWS ArcGIS."""
+    # Mock ArcGIS REST response (layer 2)
     mock_arcgis_resp = MagicMock()
     mock_arcgis_resp.status_code = 200
     mock_arcgis_resp.json.return_value = {
@@ -53,26 +53,17 @@ async def test_nws_live_storm_feed_fetch_and_parse(mock_get):
         ]
     }
     
-    # 2. Mock Nominatim reverse geocode response
-    mock_nominatim_resp = MagicMock()
-    mock_nominatim_resp.status_code = 200
-    mock_nominatim_resp.json.return_value = {
-        "address": {
-            "county": "Lowndes County"
-        }
-    }
-    
-    mock_get.side_effect = [mock_arcgis_resp, mock_nominatim_resp]
+    mock_get.return_value = mock_arcgis_resp
     
     feed = NWSLiveStormFeed()
-    reports = await feed.fetch_recent_reports()
+    reports = await feed.fetch_recent_reports(30.8766, -84.1994, 50.0)
     
     assert len(reports) == 1
     r = reports[0]
     assert r["id"] == "1001"
     assert r["event_type"] == "HAIL"
     assert r["hail_size_inches"] == 1.75
-    assert r["county"] == "Lowndes County"
+    assert r["county"] == "Valdosta, GA"
     assert r["latitude"] == 30.8327
     assert r["longitude"] == -83.2785
 
@@ -90,7 +81,7 @@ async def test_ingest_storm_events_task(mock_fetch):
             "wind_speed_mph": 0,
             "latitude": 30.85, # Near office (30.8766, -84.1994), distance ~20 miles
             "longitude": -84.00,
-            "county": "Thomas County",
+            "county": "Thomasville, GA",
             "report_time_utc": "2026-08-16T14:30:00Z",
             "loc_desc": "Thomasville",
             "remarks": "Severe hail"
@@ -99,10 +90,10 @@ async def test_ingest_storm_events_task(mock_fetch):
             "id": "ALERT_002",
             "event_type": "WIND",
             "hail_size_inches": 0,
-            "wind_speed_mph": 30, # Too low magnitude for alert
+            "wind_speed_mph": 30, # Too low magnitude for alert, but ingested
             "latitude": 30.85,
             "longitude": -84.00,
-            "county": "Thomas County",
+            "county": "Thomasville, GA",
             "report_time_utc": "2026-08-16T14:35:00Z",
             "loc_desc": "Thomasville",
             "remarks": "Light wind"
@@ -114,7 +105,7 @@ async def test_ingest_storm_events_task(mock_fetch):
             "wind_speed_mph": 0,
             "latitude": 32.00, # Too far (>50 miles), should be ignored
             "longitude": -84.00,
-            "county": "Dooly County",
+            "county": "Vienna, GA",
             "report_time_utc": "2026-08-16T14:40:00Z",
             "loc_desc": "Vienna",
             "remarks": "Huge hail but far away"
@@ -137,14 +128,15 @@ async def test_ingest_storm_events_task(mock_fetch):
     
     # Verify DB contains only ALERT_001 and ALERT_002
     conn = get_connection()
-    cursor = conn.execute("SELECT id, county, report_time_utc FROM storm_events ORDER BY id")
+    cursor = conn.execute("SELECT id, county, report_time_utc, dedup_key FROM storm_events ORDER BY id")
     rows = cursor.fetchall()
     conn.close()
     
     assert len(rows) == 2
     assert rows[0]["id"] == "ALERT_001"
-    assert rows[0]["county"] == "Thomas County"
+    assert rows[0]["county"] == "Thomasville, GA"
     assert rows[0]["report_time_utc"] == "2026-08-16T14:30:00Z"
+    assert rows[0]["dedup_key"] == "HAIL|30.85|-84.0|2026-08-16T14:30:00Z"
     
     assert rows[1]["id"] == "ALERT_002"
     
@@ -156,7 +148,7 @@ async def test_ingest_storm_events_task(mock_fetch):
     alert_payload = json.loads(published_msg)
     assert alert_payload["event_type"] == "HAIL"
     assert alert_payload["hail_size_inches"] == 1.5
-    assert alert_payload["county"] == "Thomas County"
+    assert alert_payload["county"] == "Thomasville, GA"
 
 
 def test_storm_rest_endpoints():
@@ -166,16 +158,16 @@ def test_storm_rest_endpoints():
     
     conn = get_connection()
     conn.execute(
-        "INSERT INTO storm_events (id, zipcode, event_type, event_date, hail_size_inches, wind_speed_mph, latitude, longitude, county, report_time_utc) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        ("TEST_H1", "31792", "HAIL", now_utc.strftime("%Y-%m-%d"), 1.5, 0, 30.8, -84.1, "Thomas County", now_utc.isoformat())
+        "INSERT INTO storm_events (id, zipcode, event_type, event_date, hail_size_inches, wind_speed_mph, latitude, longitude, county, report_time_utc, distance_miles_from_office) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("TEST_H1", "31792", "HAIL", now_utc.strftime("%Y-%m-%d"), 1.5, 0, 30.8, -84.1, "Thomas County", now_utc.isoformat(), 15.0)
     )
     conn.execute(
-        "INSERT INTO storm_events (id, zipcode, event_type, event_date, hail_size_inches, wind_speed_mph, latitude, longitude, county, report_time_utc) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        ("TEST_W1", "31792", "WIND", (now_utc - timedelta(hours=12)).strftime("%Y-%m-%d"), 0, 65, 30.8, -84.1, "Thomas County", (now_utc - timedelta(hours=12)).isoformat())
+        "INSERT INTO storm_events (id, zipcode, event_type, event_date, hail_size_inches, wind_speed_mph, latitude, longitude, county, report_time_utc, distance_miles_from_office) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("TEST_W1", "31792", "WIND", (now_utc - timedelta(hours=12)).strftime("%Y-%m-%d"), 0, 65, 30.8, -84.1, "Thomas County", (now_utc - timedelta(hours=12)).isoformat(), 25.0)
     )
     conn.execute(
-        "INSERT INTO storm_events (id, zipcode, event_type, event_date, hail_size_inches, wind_speed_mph, latitude, longitude, county, report_time_utc) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        ("TEST_H2", "31792", "HAIL", (now_utc - timedelta(days=5)).strftime("%Y-%m-%d"), 2.0, 0, 30.8, -84.1, "Thomas County", (now_utc - timedelta(days=5)).isoformat()) # Older than 72 hours
+        "INSERT INTO storm_events (id, zipcode, event_type, event_date, hail_size_inches, wind_speed_mph, latitude, longitude, county, report_time_utc, distance_miles_from_office) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("TEST_H2", "31792", "HAIL", (now_utc - timedelta(days=5)).strftime("%Y-%m-%d"), 2.0, 0, 30.8, -84.1, "Thomas County", (now_utc - timedelta(days=5)).isoformat(), 5.0) # Older than 72 hours
     )
     conn.commit()
     conn.close()
@@ -185,7 +177,7 @@ def test_storm_rest_endpoints():
     token = create_access_token("admin")
     client.cookies.set("auth_token", token)
     
-    # Test GET /api/storms/recent
+    # Test GET /api/storms/recent (default parameters: since_hours=72, radius_miles=50.0)
     response = client.get("/api/storms/recent")
     assert response.status_code == 200
     recent_data = response.json()
@@ -193,6 +185,20 @@ def test_storm_rest_endpoints():
     assert len(recent_data) == 2
     assert recent_data[0]["id"] == "TEST_H1"
     assert recent_data[1]["id"] == "TEST_W1"
+    
+    # Test GET /api/storms/recent with radius filter (radius_miles=20.0)
+    response = client.get("/api/storms/recent?radius_miles=20.0")
+    assert response.status_code == 200
+    recent_data = response.json()
+    assert len(recent_data) == 1
+    assert recent_data[0]["id"] == "TEST_H1"
+    
+    # Test GET /api/storms/recent with event_types filter
+    response = client.get("/api/storms/recent?event_types=WIND")
+    assert response.status_code == 200
+    recent_data = response.json()
+    assert len(recent_data) == 1
+    assert recent_data[0]["id"] == "TEST_W1"
     
     # Test GET /api/storms/summary
     response = client.get("/api/storms/summary")

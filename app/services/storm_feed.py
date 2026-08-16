@@ -1,11 +1,11 @@
 import math
+from datetime import UTC, datetime, timezone
+
 import httpx
 import structlog
-from datetime import datetime, timezone
 
 logger = structlog.get_logger("app.services.storm_feed")
 
-_county_cache = {}
 
 def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Calculate the great-circle distance between two points in miles."""
@@ -17,55 +17,45 @@ def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
 
-async def get_county_for_coordinates(lat: float, lon: float) -> str:
-    """Reverse geocode coordinates using OpenStreetMap Nominatim with caching."""
-    # Round to 3 decimal places to group close locations and limit external API hits
-    key = (round(lat, 3), round(lon, 3))
-    if key in _county_cache:
-        return _county_cache[key]
-
-    url = "https://nominatim.openstreetmap.org/reverse"
-    headers = {
-        "User-Agent": "WickhamRoofingCRM/1.0 (contact@wickhamroofing.com)"
-    }
-    params = {
-        "lat": str(lat),
-        "lon": str(lon),
-        "format": "json"
-    }
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(url, params=params, headers=headers, timeout=5)
-            if resp.status_code == 200:
-                data = resp.json()
-                county = data.get("address", {}).get("county")
-                if not county:
-                    # Fallback to city or other keys if county is missing
-                    county = data.get("address", {}).get("city") or data.get("address", {}).get("town") or "Unknown County"
-                _county_cache[key] = county
-                logger.debug("reverse_geocode_success", lat=lat, lon=lon, county=county)
-                return county
-    except Exception as e:
-        logger.warning("reverse_geocode_failed", error=str(e), lat=lat, lon=lon)
-
-    return "Unknown County"
 
 class NWSLiveStormFeed:
     """Service to fetch and parse public storm data from NOAA NWS ArcGIS REST service."""
     
-    URL = "https://mapservices.weather.noaa.gov/vector/rest/services/obs/nws_local_storm_reports/MapServer/0/query"
+    # Layer 2 is Last_72_Hours
+    URL = "https://mapservices.weather.noaa.gov/vector/rest/services/obs/nws_local_storm_reports/MapServer/2/query"
 
-    async def fetch_recent_reports(self) -> list[dict]:
-        """Fetch storm reports from the last 24h for GA and FL."""
+    async def fetch_recent_reports(
+        self, center_lat: float, center_lon: float, radius_miles: float
+    ) -> list[dict]:
+        """Fetch storm reports from the last 72h within a bounding box centered on coordinates."""
+        # Compute bounding-box envelope in degrees
+        lat_delta = radius_miles / 69.0
+        cos_lat = math.cos(math.radians(center_lat))
+        lon_delta = radius_miles / (69.0 * cos_lat) if cos_lat > 0.001 else radius_miles / 69.0
+
+        xmin = center_lon - lon_delta
+        ymin = center_lat - lat_delta
+        xmax = center_lon + lon_delta
+        ymax = center_lat + lat_delta
+
         params = {
-            "where": "state in ('GA', 'FL')",
+            "where": "1=1",
             "f": "json",
             "outFields": "objectid,wfo_id,wfo,lsr_validtime,descript,loc_desc,state,magnitude,units,remarks,valid_time",
+            "geometry": f"{xmin},{ymin},{xmax},{ymax}",
+            "geometryType": "esriGeometryEnvelope",
+            "inSR": "4326",
+            "spatialRel": "esriSpatialRelIntersects",
             "returnGeometry": "true",
             "outSR": "4326"
         }
         
-        logger.info("fetching_nws_storm_reports", url=self.URL)
+        logger.info(
+            "fetching_nws_storm_reports",
+            url=self.URL,
+            center=(center_lat, center_lon),
+            bbox=(xmin, ymin, xmax, ymax)
+        )
         try:
             async with httpx.AsyncClient() as client:
                 resp = await client.get(self.URL, params=params, timeout=15)
@@ -139,12 +129,14 @@ class NWSLiveStormFeed:
                         base_time = base_time.replace(" ", "T")
                     report_time_utc = f"{base_time}Z"
                 except Exception:
-                    report_time_utc = datetime.now(timezone.utc).isoformat()
+                    report_time_utc = datetime.now(UTC).isoformat()
             else:
-                report_time_utc = datetime.now(timezone.utc).isoformat()
+                report_time_utc = datetime.now(UTC).isoformat()
                 
-            # Perform reverse geocoding to get the county name
-            county = await get_county_for_coordinates(lat, lon)
+            # Repurpose "county" to store the location description (loc_desc + state)
+            loc_desc = attrs.get("loc_desc", "")
+            state = attrs.get("state", "")
+            location_str = f"{loc_desc}, {state}" if state else loc_desc
             
             report = {
                 "id": str(objectid),
@@ -153,11 +145,11 @@ class NWSLiveStormFeed:
                 "wind_speed_mph": wind_speed,
                 "latitude": lat,
                 "longitude": lon,
-                "county": county,
+                "county": location_str,  # Repurposed county field
                 "report_time_utc": report_time_utc,
                 "remarks": attrs.get("remarks", ""),
-                "loc_desc": attrs.get("loc_desc", ""),
-                "state": attrs.get("state", "")
+                "loc_desc": loc_desc,
+                "state": state
             }
             parsed_reports.append(report)
             

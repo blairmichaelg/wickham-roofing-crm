@@ -111,16 +111,6 @@
                 <input type="text" id="homeowner_name" class="w-full p-4 rounded-lg bg-gray-800 text-white border border-gray-700 focus:outline-none focus:border-blue-500 text-lg" required>
             </div>
             
-            <div class="mb-2">
-                <button type="button" id="gpsBtn"
-                        class="w-full bg-gray-700 hover:bg-gray-600 text-gray-300
-                               py-3 rounded-lg text-sm font-semibold
-                               transition-colors border border-gray-600">
-                    📍 Auto-Fill Address from GPS
-                </button>
-                <p id="gpsStatus" class="text-xs text-gray-500 mt-1 text-center
-                                          hidden"></p>
-            </div>
             <div>
                 <label class="block text-sm font-medium text-gray-400 mb-2">Address Line 1</label>
                 <input type="text" id="address_line1" class="w-full p-4 rounded-lg bg-gray-800 text-white border border-gray-700 focus:outline-none focus:border-blue-500 text-lg" required>
@@ -534,55 +524,6 @@
             loadMyJobs();
         });
 
-        // GPS Auto-Fill
-        document.getElementById('gpsBtn')?.addEventListener('click', async () => {
-            const btn = document.getElementById('gpsBtn');
-            const status = document.getElementById('gpsStatus');
-            btn.disabled = true;
-            btn.textContent = '📍 Locating...';
-            status.classList.add('hidden');
-
-            if (!navigator.geolocation) {
-                status.textContent = "Geolocation is not supported by this browser.";
-                status.classList.remove('hidden');
-                btn.disabled = false;
-                btn.textContent = '📍 Auto-Fill Address from GPS';
-                return;
-            }
-
-            navigator.geolocation.getCurrentPosition(async (position) => {
-                const { latitude, longitude } = position.coords;
-                try {
-                    const resp = await fetch(
-                        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
-                    );
-                    const data = await resp.json();
-                    if (data && data.address) {
-                        const addr = data.address;
-                        document.getElementById('address_line1').value =
-                            (addr.house_number ? addr.house_number + ' ' : '') +
-                            (addr.road || '');
-                        document.getElementById('city').value =
-                            addr.city || addr.town || addr.village || '';
-                        document.getElementById('state').value =
-                            addr.state || '';
-                        document.getElementById('postal_code').value =
-                            addr.postcode || '';
-                        showToast("Address populated from GPS", "success");
-                    }
-                } catch (err) {
-                    status.textContent = "Failed to reverse geocode.";
-                    status.classList.remove('hidden');
-                }
-                btn.disabled = false;
-                btn.textContent = '📍 Auto-Fill Address from GPS';
-            }, (error) => {
-                status.textContent = `GPS Error: ${error.message}`;
-                status.classList.remove('hidden');
-                btn.disabled = false;
-                btn.textContent = '📍 Auto-Fill Address from GPS';
-            }, { timeout: 10000 });
-        });
 
         function openLightbox(src) {
             const overlay = document.createElement('div');
@@ -1235,7 +1176,7 @@
             return `
                 <div class="bg-gray-900/80 border border-gray-800 p-3 rounded-lg shadow-sm hover:border-purple-500/50 transition-colors text-left">
                     <div class="flex justify-between items-start mb-1">
-                        <span class="text-xs font-bold font-mono text-purple-400">${alert.county || 'Unknown County'}</span>
+                        <span class="text-xs font-bold font-mono text-purple-400">${alert.county || 'Unknown Location'}</span>
                         <span class="text-[10px] text-gray-500">${dateStr} ${timeStr}</span>
                     </div>
                     <div class="flex justify-between items-center mt-1">

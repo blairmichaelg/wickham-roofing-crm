@@ -50,8 +50,43 @@
         </div>
     </nav>
     
-    <div class="flex-1 overflow-x-auto overflow-y-hidden p-6 flex space-x-6 bg-gray-950">
-        <!-- Kanban Columns in real-life workflow order (left → right) -->
+    <div class="flex-1 flex flex-col overflow-hidden bg-gray-950">
+        <!-- Storm Radar Widget (Statically Positioned Card) -->
+        <div id="adminStormRadar" class="mx-6 mt-4 bg-gray-900 border border-gray-800 rounded-xl shadow-lg overflow-hidden transition-all duration-300 animate-fade-in">
+            <!-- Header -->
+            <button onclick="toggleStormRadar()" class="w-full flex justify-between items-center p-4 bg-gray-950 border-b border-gray-800 font-bold hover:bg-gray-900 transition-colors">
+                <span class="flex items-center gap-2 text-white font-semibold">
+                    <span class="animate-pulse">⚡</span> Storm Radar
+                </span>
+                <div class="flex items-center gap-2">
+                    <span class="text-[10px] bg-red-900/80 text-red-300 border border-red-700 px-2 py-0.5 rounded-full font-bold">NWS Live</span>
+                    <span id="stormRadarArrow" class="text-xs text-gray-400">&uarr;</span>
+                </div>
+            </button>
+            <!-- Content -->
+            <div id="stormRadarContent" class="p-4 space-y-4 max-h-48 overflow-y-auto">
+                <div class="flex flex-col md:flex-row gap-4">
+                    <!-- Stats Card -->
+                    <div class="grid grid-cols-2 gap-2 text-center text-xs w-full md:w-48 shrink-0">
+                        <div class="p-2 bg-gray-950/60 rounded border border-gray-800">
+                            <div class="text-lg font-extrabold text-amber-400" id="adminHailCount">0</div>
+                            <div class="text-[9px] text-gray-500 uppercase font-bold">Hail</div>
+                        </div>
+                        <div class="p-2 bg-gray-950/60 rounded border border-gray-800">
+                            <div class="text-lg font-extrabold text-blue-400" id="adminWindCount">0</div>
+                            <div class="text-[9px] text-gray-500 uppercase font-bold">Wind</div>
+                        </div>
+                    </div>
+                    <!-- List -->
+                    <div id="adminStormList" class="flex-1 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                        <p class="text-gray-500 text-xs text-center py-2 col-span-full">No storms in the last 72 hours.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex-1 overflow-x-auto overflow-y-hidden px-6 pb-6 pt-4 flex space-x-6">
+            <!-- Kanban Columns in real-life workflow order (left → right) -->
 
         {% set statuses = [
             'LEAD_CAPTURED', 'CONTINGENCY_SIGNED', 'RETAIL_CONTRACT_SIGNED',
@@ -132,41 +167,11 @@
             </div>
         </div>
         {% endif %}
+        </div>
+    </div>
         
     <!-- Toast Container -->
     <div id="toastContainer" class="fixed top-4 right-4 z-50 flex flex-col space-y-2 pointer-events-none"></div>
-
-    <!-- Floating Storm Radar Widget -->
-    <div id="adminStormRadar" class="fixed bottom-4 right-4 z-40 w-80 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl overflow-hidden transition-all duration-300">
-        <!-- Header -->
-        <button onclick="toggleStormRadar()" class="w-full flex justify-between items-center p-4 bg-gray-950 border-b border-gray-800 font-bold hover:bg-gray-900 transition-colors">
-            <span class="flex items-center gap-2 text-white">
-                <span class="animate-pulse">⚡</span> Storm Radar
-            </span>
-            <div class="flex items-center gap-2">
-                <span class="text-[10px] bg-red-900/80 text-red-300 border border-red-700 px-2 py-0.5 rounded-full font-bold">NWS Live</span>
-                <span id="stormRadarArrow" class="text-xs text-gray-400">&darr;</span>
-            </div>
-        </button>
-        <!-- Content -->
-        <div id="stormRadarContent" class="hidden p-4 space-y-4 max-h-96 overflow-y-auto">
-            <!-- Stats -->
-            <div class="grid grid-cols-2 gap-2 text-center text-xs">
-                <div class="p-2 bg-gray-950/60 rounded border border-gray-800">
-                    <div class="text-lg font-extrabold text-amber-400" id="adminHailCount">0</div>
-                    <div class="text-[9px] text-gray-500 uppercase font-bold">Hail</div>
-                </div>
-                <div class="p-2 bg-gray-950/60 rounded border border-gray-800">
-                    <div class="text-lg font-extrabold text-blue-400" id="adminWindCount">0</div>
-                    <div class="text-[9px] text-gray-500 uppercase font-bold">Wind</div>
-                </div>
-            </div>
-            <!-- List -->
-            <div id="adminStormList" class="space-y-2">
-                <p class="text-gray-500 text-xs text-center py-2">No storms in the last 72 hours.</p>
-            </div>
-        </div>
-    </div>
     
     <script>
         // Simple auto-refresh on new events for Kanban
@@ -182,7 +187,7 @@
             }
         };
 
-        let isRadarOpen = false;
+        let isRadarOpen = true;
         function toggleStormRadar() {
             const content = document.getElementById('stormRadarContent');
             const arrow = document.getElementById('stormRadarArrow');
@@ -196,6 +201,9 @@
                 arrow.innerHTML = '&darr;';
             }
         }
+        
+        // Initial load for static widget
+        loadAdminStormRadar();
         
         async function loadAdminStormRadar() {
             try {

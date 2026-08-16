@@ -75,6 +75,7 @@ This guide documents the **47 test modules** comprising the Wickham Roofing CRM 
 | `test_security_phase3_task6.py` | WebSocket connections without a valid auth token are rejected immediately |
 | `test_shingle_endpoints.py` | Shingle type/color metadata endpoints store and retrieve data correctly for all job states |
 | `test_state_machine.py` | Core state machine transition table covers all valid paths with no missing transitions |
+| `test_storm_radar.py` | NOAA/NWS storm radar ingestion, bounding box calculations, API parameter filtering, and live websocket alert broadcast validation |
 | `test_supplement_engine.py` | Pure math kernel produces correct material quantities for standard and edge-case roof measurements |
 | `test_supplement_models.py` | Supplement Pydantic schemas validate material BOM, discrepancy lists, and code citations |
 | `test_ui_contracts.py` | HTML template rendering produces expected element structure for all dashboard pages |

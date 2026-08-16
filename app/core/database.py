@@ -272,8 +272,14 @@ def run_migrations() -> None:
             m17.up(conn)
             conn.execute("UPDATE schema_version SET version = 17, applied_at = CURRENT_TIMESTAMP WHERE id = 1")
 
+        if current_version < 18:
+            import importlib
+            m18 = importlib.import_module("app.core.migrations.0018_add_storm_dedup_and_audit")
+            m18.up(conn)
+            conn.execute("UPDATE schema_version SET version = 18, applied_at = CURRENT_TIMESTAMP WHERE id = 1")
+
         conn.execute("COMMIT")
-        logger.info("migrations_applied", current_version=current_version, target_version=17)
+        logger.info("migrations_applied", current_version=current_version, target_version=18)
         
         # Since seed logic was removed from up(), do it here outside the transaction
         if current_version < 1:

@@ -7,6 +7,7 @@ from __future__ import annotations
 import asyncio
 import json
 import math
+from datetime import UTC
 from pathlib import Path
 
 import structlog
@@ -551,23 +552,45 @@ async def serve_job_detail(
 
 
 @router.get("/api/storms/recent", tags=["storms"])
-async def get_recent_storms(role: str = Depends(get_current_role)):
-    """Fetch storm events in the last 72 hours, ordered by most recent."""
+async def get_recent_storms(
+    since_hours: int = 72,
+    radius_miles: float = 50.0,
+    event_types: str | None = None,
+    role: str = Depends(get_current_role)
+):
+    """
+    Fetch storm events filtered by time, distance, and type, ordered by most recent.
+    
+    Args:
+        since_hours (int): Number of hours back to query. Default is 72.
+        radius_miles (float): Distance filter in miles from the office. Default is 50.0.
+        event_types (str | None): Comma-separated list of event types (e.g. "HAIL,TORNADO").
+        role (str): Role dependency.
+    """
     from datetime import datetime, timedelta, timezone
+
     from app.core.database import get_connection
     
-    threshold = (datetime.now(timezone.utc) - timedelta(hours=72)).isoformat()
+    threshold = (datetime.now(UTC) - timedelta(hours=since_hours)).isoformat()
     conn = get_connection()
     try:
-        cursor = conn.execute(
-            """
-            SELECT id, event_type, hail_size_inches, wind_speed_mph, latitude, longitude, county, report_time_utc
+        query = """
+            SELECT id, event_type, hail_size_inches, wind_speed_mph, latitude, longitude, county, report_time_utc, distance_miles_from_office, ingested_at
             FROM storm_events
-            WHERE report_time_utc >= ?
-            ORDER BY report_time_utc DESC
-            """,
-            (threshold,)
-        )
+            WHERE report_time_utc >= ? AND distance_miles_from_office <= ?
+        """
+        params = [threshold, radius_miles]
+        
+        if event_types:
+            types_list = [t.strip().upper() for t in event_types.split(",") if t.strip()]
+            if types_list:
+                placeholders = ",".join("?" for _ in types_list)
+                query += f" AND event_type IN ({placeholders})"
+                params.extend(types_list)
+                
+        query += " ORDER BY report_time_utc DESC"
+        
+        cursor = conn.execute(query, tuple(params))
         return [dict(r) for r in cursor.fetchall()]
     finally:
         conn.close()
@@ -577,9 +600,10 @@ async def get_recent_storms(role: str = Depends(get_current_role)):
 async def get_storms_summary(role: str = Depends(get_current_role)):
     """Fetch summary of storm activity in the last 72 hours, grouped by county and type."""
     from datetime import datetime, timedelta, timezone
+
     from app.core.database import get_connection
     
-    threshold = (datetime.now(timezone.utc) - timedelta(hours=72)).isoformat()
+    threshold = (datetime.now(UTC) - timedelta(hours=72)).isoformat()
     conn = get_connection()
     try:
         cursor = conn.execute(

@@ -1,5 +1,6 @@
 """Migration 0017: Add county and report_time_utc to storm_events."""
 import sqlite3
+
 import structlog
 
 logger = structlog.get_logger("app.core.migrations.0017_add_county_and_report_time_to_storm_events")

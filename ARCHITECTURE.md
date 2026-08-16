@@ -73,6 +73,17 @@ When anomalies arise (e.g., zero-length eaves or unsupported carrier PDF formatt
 2. **Administrative Triage**: Using the technical control panel (`PATCH /api/field/jobs/{job_id}/flags/{flag_id}`), administrators correct erroneous readings directly in the UI, generating an immutable audit record (`RESOLVED: <note>`).
 3. **Resumption Engine**: Calling `POST /api/field/jobs/{job_id}/resume-supplement` re-enqueues the job into ARQ with `resume=True`. The background task reconstitutes saved state from the `supplement_reports` SQL cache, bypasses raw network parsing, and resumes PDF synthesis effortlessly.
 
+### D. Storm Ingestion & Spatial Alerting Engine
+To provide door-knocking sales reps with real-time, zero-cost weather reports near territory coordinates, the system features a live NWS ingestion service:
+1. **NOAA MapServer Ingestion (`app/services/storm_feed.py`)**:
+   - Queries NWS ArcGIS MapServer (72-hour Local Storm Reports Layer 2) using a coordinate bounding box centered around the primary corporate office.
+   - Operates entirely client-side and server-side without external reverse-geocoding (Nominatim OpenStreetMap) or paid APIs, complying with public NWS usage guidelines.
+2. **Idempotence & Unique Constraints**:
+   - Uses SQLite `INSERT OR IGNORE` with a unique index constraint on `dedup_key` (constructed via event type, latitude/longitude coordinates rounded to 3 decimal places, and event timestamp).
+3. **Real-time Alerting and WebSocket Propagation**:
+   - The ARQ background worker (`app/workers/storm_worker.py`) polls NWS hourly. If a new report exceeds severity thresholds (hail >= 1.0 inch, wind >= 58 mph, or tornado), it publishes a storm event to the Redis channels (`channel:storm_alerts`).
+   - WebSockets client-side in the office admin dashboard and mobile field app receive instant pushes to render alert overlays and notifications.
+
 ---
 
 ## 4. Security & Isolation Boundaries

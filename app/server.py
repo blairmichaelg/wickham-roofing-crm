@@ -57,7 +57,9 @@ async def redis_pubsub_listener(app: FastAPI):
     """
     import asyncio
     import json
+
     import structlog
+
     from app.core.notifications import notifier
     
     logger = structlog.get_logger("app.redis_pubsub")

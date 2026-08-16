@@ -24,8 +24,8 @@ from app.workers.inspection_processor import process_inspection
 from app.workers.photo_processor import process_photo_damage
 from app.workers.rebuttal_processor import process_rebuttal
 from app.workers.retail_quote_processor import process_retail_quote
-from app.workers.supplement_processor import process_supplement_event
 from app.workers.storm_worker import ingest_storm_events
+from app.workers.supplement_processor import process_supplement_event
 
 logger = structlog.get_logger("app.workers.settings")
 
