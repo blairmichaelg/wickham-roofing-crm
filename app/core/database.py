@@ -349,16 +349,18 @@ def seed_supplement_rules() -> None:
         conn.close()
 
 def seed_core_team_reps() -> None:
-    """Ensure Michael, Scott, Debi, and Alex Wickham exist in field_reps."""
+    """Ensure Michael, Scott, Debi, Alex Wickham, Jerry Grubb, and Matthew Zellers exist in field_reps."""
     conn = get_connection()
     try:
-        core_members = [
+        all_reps = [
             ("rep-michael", "Michael", "7194"),
             ("rep-scott", "Scott", "4826"),
             ("rep-debi", "Debi", "6315"),
             ("rep-alex", "Alex Wickham", "1999"),
+            ("rep-jerry", "Jerry Grubb", "1111"),
+            ("rep-matthew", "Matthew Zellers", "1628"),
         ]
-        for rep_id, name, default_pin in core_members:
+        for rep_id, name, default_pin in all_reps:
             row = conn.execute("SELECT id FROM field_reps WHERE name = ?", (name,)).fetchone()
             if not row:
                 pin_hash = pwd_context.hash(default_pin)
