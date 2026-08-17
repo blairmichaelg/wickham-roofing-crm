@@ -1124,7 +1124,7 @@
 
         async function loadStormRadar() {
             try {
-                const recentResp = await fetch('/api/storms/recent', {
+                const recentResp = await fetch('/api/storms/recent?require_magnitude=true', {
                     headers: { 'x-internal-token': FIELD_TOKEN }
                 });
                 const recent = recentResp.ok ? await recentResp.json() : [];
@@ -1149,7 +1149,11 @@
                     return;
                 }
                 
-                listEl.innerHTML = recent.map(alert => renderAlertItem(alert)).join('');
+                const displayItems = recent.slice(0, 5);
+                listEl.innerHTML = displayItems.map(alert => renderAlertItem(alert)).join('');
+                if (recent.length > 5) {
+                    listEl.innerHTML += '<p class="text-gray-400 text-[10px] text-center mt-1">Showing 5 most recent significant reports</p>';
+                }
             } catch (err) {
                 console.error("Failed to load storm radar data:", err);
             }

@@ -556,6 +556,7 @@ async def get_recent_storms(
     since_hours: int = 72,
     radius_miles: float = 50.0,
     event_types: str | None = None,
+    require_magnitude: bool = False,
     role: str = Depends(get_current_role)
 ):
     """
@@ -565,6 +566,7 @@ async def get_recent_storms(
         since_hours (int): Number of hours back to query. Default is 72.
         radius_miles (float): Distance filter in miles from the office. Default is 50.0.
         event_types (str | None): Comma-separated list of event types (e.g. "HAIL,TORNADO").
+        require_magnitude (bool): Filter to exclude zero/NULL magnitude events.
         role (str): Role dependency.
     """
     from datetime import datetime, timedelta, timezone
@@ -580,6 +582,13 @@ async def get_recent_storms(
             WHERE report_time_utc >= ? AND distance_miles_from_office <= ?
         """
         params = [threshold, radius_miles]
+        
+        if require_magnitude:
+            query += """ AND NOT (
+                (event_type = 'WIND' AND (wind_speed_mph IS NULL OR wind_speed_mph <= 0))
+                OR
+                (event_type = 'HAIL' AND (hail_size_inches IS NULL OR hail_size_inches <= 0))
+            )"""
         
         if event_types:
             types_list = [t.strip().upper() for t in event_types.split(",") if t.strip()]

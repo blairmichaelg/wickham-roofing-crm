@@ -358,4 +358,30 @@ same unified job detail view with full access to financials, margins,
 and all documents. The only role with restricted document visibility
 is field reps/canvassers, who can only see `field_safe` documents.
 
-*This guide reflects the Admin workflow as of version `2.1.0`. Includes support for non-blocking 'Naked Lead' field intake (`LEAD_CAPTURED`), pre-contract Evidence Grid pitch generation, unsigned contingency agreement PDF download/email, and field-app-based signature resumption flow.*
+---
+
+## 9. Storm Radar Ingestion Worker
+
+The Storm Radar feature runs as a background process to ingest Local Storm Reports (LSR) from the National Weather Service (NWS) ArcGIS feed.
+
+### Ingestion Schedule
+- **Schedule**: The storm ingestion worker runs periodically based on the config setting `STORM_INGEST_INTERVAL_MINUTES` (defaults to every `15` minutes).
+
+### Configuration Options
+The Storm Radar's ingestion and alerting thresholds are controlled by the following environment variables (defined in `app/config.py`):
+1. `STORM_OFFICE_LAT` (default: `30.8766`): Latitude of the central office center around which storms are monitored.
+2. `STORM_OFFICE_LON` (default: `-84.1994`): Longitude of the central office center around which storms are monitored.
+3. `STORM_INGEST_RADIUS_MILES` (default: `50.0`): The radius in miles around the office center within which storm events are ingested/saved to the database.
+4. `STORM_ALERT_RADIUS_MILES` (default: `30.0`): The radius in miles around the office center within which events must fall to trigger active WebSocket alerts to users.
+5. `STORM_ALERT_MIN_HAIL_INCHES` (default: `1.0`): The minimum hail size (in inches) required to trigger a storm alert.
+6. `STORM_ALERT_MIN_WIND_MPH` (default: `58.0`): The minimum wind speed (in mph) required to trigger a storm alert.
+
+### Verifying Worker Health
+To confirm the worker is running and processing correctly:
+1. Check the background service worker logs at `logs/srv_worker.log`.
+2. Inspect log outputs for entries matching `ingest_storm_events_started` and `ingest_storm_events_success`. For example, a successful run will log:
+   `ingest_storm_events_success: processed=X, inserted=Y, alerts_count=Z`
+
+---
+
+*This guide reflects the Admin workflow as of version `2.4.0`. Includes support for non-blocking 'Naked Lead' field intake (`LEAD_CAPTURED`), pre-contract Evidence Grid pitch generation, unsigned contingency agreement PDF download/email, field-app-based signature resumption flow, and NWS-integrated Storm Radar.*

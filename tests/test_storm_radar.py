@@ -1,17 +1,18 @@
-import sys
+import asyncio
 import json
 import sqlite3
-import pytest
-import asyncio
-from datetime import datetime, timezone, timedelta
+import sys
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from fastapi.testclient import TestClient
 from fastapi.websockets import WebSocketDisconnect
-from app.main import app
+
 from app.config import get_settings
 from app.core.database import get_connection
+from app.main import app
 from app.services.storm_feed import NWSLiveStormFeed
 from app.workers.storm_worker import ingest_storm_events
 
@@ -154,7 +155,7 @@ async def test_ingest_storm_events_task(mock_fetch):
 def test_storm_rest_endpoints():
     """Test GET /api/storms/recent and GET /api/storms/summary REST endpoints."""
     # 1. Insert test data directly
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
     
     conn = get_connection()
     conn.execute(
@@ -222,16 +223,138 @@ def test_field_websocket_auth():
     
     # 1. Invalid token / missing token
     with pytest.raises(Exception):
-        with client.websocket_connect("/ws/field") as websocket:
+        with client.websocket_connect("/ws/field"):
             pass
             
     # 2. Authorized field user token
     field_token = create_access_token("field", rep_name="Matthew Zellers", rep_id="rep-123")
-    with client.websocket_connect(f"/ws/field?token={field_token}") as websocket:
+    with client.websocket_connect(f"/ws/field?token={field_token}"):
         pass
         
     # 3. Forbidden role token (e.g. accounting)
     accounting_token = create_access_token("accounting")
     with pytest.raises(Exception):
-        with client.websocket_connect(f"/ws/field?token={accounting_token}") as websocket:
+        with client.websocket_connect(f"/ws/field?token={accounting_token}"):
             pass
+
+
+def test_storm_recent_require_magnitude_filter():
+    """Test GET /api/storms/recent?require_magnitude=true filter logic."""
+    now_utc = datetime.now(UTC)
+    
+    conn = get_connection()
+    # 1. Zero-magnitude WIND row
+    conn.execute(
+        "INSERT INTO storm_events (id, zipcode, event_type, event_date, hail_size_inches, wind_speed_mph, latitude, longitude, county, report_time_utc, distance_miles_from_office) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("TEST_ZERO_WIND", "31792", "WIND", now_utc.strftime("%Y-%m-%d"), 0.0, 0.0, 30.8, -84.1, "Thomas County", now_utc.isoformat(), 15.0)
+    )
+    # 2. Positive-magnitude WIND row
+    conn.execute(
+        "INSERT INTO storm_events (id, zipcode, event_type, event_date, hail_size_inches, wind_speed_mph, latitude, longitude, county, report_time_utc, distance_miles_from_office) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("TEST_POS_WIND", "31792", "WIND", now_utc.strftime("%Y-%m-%d"), 0.0, 60.0, 30.8, -84.1, "Thomas County", now_utc.isoformat(), 15.0)
+    )
+    # 3. Zero-magnitude HAIL row
+    conn.execute(
+        "INSERT INTO storm_events (id, zipcode, event_type, event_date, hail_size_inches, wind_speed_mph, latitude, longitude, county, report_time_utc, distance_miles_from_office) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("TEST_ZERO_HAIL", "31792", "HAIL", now_utc.strftime("%Y-%m-%d"), 0.0, 0.0, 30.8, -84.1, "Thomas County", now_utc.isoformat(), 15.0)
+    )
+    # 4. Positive-magnitude HAIL row
+    conn.execute(
+        "INSERT INTO storm_events (id, zipcode, event_type, event_date, hail_size_inches, wind_speed_mph, latitude, longitude, county, report_time_utc, distance_miles_from_office) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("TEST_POS_HAIL", "31792", "HAIL", now_utc.strftime("%Y-%m-%d"), 1.5, 0.0, 30.8, -84.1, "Thomas County", now_utc.isoformat(), 15.0)
+    )
+    # 5. TORNADO row with zero magnitude fields
+    conn.execute(
+        "INSERT INTO storm_events (id, zipcode, event_type, event_date, hail_size_inches, wind_speed_mph, latitude, longitude, county, report_time_utc, distance_miles_from_office) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("TEST_ZERO_TORNADO", "31792", "TORNADO", now_utc.strftime("%Y-%m-%d"), 0.0, 0.0, 30.8, -84.1, "Thomas County", now_utc.isoformat(), 15.0)
+    )
+    conn.commit()
+    conn.close()
+    
+    # Login to get token for auth
+    from app.api.auth import create_access_token
+    token = create_access_token("admin")
+    client.cookies.set("auth_token", token)
+    
+    # Request with require_magnitude=true
+    response = client.get("/api/storms/recent?require_magnitude=true")
+    assert response.status_code == 200
+    recent_data = response.json()
+    
+    returned_ids = {r["id"] for r in recent_data}
+    assert "TEST_POS_WIND" in returned_ids
+    assert "TEST_POS_HAIL" in returned_ids
+    assert "TEST_ZERO_TORNADO" in returned_ids
+    assert "TEST_ZERO_WIND" not in returned_ids
+    assert "TEST_ZERO_HAIL" not in returned_ids
+    assert len(recent_data) == 3
+
+
+@pytest.mark.asyncio
+@patch("app.workers.storm_worker.NWSLiveStormFeed.fetch_recent_reports")
+async def test_ingest_storm_events_is_idempotent_across_runs(mock_fetch):
+    """Test that ingesting the same storm events twice is idempotent."""
+    mock_fetch.return_value = [
+        {
+            "id": "ALERT_001",
+            "event_type": "HAIL",
+            "hail_size_inches": 1.5,
+            "wind_speed_mph": 0,
+            "latitude": 30.85, # Near office (30.8766, -84.1994), distance ~20 miles
+            "longitude": -84.00,
+            "county": "Thomasville, GA",
+            "report_time_utc": "2026-08-16T14:30:00Z",
+            "loc_desc": "Thomasville",
+            "remarks": "Severe hail"
+        },
+        {
+            "id": "ALERT_002",
+            "event_type": "WIND",
+            "hail_size_inches": 0,
+            "wind_speed_mph": 30, # Too low magnitude for alert, but ingested
+            "latitude": 30.85,
+            "longitude": -84.00,
+            "county": "Thomasville, GA",
+            "report_time_utc": "2026-08-16T14:35:00Z",
+            "loc_desc": "Thomasville",
+            "remarks": "Light wind"
+        }
+    ]
+    
+    # Mock Redis client for publishing
+    mock_redis = AsyncMock()
+    ctx = {"redis": mock_redis}
+    
+    # Mock open for zipcodes.json (isolate to app.workers.storm_worker)
+    import io
+    mock_zip_data = json.dumps({
+        "31792": {"lat": 30.85, "lon": -84.00}
+    })
+    
+    with patch("app.workers.storm_worker.open", return_value=io.StringIO(mock_zip_data), create=True):
+        # Run the worker task the first time
+        await ingest_storm_events(ctx)
+        
+    # Get rows after first call
+    conn = get_connection()
+    cursor = conn.execute("SELECT id FROM storm_events")
+    rows_first = cursor.fetchall()
+    conn.close()
+    assert len(rows_first) == 2
+    
+    publish_count_first = mock_redis.publish.call_count
+    assert publish_count_first == 1 # ALERT_001 satisfies severity and proximity
+    
+    # Run the worker task the second time with same mock values
+    with patch("app.workers.storm_worker.open", return_value=io.StringIO(mock_zip_data), create=True):
+        await ingest_storm_events(ctx) # should not raise
+        
+    # Verify rows in DB didn't duplicate
+    conn = get_connection()
+    cursor = conn.execute("SELECT id FROM storm_events")
+    rows_second = cursor.fetchall()
+    conn.close()
+    assert len(rows_second) == 2
+    
+    # Verify Redis publish was not called again
+    assert mock_redis.publish.call_count == publish_count_first

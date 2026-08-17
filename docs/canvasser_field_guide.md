@@ -345,6 +345,21 @@ Contact the office/Tech Admin if:
 
 ---
 
-*This guide reflects the field app as of version `2.3.0`. If the app's
+## 12. Storm Radar in the Field App
+
+The field app contains a live **Storm Radar** widget located below the intake form.
+
+### What it displays
+- **Hail Events & Wind Events Counts**: These counts represent the total number of verified hail and wind reports recorded by the National Weather Service (NWS) within a 50-mile radius of the main office in the last 72 hours.
+- **Recent Alerts List**: Displays the 5 most recent significant storm reports with details (county, magnitude like hail size/wind speed, and time).
+
+### Actionable Rep Response
+When you see a live, severe in-app banner alert (WebSocket toast) or see high event counts in specific areas on the Storm Radar card:
+- **Target Canvassing**: Prioritize canvassing and door-knocking in those affected neighborhoods/zipcodes. High-magnitude storms indicate a higher likelihood of property damage and interested homeowners.
+- **Leverage Evidence Grid**: Use the NOAA storm dates and report data to pitch to homeowners in that immediate area, establishing credibility and generating new leads.
+
+---
+
+*This guide reflects the field app as of version `2.4.0`. If the app's
 screens, buttons, or error messages change in a future update, this
 guide should be reviewed and updated to match.*
