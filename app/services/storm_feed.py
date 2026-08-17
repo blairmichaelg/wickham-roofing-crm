@@ -1,10 +1,53 @@
 import math
+import re
 from datetime import UTC, datetime, timezone
 
 import httpx
 import structlog
 
 logger = structlog.get_logger("app.services.storm_feed")
+
+
+DIRECTIONS = {
+    "N": "North",
+    "S": "South",
+    "E": "East",
+    "W": "West",
+    "NE": "Northeast",
+    "NW": "Northwest",
+    "SE": "Southeast",
+    "SW": "Southwest",
+    "NNE": "North-Northeast",
+    "NNW": "North-Northwest",
+    "SSE": "South-Southeast",
+    "SSW": "South-Southwest",
+    "ENE": "East-Northeast",
+    "ESE": "East-Southeast",
+    "WNW": "West-Northwest",
+    "WSW": "West-Southwest",
+}
+
+
+def normalize_nws_location(location_str: str) -> str:
+    """
+    Parse and clean NWS meteorologist shorthand (e.g. "4 SE Peoples Still, GA" -> "4 miles Southeast of Peoples Still, GA").
+    """
+    if not location_str:
+        return location_str
+    
+    # Matches a distance (number/decimal), a direction abbreviation (case-insensitive), and the remaining location text.
+    pattern = r"^\s*(\d+(?:\.\d+)?)\s*(N|S|E|W|NE|NW|SE|SW|NNE|NNW|SSE|SSW|ENE|ESE|WNW|WSW)\s+(.+)$"
+    match = re.match(pattern, location_str, re.IGNORECASE)
+    if match:
+        dist_str, dir_abbr, rest = match.groups()
+        dir_full = DIRECTIONS.get(dir_abbr.upper(), dir_abbr)
+        try:
+            val = float(dist_str)
+            unit = "mile" if val == 1.0 else "miles"
+        except ValueError:
+            unit = "miles"
+        return f"{dist_str} {unit} {dir_full} of {rest}"
+    return location_str
 
 
 def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -137,6 +180,7 @@ class NWSLiveStormFeed:
             loc_desc = attrs.get("loc_desc", "")
             state = attrs.get("state", "")
             location_str = f"{loc_desc}, {state}" if state else loc_desc
+            location_str = normalize_nws_location(location_str)
             
             report = {
                 "id": str(objectid),

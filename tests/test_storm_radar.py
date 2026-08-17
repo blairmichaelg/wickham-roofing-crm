@@ -358,3 +358,86 @@ async def test_ingest_storm_events_is_idempotent_across_runs(mock_fetch):
     
     # Verify Redis publish was not called again
     assert mock_redis.publish.call_count == publish_count_first
+
+
+def test_normalize_nws_location_shorthand():
+    """Test that normalize_nws_location correctly parses and normalizes NWS shorthand."""
+    from app.services.storm_feed import normalize_nws_location
+    
+    assert normalize_nws_location("4 SE Peoples Still, GA") == "4 miles Southeast of Peoples Still, GA"
+    assert normalize_nws_location("1 WNW Mitchell Co a/P, GA") == "1 mile West-Northwest of Mitchell Co a/P, GA"
+    assert normalize_nws_location("10 NNE Atlanta, GA") == "10 miles North-Northeast of Atlanta, GA"
+    assert normalize_nws_location("0.5 E Boston, GA") == "0.5 miles East of Boston, GA"
+    # Unmatched patterns should be returned as-is
+    assert normalize_nws_location("Thomas County, GA") == "Thomas County, GA"
+    assert normalize_nws_location("") == ""
+    assert normalize_nws_location(None) is None
+
+
+def test_storm_summary_filtering():
+    """Test that /api/storms/summary applies the same magnitude filtering and distance query params."""
+    # Populate the database using get_connection
+    conn = get_connection()
+    now_utc = datetime.now(UTC)
+    
+    # 1. Zero-magnitude WIND row
+    conn.execute(
+        "INSERT INTO storm_events (id, zipcode, event_type, event_date, hail_size_inches, wind_speed_mph, latitude, longitude, county, report_time_utc, distance_miles_from_office) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("TEST_ZERO_WIND", "31792", "WIND", now_utc.strftime("%Y-%m-%d"), 0.0, 0.0, 30.8, -84.1, "Thomas County", now_utc.isoformat(), 15.0)
+    )
+    # 2. Positive-magnitude WIND row
+    conn.execute(
+        "INSERT INTO storm_events (id, zipcode, event_type, event_date, hail_size_inches, wind_speed_mph, latitude, longitude, county, report_time_utc, distance_miles_from_office) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("TEST_POS_WIND", "31792", "WIND", now_utc.strftime("%Y-%m-%d"), 0.0, 60.0, 30.8, -84.1, "Thomas County", now_utc.isoformat(), 15.0)
+    )
+    # 3. Zero-magnitude HAIL row
+    conn.execute(
+        "INSERT INTO storm_events (id, zipcode, event_type, event_date, hail_size_inches, wind_speed_mph, latitude, longitude, county, report_time_utc, distance_miles_from_office) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("TEST_ZERO_HAIL", "31792", "HAIL", now_utc.strftime("%Y-%m-%d"), 0.0, 0.0, 30.8, -84.1, "Thomas County", now_utc.isoformat(), 15.0)
+    )
+    # 4. Positive-magnitude HAIL row
+    conn.execute(
+        "INSERT INTO storm_events (id, zipcode, event_type, event_date, hail_size_inches, wind_speed_mph, latitude, longitude, county, report_time_utc, distance_miles_from_office) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("TEST_POS_HAIL", "31792", "HAIL", now_utc.strftime("%Y-%m-%d"), 1.5, 0.0, 30.8, -84.1, "Thomas County", now_utc.isoformat(), 15.0)
+    )
+    # 5. Out of bounds (distance too large) row
+    conn.execute(
+        "INSERT INTO storm_events (id, zipcode, event_type, event_date, hail_size_inches, wind_speed_mph, latitude, longitude, county, report_time_utc, distance_miles_from_office) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("TEST_OUT_OF_BOUNDS", "31792", "HAIL", now_utc.strftime("%Y-%m-%d"), 2.0, 0.0, 30.8, -84.1, "Thomas County", now_utc.isoformat(), 80.0)
+    )
+    
+    conn.commit()
+    conn.close()
+    
+    # Login to get token for auth
+    from app.api.auth import create_access_token
+    token = create_access_token("admin")
+    client.cookies.set("auth_token", token)
+    
+    # Request summary without magnitude filter, but with default distance (50 miles)
+    response = client.get("/api/storms/summary")
+    assert response.status_code == 200
+    summary_data = response.json()
+    
+    # Under Thomas County, should see 2 hail and 2 wind events
+    assert "Thomas County" in summary_data
+    stats = summary_data["Thomas County"]
+    assert stats["hail_count"] == 2
+    assert stats["wind_count"] == 2
+    
+    # Request summary with require_magnitude=true
+    response_filtered = client.get("/api/storms/summary?require_magnitude=true")
+    assert response_filtered.status_code == 200
+    summary_data_filtered = response_filtered.json()
+    
+    # Under Thomas County, should now only see 1 hail and 1 wind event
+    assert "Thomas County" in summary_data_filtered
+    stats_filtered = summary_data_filtered["Thomas County"]
+    assert stats_filtered["hail_count"] == 1
+    assert stats_filtered["wind_count"] == 1
+    
+    # Request summary with radius_miles=10 (none match since distance is 15)
+    response_radius = client.get("/api/storms/summary?radius_miles=10")
+    assert response_radius.status_code == 200
+    assert response_radius.json() == {}
+

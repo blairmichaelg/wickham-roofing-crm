@@ -606,23 +606,43 @@ async def get_recent_storms(
 
 
 @router.get("/api/storms/summary", tags=["storms"])
-async def get_storms_summary(role: str = Depends(get_current_role)):
-    """Fetch summary of storm activity in the last 72 hours, grouped by county and type."""
+async def get_storms_summary(
+    since_hours: int = 72,
+    radius_miles: float = 50.0,
+    event_types: str | None = None,
+    require_magnitude: bool = False,
+    role: str = Depends(get_current_role)
+):
+    """Fetch summary of storm activity grouped by county/location, filtered by time, distance, and type."""
     from datetime import datetime, timedelta, timezone
 
     from app.core.database import get_connection
     
-    threshold = (datetime.now(UTC) - timedelta(hours=72)).isoformat()
+    threshold = (datetime.now(UTC) - timedelta(hours=since_hours)).isoformat()
     conn = get_connection()
     try:
-        cursor = conn.execute(
-            """
+        query = """
             SELECT county, event_type, hail_size_inches, wind_speed_mph
             FROM storm_events
-            WHERE report_time_utc >= ? AND county IS NOT NULL AND county != ''
-            """,
-            (threshold,)
-        )
+            WHERE report_time_utc >= ? AND distance_miles_from_office <= ? AND county IS NOT NULL AND county != ''
+        """
+        params = [threshold, radius_miles]
+        
+        if require_magnitude:
+            query += """ AND NOT (
+                (event_type = 'WIND' AND (wind_speed_mph IS NULL OR wind_speed_mph <= 0))
+                OR
+                (event_type = 'HAIL' AND (hail_size_inches IS NULL OR hail_size_inches <= 0))
+            )"""
+            
+        if event_types:
+            types_list = [t.strip().upper() for t in event_types.split(",") if t.strip()]
+            if types_list:
+                placeholders = ",".join("?" for _ in types_list)
+                query += f" AND event_type IN ({placeholders})"
+                params.extend(types_list)
+                
+        cursor = conn.execute(query, tuple(params))
         rows = cursor.fetchall()
     finally:
         conn.close()

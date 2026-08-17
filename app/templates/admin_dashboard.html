@@ -135,12 +135,12 @@
         {% endif %}
         </div>
 
-        <!-- Storm Radar Widget (Statically Positioned Card) -->
+        <!-- Storm Activity Monitor Widget (Statically Positioned Card) -->
         <div id="adminStormRadar" class="mx-6 mb-4 bg-gray-900 border border-gray-800 rounded-xl shadow-lg overflow-hidden transition-all duration-300">
             <!-- Header -->
             <button onclick="toggleStormRadar()" class="w-full flex justify-between items-center p-4 bg-gray-950 border-b border-gray-800 font-bold hover:bg-gray-900 transition-colors">
                 <span class="flex items-center gap-2 text-white font-semibold">
-                    <span>⚡</span> Storm Radar
+                    <span>⚡</span> Storm Activity Monitor
                 </span>
                 <div class="flex items-center gap-2">
                     <span class="text-[10px] bg-red-900/80 text-red-300 border border-red-700 px-2 py-0.5 rounded-full font-bold">NWS Live</span>
@@ -210,7 +210,7 @@
                 const recentResp = await fetch('/api/storms/recent?require_magnitude=true');
                 const recent = recentResp.ok ? await recentResp.json() : [];
                 
-                const summaryResp = await fetch('/api/storms/summary');
+                const summaryResp = await fetch('/api/storms/summary?require_magnitude=true');
                 const summary = summaryResp.ok ? await summaryResp.json() : {};
                 
                 let totalHail = 0;

@@ -94,7 +94,7 @@ Field reps can now capture minimal lead data (name, address, phone) at the door 
 - **Unsigned Agreement PDF**: Reps can download or email the homeowner a printable unsigned contingency agreement directly from the job card — no office visit required.
 - **Evidence Grid Pitch Tool**: The Inspection Evidence Grid PDF (storm findings, hail impacts, weather data) is accessible directly from the job card, enabling reps to present objective storm damage proof before asking for the signature.
 
-### 4. Real-Time Storm Radar Ingestion & Alerting
+### 4. Real-Time Storm Activity Monitor Ingestion & Alerting
 
 The CRM automatically monitors and ingests Local Storm Reports (LSR) directly from the National Weather Service (NWS) ArcGIS server to identify hail, wind, and tornado occurrences.
 
