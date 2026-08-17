@@ -479,6 +479,7 @@
                 let stormStatusText = '';
                 if (job.status === 'LEAD_CAPTURED' && job.postal_code) {
                     try {
+                        // NOTE: Depends on standard envelope shape {"events": [...], "last_refreshed_utc": ...} from /api/field/storms/{zipcode}
                         const sRes = await fetch(`/api/field/storms/${encodeURIComponent(job.postal_code.trim())}`, {
                             headers: { 'x-internal-token': FIELD_TOKEN }
                         });
@@ -559,6 +560,7 @@
             window.location.href = mailtoUrl;
         }
 
+        // NOTE: Depends on standard envelope shape {"events": [...], "last_refreshed_utc": ...} from /api/field/storms/{zipcode}
         async function checkZipStorms(zip) {
             if (!zip || zip.trim().length < 5) return;
             const container = document.getElementById('zipStormNotice');
@@ -569,7 +571,8 @@
                     headers: { 'x-internal-token': FIELD_TOKEN }
                 });
                 if (!res.ok) return;
-                const storms = await res.json();
+                const data = await res.json();
+                const storms = data.events || [];
                 if (storms && storms.length > 0) {
                     codeEl.textContent = zip.trim();
                     listEl.innerHTML = storms.map(s => {

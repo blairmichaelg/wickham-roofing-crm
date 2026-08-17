@@ -20,7 +20,12 @@ client = TestClient(app)
 
 @pytest.fixture(autouse=True)
 def clean_storm_events():
-    """Clear the storm_events table before each test to ensure isolation."""
+    """Clear the storm_events table before and after each test to ensure isolation."""
+    conn = get_connection()
+    conn.execute("DELETE FROM storm_events")
+    conn.commit()
+    conn.close()
+    yield
     conn = get_connection()
     conn.execute("DELETE FROM storm_events")
     conn.commit()
@@ -457,9 +462,6 @@ def test_migration_backfills_normalized_locations():
     conn = get_connection()
     now_utc = datetime.now(UTC)
     
-    # Clean table to start
-    conn.execute("DELETE FROM storm_events")
-    
     # 1. Row needing normalization
     conn.execute(
         "INSERT INTO storm_events (id, zipcode, event_type, event_date, hail_size_inches, wind_speed_mph, latitude, longitude, county, report_time_utc, distance_miles_from_office) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -491,9 +493,8 @@ def test_new_storm_business_logic():
     from app.core.database import add_storm_flags_to_jobs, get_recent_storm_zips_detail, get_connection
     from app.api.auth import create_access_token
     
-    # 1. Setup clean test data
+    # 1. Setup test data (relying on autouse fixture clean_storm_events)
     conn = get_connection()
-    conn.execute("DELETE FROM storm_events")
     now_utc = datetime.now(UTC)
     
     # Insert a high-wind event in ZIP 31792 (55 mph wind, 0" hail)
@@ -566,7 +567,9 @@ def test_new_storm_business_logic():
     assert response_since.status_code == 200
     assert response_since.json()["target_zips"] == target_zips
     
-    # 4. Test field API GET /api/field/storms/{zipcode} returns wrapped events
+    # 4. Test field API GET /api/field/storms/{zipcode} returns wrapped events.
+    # NOTE: This serves as the contract test for the JSON envelope shape {"events": [...], "last_refreshed_utc": ...}
+    # which is expected and parsed by checkZipStorms() and resumeLead() in field_app.html.
     field_token = create_access_token("field")
     response_field = client.get("/api/field/storms/31792", headers={"x-internal-token": field_token})
     assert response_field.status_code == 200
