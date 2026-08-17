@@ -2,9 +2,11 @@
 Unit tests for the Smart Code Router (Zero-Cost RAG).
 """
 
-from unittest.mock import patch, MagicMock
-from app.core.code_router import parse_code_files, get_relevant_codes
-from app.core.supplement_models import DiscrepancyReport, Discrepancy, MaterialBOM, CodeSection
+from unittest.mock import MagicMock, patch
+
+from app.core.code_router import get_relevant_codes, parse_code_files
+from app.core.supplement_models import CodeSection, Discrepancy, DiscrepancyReport, MaterialBOM
+
 
 class TestCodeRouter:
     @patch("app.core.code_router.Path")

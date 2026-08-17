@@ -8,20 +8,20 @@ InspectionPhoto extension validation, and the get_stable_photos() dual-guard
 
 import os
 import time
-import pytest
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+
+import pytest
 
 from app.core.inspection_models import (
     DamageType,
-    Severity,
-    PhotoAnalysis,
-    InspectionPhoto,
     InspectionJob,
-    get_stable_photos,
+    InspectionPhoto,
+    PhotoAnalysis,
+    Severity,
     _compute_sha256,
+    get_stable_photos,
 )
-
 
 # ── PhotoAnalysis Schema Tests ────────────────────────────────────────────────
 

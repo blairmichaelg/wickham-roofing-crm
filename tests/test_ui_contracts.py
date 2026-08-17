@@ -1,10 +1,18 @@
-import pytest
-from unittest.mock import MagicMock
-from fastapi.testclient import TestClient
-import uuid
 import sqlite3
+import uuid
+from unittest.mock import MagicMock
+
+import pytest
+from fastapi.testclient import TestClient
+
+from app.core.database import (
+    JobStatus,
+    get_connection,
+    get_qbo_export_batch,
+    mark_qbo_exported,
+    transition_material_flags,
+)
 from app.main import app
-from app.core.database import transition_material_flags, JobStatus, get_qbo_export_batch, mark_qbo_exported, get_connection
 
 client = TestClient(app)
 
@@ -100,7 +108,7 @@ def test_qbo_mark_exported_idempotent(db_conn):
     assert row["qbo_exported"] == 1
 
 def test_admin_dashboard_renders_retail_contract_signed(set_auth, db_conn):
-    job_id = setup_test_job(db_conn, "RETAIL_CONTRACT_SIGNED")
+    _job_id = setup_test_job(db_conn, "RETAIL_CONTRACT_SIGNED")
     
     # We also need to add a few fields for rendering to work flawlessly or homeowner_name is enough.
     # The setup_test_job already inserts 'Test User' as homeowner_name and '123 Test St' as address_line1.

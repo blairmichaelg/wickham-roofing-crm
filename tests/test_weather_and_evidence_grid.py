@@ -1,10 +1,11 @@
 import uuid
-import pytest
 from pathlib import Path
 
-from app.core.database import update_job_claim_info, get_connection, update_job_status
-from app.services.pdf import PDFGenerator
+import pytest
+
 from app.api.field_routes import get_inspection_summary
+from app.core.database import get_connection, update_job_claim_info, update_job_status
+from app.services.pdf import PDFGenerator
 
 
 @pytest.mark.asyncio
@@ -112,8 +113,9 @@ def test_naked_lead_lifecycle_and_conversion():
 async def test_generate_evidence_grid_fallback_caption(tmp_path):
     """Verify that a photo with NO cached AI analysis gets the correct fallback caption in the Evidence Grid."""
     import uuid
-    from PIL import Image as PILImage
+
     from pdfminer.high_level import extract_text
+    from PIL import Image as PILImage
     
     job_id = str(uuid.uuid4())
     

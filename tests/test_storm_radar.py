@@ -441,3 +441,41 @@ def test_storm_summary_filtering():
     assert response_radius.status_code == 200
     assert response_radius.json() == {}
 
+
+def test_migration_backfills_normalized_locations():
+    """Test that migration 0019 backfills and normalizes location shorthand in the database."""
+    import importlib
+    migration_module = importlib.import_module("app.core.migrations.0019_normalize_nws_locations")
+    migration_up = migration_module.up
+    
+    conn = get_connection()
+    now_utc = datetime.now(UTC)
+    
+    # Clean table to start
+    conn.execute("DELETE FROM storm_events")
+    
+    # 1. Row needing normalization
+    conn.execute(
+        "INSERT INTO storm_events (id, zipcode, event_type, event_date, hail_size_inches, wind_speed_mph, latitude, longitude, county, report_time_utc, distance_miles_from_office) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("TEST_UNNORMALIZED", "31792", "HAIL", now_utc.strftime("%Y-%m-%d"), 1.0, 0.0, 30.8, -84.1, "4 SE Peoples Still, GA", now_utc.isoformat(), 15.0)
+    )
+    # 2. Row already normalized / regular county
+    conn.execute(
+        "INSERT INTO storm_events (id, zipcode, event_type, event_date, hail_size_inches, wind_speed_mph, latitude, longitude, county, report_time_utc, distance_miles_from_office) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("TEST_NORMALIZED", "31792", "HAIL", now_utc.strftime("%Y-%m-%d"), 1.0, 0.0, 30.8, -84.1, "Thomas County, GA", now_utc.isoformat(), 15.0)
+    )
+    
+    conn.commit()
+    
+    # Run migration's up function directly
+    migration_up(conn)
+    
+    # Fetch results and assert
+    cursor = conn.execute("SELECT id, county FROM storm_events")
+    rows = {r["id"]: r["county"] for r in cursor.fetchall()}
+    conn.close()
+    
+    assert rows["TEST_UNNORMALIZED"] == "4 miles Southeast of Peoples Still, GA"
+    assert rows["TEST_NORMALIZED"] == "Thomas County, GA"
+
+

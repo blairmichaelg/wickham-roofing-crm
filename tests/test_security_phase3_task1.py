@@ -1,6 +1,9 @@
-import pytest
 from unittest.mock import patch
+
+import pytest
+
 from app.workers.supplement_processor import process_supplement_event
+
 
 @pytest.mark.asyncio
 async def test_supplement_processor_role_forbidden():

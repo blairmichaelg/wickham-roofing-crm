@@ -1,6 +1,16 @@
-import pytest
 import uuid
-from app.core.database import JobStatus, update_job_status, insert_job_document, get_job_documents, get_connection, force_override_status
+
+import pytest
+
+from app.core.database import (
+    JobStatus,
+    force_override_status,
+    get_connection,
+    get_job_documents,
+    insert_job_document,
+    update_job_status,
+)
+
 
 @pytest.fixture
 def setup_job():

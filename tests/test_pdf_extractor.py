@@ -4,10 +4,12 @@ Unit tests for the V4 EagleView strict Regex PDF extractor.
 
 import asyncio
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
+
 from app.services.pdf_extractor import extract_eagleview_data
+
 
 # ---------------------------------------------------------------------------
 # Test: Async extraction function

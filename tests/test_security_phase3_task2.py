@@ -1,5 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
+
 from app.main import app
 
 client = TestClient(app)
@@ -20,8 +21,9 @@ def test_download_export_path_traversal():
 @pytest.mark.asyncio
 async def test_download_export_legitimate(tmp_path):
     """Task 2: Test legitimate file download on /api/office/download/{filename}"""
-    from app.api.office_routes import EXPORT_DIR
     import os
+
+    from app.api.office_routes import EXPORT_DIR
     
     # Create a legitimate file
     test_file = EXPORT_DIR / "legitimate_test_file.csv"

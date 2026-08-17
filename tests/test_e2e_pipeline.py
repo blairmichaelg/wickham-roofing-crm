@@ -1,8 +1,9 @@
-import pytest
 from pathlib import Path
+from unittest.mock import patch
+
+import pytest
 from fastapi.testclient import TestClient
 
-from unittest.mock import patch
 
 @pytest.fixture(autouse=True)
 def mock_pdf_detector():
@@ -10,8 +11,8 @@ def mock_pdf_detector():
          patch("app.core.pipeline.detect_pdf_format", return_value="EAGLEVIEW"):
         yield
 
-from app.main import app
 from app.core.database import get_connection
+from app.main import app
 
 client = TestClient(app)
 response = client.post("/auth/login", data={"pin": "9999", "redirect_url": "/"}, follow_redirects=False)
@@ -86,6 +87,7 @@ def test_full_job_lifecycle(tmp_path):
     # Mock the extract_eagleview_data so we don't need a real PDF
     # We will use dependency injection or patching for the extraction
     from unittest.mock import patch
+
     from app.core.supplement_models import EagleViewData
     
     mock_ev_data = EagleViewData(

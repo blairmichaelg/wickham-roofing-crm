@@ -1,5 +1,7 @@
 import pytest
+
 from app.services.supplement_engine import SupplementEngine
+
 
 def test_iws_standard_calculation():
     """Happy path: 6/12 pitch, standard lengths."""

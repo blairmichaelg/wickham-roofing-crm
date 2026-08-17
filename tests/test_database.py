@@ -2,11 +2,13 @@
 Unit tests for the V4 SQLite Database interactions.
 """
 
-import pytest
 import json
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-from app.core.database import update_job_status, JobStatus
+import pytest
+
+from app.core.database import JobStatus, update_job_status
+
 
 def test_update_job_status_valid_enum():
     """Test that a valid enum string passes validation."""

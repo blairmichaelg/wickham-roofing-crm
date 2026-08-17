@@ -278,8 +278,14 @@ def run_migrations() -> None:
             m18.up(conn)
             conn.execute("UPDATE schema_version SET version = 18, applied_at = CURRENT_TIMESTAMP WHERE id = 1")
 
+        if current_version < 19:
+            import importlib
+            m19 = importlib.import_module("app.core.migrations.0019_normalize_nws_locations")
+            m19.up(conn)
+            conn.execute("UPDATE schema_version SET version = 19, applied_at = CURRENT_TIMESTAMP WHERE id = 1")
+
         conn.execute("COMMIT")
-        logger.info("migrations_applied", current_version=current_version, target_version=18)
+        logger.info("migrations_applied", current_version=current_version, target_version=19)
         
         # Since seed logic was removed from up(), do it here outside the transaction
         if current_version < 1:

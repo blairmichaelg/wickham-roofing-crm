@@ -7,31 +7,30 @@ making real API calls. The backoff tests use monkeypatching to
 eliminate actual sleep delays.
 """
 
-import io
 import asyncio
-from pathlib import Path
+import io
 from datetime import datetime
-from unittest.mock import patch, MagicMock, AsyncMock
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from PIL import Image as PILImage
 
 from app.core.inspection_models import (
     DamageType,
-    Severity,
-    PhotoAnalysis,
-    InspectionPhoto,
     InspectionJob,
+    InspectionPhoto,
+    PhotoAnalysis,
+    Severity,
 )
 from app.core.temp_manager import (
-    create_temp_file,
-    track_file,
-    cleanup_all,
-    get_tracked_count,
     _reset_tracking,
+    cleanup_all,
+    create_temp_file,
+    get_tracked_count,
+    track_file,
 )
-from app.workers.inspection_processor import resize_for_pdf, resize_for_ai
-
+from app.workers.inspection_processor import resize_for_ai, resize_for_pdf
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 

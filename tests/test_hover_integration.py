@@ -1,9 +1,11 @@
 import os
 import tempfile
+
 from fastapi.testclient import TestClient
-from app.main import app
-from app.core.database import get_connection
+
 from app.api.auth import create_access_token
+from app.core.database import get_connection
+from app.main import app
 
 client = TestClient(app)
 

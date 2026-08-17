@@ -8,10 +8,10 @@ examples, covering the full domain of valid inputs.
 import math
 
 import pytest
-from hypothesis import given, settings, assume
+from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
-from app.services.supplement_engine import SupplementEngine, ROLL_SQFT_YIELD
+from app.services.supplement_engine import ROLL_SQFT_YIELD, SupplementEngine
 
 # ---------------------------------------------------------------------------
 # Shared strategies

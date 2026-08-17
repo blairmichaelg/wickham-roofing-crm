@@ -1,7 +1,9 @@
 import pytest
 from fastapi.testclient import TestClient
+
+from app.core.database import get_connection
+from app.core.database import run_migrations as init_db
 from app.main import app
-from app.core.database import get_connection, run_migrations as init_db
 
 client = TestClient(app)
 

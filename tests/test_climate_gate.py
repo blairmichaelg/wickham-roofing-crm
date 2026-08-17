@@ -1,6 +1,8 @@
 import pytest
-from app.core.pipeline import generate_and_gate_flags
+
 from app.core.database import get_connection
+from app.core.pipeline import generate_and_gate_flags
+
 
 @pytest.fixture
 def setup_test_jobs():
@@ -133,8 +135,9 @@ def test_generate_and_gate_flags_multi_failure_scoping(setup_test_jobs):
     Proves that if multiple rules trigger ValueError, the loop catches them independently,
     flags them for manual review, and successfully batch-inserts everything.
     """
-    from app.core.supplement_models import EagleViewData
     import uuid
+
+    from app.core.supplement_models import EagleViewData
     # Negative pitch will cause ValueError in IWS calculation
     ev_data = EagleViewData(
         total_area_sf=1000.0, rake_lf=0.0, valley_lf=20.0, ridge_lf=0.0,

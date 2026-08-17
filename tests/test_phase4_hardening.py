@@ -1,13 +1,14 @@
-import pytest
-from unittest.mock import patch, MagicMock
-from fastapi.testclient import TestClient
-import uuid
-import sqlite3
 import asyncio
+import sqlite3
+import uuid
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
+import pytest
+from fastapi.testclient import TestClient
+
+from app.core.database import JobStatus, atomic_qbo_export, get_connection
 from app.main import app
-from app.core.database import get_connection, atomic_qbo_export, JobStatus
 from app.workers.supplement_processor import process_supplement_event
 
 client = TestClient(app)
@@ -253,7 +254,7 @@ async def test_generate_material_order_pipeline_dynamic_waste(
     mock_field_docs.__truediv__.return_value = tmp_path
     
     # Mock EagleView with high complexity
-    ev_data = EagleViewData(
+    _ev_data = EagleViewData(
         total_area_sf=1000.0, rake_lf=0, valley_lf=100.0, ridge_lf=0, hip_lf=0,
         eaves_lf=0, drip_edge_lf=0, flashing_lf=0, step_flashing_lf=0,
         total_facets=5, predominant_pitch="12/12"

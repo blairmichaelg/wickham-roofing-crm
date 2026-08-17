@@ -3,10 +3,12 @@ Unit tests for the Artifact Garbage Collection (cleanup.py) logic.
 """
 
 import time
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-from app.core.cleanup import cleanup_orphaned_artifacts, DIRECTORIES_TO_SCAN
+import pytest
+
+from app.core.cleanup import DIRECTORIES_TO_SCAN, cleanup_orphaned_artifacts
+
 
 @pytest.fixture
 def mock_directories(tmp_path):

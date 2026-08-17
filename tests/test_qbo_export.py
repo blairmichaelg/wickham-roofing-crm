@@ -3,12 +3,13 @@ Unit tests for the QuickBooks Online (QBO) CSV Export Bridge.
 """
 
 import csv
-import pytest
 from pathlib import Path
+from unittest.mock import patch
+
+import pytest
 
 from app.core.supplement_models import InvoiceExport, InvoiceLine, MaterialBOM
-from app.services.qbo_export import export_to_csv, EXPORT_DIR, QBO_ITEMS, generate_qbo_invoice
-from unittest.mock import patch
+from app.services.qbo_export import EXPORT_DIR, QBO_ITEMS, export_to_csv, generate_qbo_invoice
 
 
 @pytest.fixture(autouse=True)
@@ -51,7 +52,7 @@ def test_qbo_export_formats_correctly():
     assert Path(filepath).name == "INV-1001_QBO.csv"
 
     # Read and verify CSV contents
-    with open(filepath, "r", encoding="utf-8") as f:
+    with open(filepath, encoding="utf-8") as f:
         reader = csv.reader(f)
         rows = list(reader)
 
@@ -105,7 +106,7 @@ def test_qbo_export_skips_negative_amounts():
 
     filepath = export_to_csv(export)
 
-    with open(filepath, "r", encoding="utf-8") as f:
+    with open(filepath, encoding="utf-8") as f:
         reader = csv.reader(f)
         rows = list(reader)
 
@@ -134,7 +135,7 @@ def test_qbo_export_unmapped_item_fallback():
 
     filepath = export_to_csv(export)
 
-    with open(filepath, "r", encoding="utf-8") as f:
+    with open(filepath, encoding="utf-8") as f:
         reader = csv.reader(f)
         rows = list(reader)
         
@@ -171,7 +172,7 @@ def test_generate_qbo_invoice_includes_op_and_fees(mock_get_financials):
         
         filepath = generate_qbo_invoice("demo_job_1", bom)
         
-        with open(filepath, "r", encoding="utf-8") as f:
+        with open(filepath, encoding="utf-8") as f:
             reader = csv.reader(f)
             rows = list(reader)
             

@@ -1,7 +1,8 @@
 from fastapi.testclient import TestClient
+
+from app.api.auth import create_access_token
 from app.main import app
 from app.services.rate_limit import reset_rate_limits
-from app.api.auth import create_access_token
 
 client = TestClient(app, raise_server_exceptions=False)
 

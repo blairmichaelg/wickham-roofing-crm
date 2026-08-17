@@ -4,12 +4,18 @@ Unit tests for the PDF Generator.
 
 import asyncio
 import tempfile
-from unittest.mock import patch
 from pathlib import Path
+from unittest.mock import patch
 
-from app.services.pdf import PDFGenerator
+from app.core.inspection_models import (
+    DamageType,
+    InspectionJob,
+    InspectionPhoto,
+    PhotoAnalysis,
+    Severity,
+)
 from app.core.supplement_models import MaterialBOM
-from app.core.inspection_models import InspectionJob, InspectionPhoto, PhotoAnalysis, DamageType, Severity
+from app.services.pdf import PDFGenerator
 
 
 def test_generate_estimate_pdf_creates_file():

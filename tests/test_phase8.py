@@ -15,20 +15,20 @@ Tests:
 11. test_canvasser_reassign_route
 12. test_canvasser_reassign_requires_admin
 """
+import datetime
 import inspect
 import uuid
-import datetime
-import pytest
-
-from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, patch
 
-from app.main import app
+import pytest
+from fastapi.testclient import TestClient
+
 from app.core.database import (
-    get_connection,
     JobStatus,
     get_aging_jobs,
+    get_connection,
 )
+from app.main import app
 
 client = TestClient(app)
 
@@ -174,7 +174,7 @@ def test_appraisal_invoked_is_operator_gate():
 
 def test_get_aging_jobs_sla_filter():
     """Only jobs genuinely over SLA (>= carrier_sla_days) must appear."""
-    now = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+    now = datetime.datetime.now(datetime.UTC).replace(tzinfo=None)
     old_date = (now - datetime.timedelta(days=20)).strftime("%Y-%m-%d %H:%M:%S")
     new_date = (now - datetime.timedelta(days=5)).strftime("%Y-%m-%d %H:%M:%S")
 
@@ -195,7 +195,7 @@ async def test_escalation_appraisal_gate():
     """Second offense (escalation_sent_at is set) must invoke APPRAISAL_INVOKED."""
     from app.workers.escalation_processor import process_escalation
 
-    past = (datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None) - datetime.timedelta(days=15)).strftime(
+    past = (datetime.datetime.now(datetime.UTC).replace(tzinfo=None) - datetime.timedelta(days=15)).strftime(
         "%Y-%m-%d %H:%M:%S"
     )
     job_id = _insert_test_job(
@@ -224,7 +224,7 @@ async def test_escalation_sla_timer_reset():
     """First escalation must reset supplement_sent_at to NOW and set escalation_sent_at."""
     from app.workers.escalation_processor import process_escalation
 
-    past = (datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None) - datetime.timedelta(days=20)).strftime(
+    past = (datetime.datetime.now(datetime.UTC).replace(tzinfo=None) - datetime.timedelta(days=20)).strftime(
         "%Y-%m-%d %H:%M:%S"
     )
     job_id = _insert_test_job(
@@ -275,7 +275,7 @@ async def test_escalation_sla_timer_reset():
     sent_at = datetime.datetime.strptime(
         str(row["supplement_sent_at"]), "%Y-%m-%d %H:%M:%S"
     )
-    delta = (datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None) - sent_at).total_seconds()
+    delta = (datetime.datetime.now(datetime.UTC).replace(tzinfo=None) - sent_at).total_seconds()
     assert delta < 15, (
         f"supplement_sent_at not reset (delta={delta:.1f}s, expected < 15s)"
     )

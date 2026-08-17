@@ -1,10 +1,12 @@
-import pytest
-from unittest.mock import patch, MagicMock
 from decimal import Decimal
+from unittest.mock import MagicMock, patch
 
+import pytest
+
+from app.core.ingestion_models import ClaimLineItem, EvidenceRef, SourcedValue, UniversalClaimAST
 from app.services.pdf_extractor import extract_eagleview_data
 from app.services.supplement_engine import SupplementEngine
-from app.core.ingestion_models import UniversalClaimAST, ClaimLineItem, SourcedValue, EvidenceRef
+
 
 @pytest.fixture
 def dummy_pdf_path(tmp_path):
@@ -140,7 +142,8 @@ def test_claim_line_item_passes_valid_math():
 # 7. test_universal_ast_requires_source_hash
 def test_universal_ast_requires_source_hash():
     from pydantic import ValidationError
-    from app.core.ingestion_models import RoofGeometry, ClaimFinancials
+
+    from app.core.ingestion_models import ClaimFinancials, RoofGeometry
     
     geo = RoofGeometry(
         pitch=create_mock_sourced_str("6/12"),
@@ -167,9 +170,10 @@ def test_universal_ast_requires_source_hash():
 # 8. test_pipeline_halts_on_gross_rcv_mismatch
 @pytest.mark.asyncio
 async def test_pipeline_halts_on_gross_rcv_mismatch(tmp_path):
-    from app.core.pipeline import run_supplement_pipeline
-    from app.core.database import get_connection
     import uuid
+
+    from app.core.database import get_connection
+    from app.core.pipeline import run_supplement_pipeline
 
     job_id = str(uuid.uuid4())
     conn = get_connection()
@@ -201,7 +205,7 @@ async def test_pipeline_halts_on_gross_rcv_mismatch(tmp_path):
         step_flashing_lf=10.0, total_facets=2, predominant_pitch="6/12"
     )
 
-    from app.core.ingestion_models import RoofGeometry, ClaimFinancials
+    from app.core.ingestion_models import ClaimFinancials, RoofGeometry
     mock_sol_data = UniversalClaimAST(
         line_items=[],
         roof_geometry=RoofGeometry(

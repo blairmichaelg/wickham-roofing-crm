@@ -1,11 +1,12 @@
-import pytest
+import datetime
 import sqlite3
 import uuid
-import datetime
+
+import pytest
 from fastapi.testclient import TestClient
 
+from app.core.database import get_aging_jobs, get_connection, toggle_payment_flag
 from app.main import app, days_since
-from app.core.database import get_connection, toggle_payment_flag, get_aging_jobs
 
 client = TestClient(app)
 
@@ -62,10 +63,10 @@ def test_toggle_payment_commission_trigger():
 def test_get_aging_jobs():
     conn = get_connection()
     # One job over SLA (15 days ago)
-    past_date = (datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None) - datetime.timedelta(days=15)).strftime("%Y-%m-%d %H:%M:%S")
+    past_date = (datetime.datetime.now(datetime.UTC).replace(tzinfo=None) - datetime.timedelta(days=15)).strftime("%Y-%m-%d %H:%M:%S")
     job_id_aged = setup_test_job(conn, status="AWAITING_CARRIER_RESPONSE", supp_sent=past_date)
     # One job not over SLA (1 day ago)
-    recent_date = (datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None) - datetime.timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
+    recent_date = (datetime.datetime.now(datetime.UTC).replace(tzinfo=None) - datetime.timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
     setup_test_job(conn, status="AWAITING_CARRIER_RESPONSE", supp_sent=recent_date)
     conn.close()
 
@@ -76,7 +77,7 @@ def test_get_aging_jobs():
 
 # 6. Test days_since jinja filter
 def test_days_since_filter():
-    past_date = (datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None) - datetime.timedelta(days=20)).strftime("%Y-%m-%d %H:%M:%S")
+    past_date = (datetime.datetime.now(datetime.UTC).replace(tzinfo=None) - datetime.timedelta(days=20)).strftime("%Y-%m-%d %H:%M:%S")
     assert days_since(past_date) == 20
     assert days_since(None) == 0
 

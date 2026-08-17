@@ -1,12 +1,10 @@
-import pytest
 from uuid import uuid4
+
+import pytest
 from fastapi.testclient import TestClient
 
+from app.core.database import JobStatus, generate_invoice_id, get_connection, update_job_status
 from app.main import app
-from app.core.database import (
-    get_connection, generate_invoice_id, update_job_status,
-    JobStatus
-)
 
 client = TestClient(app)
 

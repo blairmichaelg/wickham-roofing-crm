@@ -6,12 +6,12 @@ for the InsurTech Supplement Engine's data contracts.
 """
 
 from app.core.supplement_models import (
-    EagleViewData,
-    LineItem,
-    StatementOfLoss,
     Discrepancy,
     DiscrepancyReport,
+    EagleViewData,
+    LineItem,
     MaterialBOM,
+    StatementOfLoss,
 )
 
 

@@ -1,8 +1,9 @@
 import pytest
 from fastapi.testclient import TestClient
-from app.main import app
+
 from app.api.auth import create_access_token
-from app.core.database import get_connection, pwd_context, create_field_rep
+from app.core.database import create_field_rep, get_connection, pwd_context
+from app.main import app
 
 client = TestClient(app)
 
@@ -33,7 +34,7 @@ def test_reps_and_jobs():
     finally:
         try:
             conn.execute("ROLLBACK")
-        except:
+        except Exception:
             pass
         conn.execute("BEGIN IMMEDIATE")
         conn.execute("DELETE FROM jobs WHERE id = 'test-job-rep1'")

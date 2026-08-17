@@ -19,20 +19,20 @@ Tests (14 total, targeting 195 + 14 = 209 passing):
 """
 
 import time
-import pytest
-import jwt as pyjwt
 
+import jwt as pyjwt
+import pytest
 from fastapi.testclient import TestClient
 
-from app.main import app
 from app.config import get_settings
 from app.core.database import (
-    get_connection,
     create_field_rep,
-    list_field_reps,
+    get_connection,
     get_field_rep_by_pin,
+    list_field_reps,
     update_field_rep,
 )
+from app.main import app
 
 client = TestClient(app)
 

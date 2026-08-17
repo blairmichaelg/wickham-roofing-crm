@@ -2,9 +2,10 @@
 Unit tests for the deterministic reconciliation engine.
 """
 
-from app.core.reconciliation import reconcile
-from app.core.supplement_models import EagleViewData, StatementOfLoss, LineItem
 import pytest
+
+from app.core.reconciliation import reconcile
+from app.core.supplement_models import EagleViewData, LineItem, StatementOfLoss
 
 
 def test_reconcile_square_variance():

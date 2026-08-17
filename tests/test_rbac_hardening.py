@@ -1,10 +1,12 @@
+import os
+import uuid
+
 import pytest
 from fastapi.testclient import TestClient
-from app.main import app
-from app.core.database import get_connection, insert_job_document
+
 from app.api.auth import create_access_token
-import uuid
-import os
+from app.core.database import get_connection, insert_job_document
+from app.main import app
 
 client = TestClient(app)
 

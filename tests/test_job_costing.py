@@ -4,6 +4,7 @@ Unit tests for the V4 Job Costing math engine (Integer Cents).
 
 from app.core.job_costing import compute_job_profitability
 
+
 def test_compute_job_profitability_normal_case():
     """Test standard profitability calculations."""
     results = compute_job_profitability(

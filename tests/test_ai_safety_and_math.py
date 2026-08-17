@@ -4,18 +4,19 @@ Unit tests for AI safety, math verification, and schema constraints.
 
 from decimal import Decimal
 from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
 from app.core.ingestion_models import (
-    UniversalClaimAST,
-    ClaimLineItem,
-    RoofGeometry,
     ClaimFinancials,
-    SourcedValue,
+    ClaimLineItem,
     EvidenceRef,
+    RoofGeometry,
+    SourcedValue,
+    UniversalClaimAST,
 )
-from app.core.inspection_models import PhotoAnalysis, DamageType, Severity
+from app.core.inspection_models import DamageType, PhotoAnalysis, Severity
 
 
 def test_prompt_templates_for_critical_directives():

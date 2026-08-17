@@ -1,5 +1,6 @@
-import pytest
 import os
+
+import pytest
 
 os.environ["ADMIN_PIN"] = "9999"
 os.environ["ACCOUNTING_PIN"] = "8888"
@@ -7,6 +8,7 @@ os.environ["OPERATIONS_PIN"] = "7777"
 os.environ["APP_ENV"] = "test"
 
 from app.core.database import run_migrations as init_db
+
 
 @pytest.fixture(autouse=True, scope="session")
 def setup_test_db(tmp_path_factory):

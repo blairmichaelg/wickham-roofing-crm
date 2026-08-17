@@ -1,6 +1,7 @@
 from app.core.complexity import build_waste_explanation
 from app.core.supplement_models import EagleViewData
 
+
 def test_build_waste_explanation_weaponized():
     """
     Test that build_waste_explanation properly interpolates all fields

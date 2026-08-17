@@ -1,12 +1,14 @@
-import pytest
-from unittest.mock import patch, MagicMock
-from pathlib import Path
 import json
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
+import pytest
+
+from app.core.cache import init_db as init_cache_db
+from app.core.inspection_models import InspectionJob, InspectionPhoto
 from app.services.document_parser import parse_statement_of_loss
 from app.workers.inspection_processor import process_inspection
-from app.core.inspection_models import InspectionJob, InspectionPhoto
-from app.core.cache import init_db as init_cache_db
+
 
 # Pytest fixture to initialize cache DB
 @pytest.fixture(autouse=True)
@@ -22,7 +24,7 @@ async def test_parse_statement_of_loss(tmp_path):
     dummy_pdf = tmp_path / "dummy.pdf"
     dummy_pdf.touch()
 
-    from app.core.supplement_models import StatementOfLoss, LineItem
+    from app.core.supplement_models import LineItem, StatementOfLoss
     mock_sol = StatementOfLoss(
         carrier_name="State Farm",
         claim_number="1234",
@@ -99,9 +101,9 @@ async def test_process_inspection(tmp_path, monkeypatch):
     
     monkeypatch.setattr("app.workers.inspection_processor.FIELD_DOCS_DIR", test_field_docs)
 
-    from app.core.inspection_models import PhotoAnalysis, DamageType, Severity
-
     from datetime import datetime
+
+    from app.core.inspection_models import DamageType, PhotoAnalysis, Severity
     
     mock_job = InspectionJob(
         job_id=job_id,

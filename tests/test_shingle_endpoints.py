@@ -2,14 +2,15 @@
 Unit tests for the shingle-info and claim-info routes, and their integration.
 """
 
-import pytest
 import uuid
-from fastapi.testclient import TestClient
 from unittest.mock import patch
 
-from app.main import app
+import pytest
+from fastapi.testclient import TestClient
+
 from app.api.auth import create_access_token
 from app.core.database import get_connection
+from app.main import app
 
 client = TestClient(app)
 

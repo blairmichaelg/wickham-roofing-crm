@@ -3,20 +3,23 @@ Unit tests for the Field UX FastApi endpoints (Epic 2).
 """
 
 import io
+
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core.cache import init_db, set_cached_analysis
+from app.core.inspection_models import DamageType, PhotoAnalysis, Severity
 from app.main import app
-from app.core.cache import set_cached_analysis, init_db
-from app.core.inspection_models import PhotoAnalysis, DamageType, Severity
 
 client = TestClient(app)
 
 # Phase 9: static field_pin is retired. Seed a field rep before login.
-from app.core.database import create_field_rep, get_field_rep_by_pin  # noqa: E402
-from app.core.cache import init_db as _init_cache
-from app.core.database import run_migrations as _init_crm
 from unittest.mock import patch
+
+from app.core.cache import init_db as _init_cache
+from app.core.database import create_field_rep, get_field_rep_by_pin  # noqa: E402
+from app.core.database import run_migrations as _init_crm
+
 
 @pytest.fixture(autouse=True)
 def mock_assert_field_rep_owns_job(request):
@@ -282,13 +285,14 @@ def test_capture_retail_signature():
     
     import app.api.field_routes as fr
     expected_sig_path = fr.FIELD_DOCS_DIR / "99999999-9999-9999-9999-999999999995" / "99999999-9999-9999-9999-999999999995_retail_contract_sig.png"
-    # Ah, let me check _sync_process_image in field_routes.py. 
+    assert expected_sig_path.exists()
 
 
 def test_resolve_flag_success():
     """Test that a flag is successfully updated and resolved."""
-    from app.core.database import get_connection
     import uuid
+
+    from app.core.database import get_connection
     conn = get_connection()
     job_id = str(uuid.uuid4())
     flag_id = str(uuid.uuid4())
@@ -339,8 +343,9 @@ def test_resolve_flag_invalid_flag_uuid():
 
 def test_resolve_flag_idor():
     """Test IDOR defense: a valid flag_id but wrong job_id returns 404."""
-    from app.core.database import get_connection
     import uuid
+
+    from app.core.database import get_connection
     conn = get_connection()
     job_id_1 = str(uuid.uuid4())
     job_id_2 = str(uuid.uuid4())
@@ -371,9 +376,10 @@ def test_resolve_flag_idor():
 
 
 def test_field_document_visibility_restriction():
-    from app.core.database import get_connection, insert_job_document
-    from pathlib import Path
     import uuid
+    from pathlib import Path
+
+    from app.core.database import get_connection, insert_job_document
     
     conn = get_connection()
     job_id = str(uuid.uuid4())
@@ -419,10 +425,17 @@ def test_field_document_visibility_restriction():
 
 @pytest.mark.no_mock_ownership
 def test_field_access_enforcement():
-    from app.core.database import get_connection, insert_job_document, create_field_rep, get_field_rep_by_pin
-    from app.main import app
-    from fastapi.testclient import TestClient
     import uuid
+
+    from fastapi.testclient import TestClient
+
+    from app.core.database import (
+        create_field_rep,
+        get_connection,
+        get_field_rep_by_pin,
+        insert_job_document,
+    )
+    from app.main import app
     
     # Create fresh rep
     pin = "4444"
@@ -495,10 +508,12 @@ def test_field_access_enforcement():
 
 
 def test_field_claim_info_update():
+    import uuid
+
+    from fastapi.testclient import TestClient
+
     from app.core.database import get_connection
     from app.main import app
-    from fastapi.testclient import TestClient
-    import uuid
 
     job_id = str(uuid.uuid4())
     conn = get_connection()
@@ -540,8 +555,9 @@ def test_field_claim_info_update():
 
 def test_get_field_job_details_returns_full_intake_fields():
     """GET /api/field/jobs/{job_id} should return full job data for lead resumption."""
-    from app.core.database import get_connection
     import uuid
+
+    from app.core.database import get_connection
 
     job_id = str(uuid.uuid4())
     conn = get_connection()
@@ -572,8 +588,9 @@ def test_get_field_job_details_404_for_missing_job():
 
 def test_download_unsigned_contingency_generates_pdf():
     """GET /api/field/jobs/{job_id}/docs/contingency should return a PDF for a valid job."""
-    from app.core.database import get_connection
     import uuid
+
+    from app.core.database import get_connection
 
     job_id = str(uuid.uuid4())
     conn = get_connection()

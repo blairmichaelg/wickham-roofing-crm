@@ -1,10 +1,12 @@
-import pytest
-import tempfile
 import asyncio
+import tempfile
 from pathlib import Path
 
-from app.services.hover_extractor import extract_hover_data, parse_feet_inches, detect_pdf_format
+import pytest
+
 from app.core.supplement_models import EagleViewData
+from app.services.hover_extractor import detect_pdf_format, extract_hover_data, parse_feet_inches
+
 
 def test_parse_feet_inches():
     assert parse_feet_inches("106' 8\"") == 106.667

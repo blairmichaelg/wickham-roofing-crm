@@ -1,8 +1,11 @@
-import pytest
 from pathlib import Path
-from fastapi import UploadFile, HTTPException
-from app.core.upload_utils import stream_upload_safely
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+from fastapi import HTTPException, UploadFile
+
+from app.core.upload_utils import stream_upload_safely
+
 
 @pytest.mark.asyncio
 async def test_stream_upload_safely_exceeds_max_bytes(tmp_path: Path):

@@ -25,9 +25,10 @@ def _make_test_app():
     mock_settings.log_level = "DEBUG"
 
 
+    from fastapi import FastAPI
+
     from app.api.webhooks import router
     from app.config import get_settings
-    from fastapi import FastAPI
 
     test_app = FastAPI()
     test_app.include_router(router)

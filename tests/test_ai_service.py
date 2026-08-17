@@ -5,11 +5,12 @@ Tests cover the google-genai SDK integration, Pydantic schema validation,
 and error handling for the Gemini AI cognitive engine.
 """
 
-import json
 import asyncio
-from unittest.mock import patch, MagicMock
+import json
+from unittest.mock import MagicMock, patch
 
 import pytest
+
 from app.services.ai_service import get_ai_client
 
 
@@ -117,7 +118,7 @@ def test_extract_sol_from_pdf_success(
     
     # Mock generation response
     mock_response = MagicMock()
-    from app.core.supplement_models import StatementOfLoss, LineItem
+    from app.core.supplement_models import LineItem, StatementOfLoss
     mock_response.parsed = StatementOfLoss(
         carrier_name="State Farm",
         claim_number="1234",
@@ -191,7 +192,7 @@ def test_extract_sol_symbility_routing(
     
     # Mock generation response
     mock_response = MagicMock()
-    from app.core.supplement_models import StatementOfLoss, LineItem
+    from app.core.supplement_models import LineItem, StatementOfLoss
     mock_response.parsed = StatementOfLoss(
         carrier_name="Allstate",
         claim_number="5678",
@@ -253,7 +254,7 @@ def test_extract_sol_from_pdf_finally_block_on_error(
 def test_photo_processor_abstraction():
     """Verify that photo_processor.py does not import google.genai directly."""
     import ast
-    with open("app/workers/photo_processor.py", "r") as f:
+    with open("app/workers/photo_processor.py") as f:
         tree = ast.parse(f.read())
         
     for node in ast.walk(tree):

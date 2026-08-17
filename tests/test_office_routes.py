@@ -3,6 +3,7 @@ Unit tests for the Office Control Center API routes.
 """
 
 from unittest.mock import AsyncMock, MagicMock, patch
+
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -15,6 +16,8 @@ auth_cookie = response.cookies.get("auth_token")
 client.cookies.set("auth_token", auth_cookie)
 
 import pytest
+
+
 @pytest.fixture(autouse=True)
 def mock_pdf_detector():
     with patch("app.api.office_routes.detect_pdf_format", return_value="EAGLEVIEW"), \
@@ -201,8 +204,8 @@ class TestEvidenceGridRoute:
     @patch("app.api.office_routes.PDFGenerator")
     @patch("app.api.office_routes.get_inspection_summary", new_callable=AsyncMock)
     def test_evidence_grid_regenerates_when_ai_analysis_exists(self, mock_summary, mock_pdf_generator, tmp_path):
-        from types import SimpleNamespace
         import uuid
+        from types import SimpleNamespace
 
         from app.core.database import get_connection, insert_job_document
 
@@ -290,8 +293,9 @@ class TestMaterialOrderIntegration:
         assert "EagleView PDF not found" in response.json()["detail"]
 
 def test_mark_commission_paid(monkeypatch):
-    from app.core.database import get_connection
     import uuid
+
+    from app.core.database import get_connection
     job_id = str(uuid.uuid4())
     conn = get_connection()
     conn.execute(

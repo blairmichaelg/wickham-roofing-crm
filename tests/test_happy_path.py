@@ -1,8 +1,10 @@
 import pytest
-from httpx import AsyncClient, ASGITransport
-from app.main import app
+from httpx import ASGITransport, AsyncClient
+
 from app.api.auth import create_access_token
-from app.core.database import update_job_status, JobStatus, get_connection
+from app.core.database import JobStatus, get_connection, update_job_status
+from app.main import app
+
 
 @pytest.fixture
 def field_headers():

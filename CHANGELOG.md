@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.1] - 2026-08-17
+### Fixed & Normalized (Storm Activity Monitor Final Polish)
+- **Rebranded Badge Text**: Standardized the NWS widget header badge text to "Live NWS Data" in both `admin_dashboard.html` and `field_app.html`.
+- **Location Normalization Migration**: Implemented a database migration (`0019_normalize_nws_locations.py`) that retroactively normalizes legacy NWS shorthand strings (e.g., "4 SE Peoples Still, GA") to human-readable locations in the `storm_events` table.
+- **Migration Orchestration**: Integrated the new migration into the `run_migrations()` startup loop in `app/core/database.py`.
+- **Validation Suite**: Added migration unit tests in `tests/test_storm_radar.py` and resolved codebase-wide import styling/linting warnings.
+
 ## [2.3.0] - 2026-08-16
 ### Refined & Remediated (Storm Ingestion Pipeline & Dashboard Restructuring)
 - **High-Performance Bounding-Box Ingestion**: Replaced inefficient, state-wide data fetching with spatial bounding-box geometry queries centered on the office coordinate system on the NWS 72-hour layer (Layer 2).

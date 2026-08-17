@@ -1,6 +1,9 @@
-import pytest
 from unittest.mock import patch
+
+import pytest
+
 from scripts.cron_storm_ingest import fetch_storm_data
+
 
 @patch('scripts.cron_storm_ingest.requests.get')
 @patch('scripts.cron_storm_ingest.sqlite3.connect')
@@ -34,7 +37,8 @@ def test_storm_ingest(mock_connect, mock_get):
     with patch('scripts.cron_storm_ingest.Path.exists', return_value=True):
         with patch('scripts.cron_storm_ingest.get_db_path', return_value='dummy.db'):
             with patch('builtins.open', create=True) as mock_open:
-                import json, io
+                import io
+                import json
                 mock_open.return_value = io.StringIO(json.dumps({
                     "31602": {"lat": 30.8327, "lon": -83.2785}
                 }))
