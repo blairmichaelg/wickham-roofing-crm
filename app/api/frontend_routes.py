@@ -212,6 +212,8 @@ async def serve_field_app(request: Request, role: str = Depends(verify_field)):
             pass
     is_core = is_core_user(claims)
 
+    from app.config import get_settings
+    settings = get_settings()
     return templates.TemplateResponse(
         request,
         "field_app.html",
@@ -223,6 +225,7 @@ async def serve_field_app(request: Request, role: str = Depends(verify_field)):
             "current_rep_name": current_rep_name,
             "active_page": "field",
             "field_token": token,
+            "settings": settings,
         },
     )
 
@@ -253,6 +256,8 @@ async def serve_admin_dashboard(
     """Serve the Admin Kanban Board."""
     templates = request.app.state.templates
     jobs = await asyncio.to_thread(_fetch_active_jobs_sync)
+    from app.config import get_settings
+    settings = get_settings()
     return templates.TemplateResponse(
         request,
         "admin_dashboard.html",
@@ -261,6 +266,7 @@ async def serve_admin_dashboard(
             "jobs": jobs,
             "active_page": "admin",
             "auth_token": request.cookies.get("auth_token", ""),
+            "settings": settings,
         },
     )
 
@@ -555,10 +561,10 @@ async def serve_job_detail(
 
 @router.get("/api/storms/recent", tags=["storms"])
 async def get_recent_storms(
-    window_hours: int = 72,
+    window_hours: int | None = None,
+    since_hours: int | None = None,
     radius_miles: float = 50.0,
     event_types: str | None = None,
-    require_magnitude: bool = False,
     role: str = Depends(get_current_role)
 ):
     """
@@ -567,9 +573,15 @@ async def get_recent_storms(
     """
     from datetime import datetime, timedelta
 
+    from app.config import get_settings
     from app.core.database import get_connection
+
+    hours = window_hours if window_hours is not None else (since_hours if since_hours is not None else 72)
+    settings = get_settings()
+    min_hail = settings.storm_alert_min_hail_inches
+    min_wind = settings.storm_alert_min_wind_mph
     
-    threshold = (datetime.now(UTC) - timedelta(hours=window_hours)).isoformat()
+    threshold = (datetime.now(UTC) - timedelta(hours=hours)).isoformat()
     conn = get_connection()
     try:
         query = """
@@ -577,14 +589,14 @@ async def get_recent_storms(
             FROM storm_events
             WHERE report_time_utc >= ? AND distance_miles_from_office <= ?
               AND (
-                (event_type = 'HAIL' AND hail_size_inches >= 1.0)
+                (event_type = 'HAIL' AND hail_size_inches >= ?)
                 OR
-                (event_type = 'WIND' AND wind_speed_mph >= 40.0)
+                (event_type = 'WIND' AND wind_speed_mph >= ?)
                 OR
                 (event_type NOT IN ('HAIL', 'WIND'))
               )
         """
-        params = [threshold, radius_miles]
+        params = [threshold, radius_miles, min_hail, min_wind]
         
         if event_types:
             types_list = [t.strip().upper() for t in event_types.split(",") if t.strip()]
@@ -609,18 +621,24 @@ async def get_recent_storms(
 
 @router.get("/api/storms/summary", tags=["storms"])
 async def get_storms_summary(
-    window_hours: int = 72,
+    window_hours: int | None = None,
+    since_hours: int | None = None,
     radius_miles: float = 50.0,
     event_types: str | None = None,
-    require_magnitude: bool = False,
     role: str = Depends(get_current_role)
 ):
     """Fetch summary of storm activity and ranked target ZIPs, enforcing hard magnitude thresholds."""
     from datetime import datetime, timedelta
 
+    from app.config import get_settings
     from app.core.database import get_connection
     
-    threshold = (datetime.now(UTC) - timedelta(hours=window_hours)).isoformat()
+    hours = window_hours if window_hours is not None else (since_hours if since_hours is not None else 72)
+    settings = get_settings()
+    min_hail = settings.storm_alert_min_hail_inches
+    min_wind = settings.storm_alert_min_wind_mph
+    
+    threshold = (datetime.now(UTC) - timedelta(hours=hours)).isoformat()
     conn = get_connection()
     try:
         query = """
@@ -628,14 +646,14 @@ async def get_storms_summary(
             FROM storm_events
             WHERE report_time_utc >= ? AND distance_miles_from_office <= ? AND county IS NOT NULL AND county != ''
               AND (
-                (event_type = 'HAIL' AND hail_size_inches >= 1.0)
+                (event_type = 'HAIL' AND hail_size_inches >= ?)
                 OR
-                (event_type = 'WIND' AND wind_speed_mph >= 40.0)
+                (event_type = 'WIND' AND wind_speed_mph >= ?)
                 OR
                 (event_type NOT IN ('HAIL', 'WIND'))
               )
         """
-        params = [threshold, radius_miles]
+        params = [threshold, radius_miles, min_hail, min_wind]
             
         if event_types:
             types_list = [t.strip().upper() for t in event_types.split(",") if t.strip()]
@@ -708,8 +726,17 @@ async def get_storms_summary(
             if time_utc > z["most_recent_event_utc"]:
                 z["most_recent_event_utc"] = time_utc
                 
+    hail_norm = min_hail if min_hail > 0 else 1.0
+    wind_norm = min_wind if min_wind > 0 else 50.0
+
     target_zips = list(zips.values())
-    target_zips.sort(key=lambda z: (z["max_hail_inches"], z["max_wind_mph"], z["most_recent_event_utc"]), reverse=True)
+    target_zips.sort(
+        key=lambda z: (
+            max(z["max_hail_inches"] / hail_norm, z["max_wind_mph"] / wind_norm),
+            z["most_recent_event_utc"]
+        ),
+        reverse=True
+    )
     
     return {
         "summary": summary,

@@ -64,14 +64,16 @@ const StormRadar = {
      */
     filterWebSocketAlert(data) {
         if (!data || !data.event_type) return false;
+        const minHail = (typeof window !== 'undefined' && typeof window.STORM_MIN_HAIL_INCHES !== 'undefined') ? window.STORM_MIN_HAIL_INCHES : 1.0;
+        const minWind = (typeof window !== 'undefined' && typeof window.STORM_MIN_WIND_MPH !== 'undefined') ? window.STORM_MIN_WIND_MPH : 50.0;
         const etype = data.event_type.toUpperCase();
         if (etype === 'HAIL') {
             const hail = parseFloat(data.hail_size_inches);
-            return !isNaN(hail) && hail >= 1.0;
+            return !isNaN(hail) && hail >= minHail;
         }
         if (etype === 'WIND') {
             const wind = parseFloat(data.wind_speed_mph);
-            return !isNaN(wind) && wind >= 40.0;
+            return !isNaN(wind) && wind >= minWind;
         }
         return true; // Keep tornado/other significant events
     },

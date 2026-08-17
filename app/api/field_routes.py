@@ -924,6 +924,13 @@ async def sign_retail_contract(job_id: str, payload: RetailContractSignaturePayl
 @router.get("/storms/{zipcode}")
 async def get_zip_storms(zipcode: str, role: str = Depends(verify_field)):
     """Fetch recent storm events for a given zip code for field sales reps."""
+    from datetime import UTC, datetime
+
+    from app.config import get_settings
+    settings = get_settings()
+    min_hail = settings.storm_alert_min_hail_inches
+    min_wind = settings.storm_alert_min_wind_mph
+
     conn = get_connection()
     try:
         cursor = conn.execute(
@@ -932,9 +939,9 @@ async def get_zip_storms(zipcode: str, role: str = Depends(verify_field)):
             FROM storm_events 
             WHERE zipcode = ?
               AND (
-                (event_type = 'HAIL' AND hail_size_inches >= 1.0)
+                (event_type = 'HAIL' AND hail_size_inches >= ?)
                 OR
-                (event_type = 'WIND' AND wind_speed_mph >= 40.0)
+                (event_type = 'WIND' AND wind_speed_mph >= ?)
                 OR
                 (event_type NOT IN ('HAIL', 'WIND'))
               )
@@ -942,7 +949,7 @@ async def get_zip_storms(zipcode: str, role: str = Depends(verify_field)):
             ORDER BY event_date DESC 
             LIMIT 5
             """,
-            (zipcode.strip(),)
+            (zipcode.strip(), min_hail, min_wind)
         )
         raw_events = [dict(r) for r in cursor.fetchall()]
         formatted_events = []
@@ -969,7 +976,12 @@ async def get_zip_storms(zipcode: str, role: str = Depends(verify_field)):
             e["badge_class"] = badge_class
             e["formatted_date"] = str(e.get("event_date", ""))[:10]
             formatted_events.append(e)
-        return formatted_events
+
+        cursor_ref = conn.execute("SELECT MAX(ingested_at) FROM storm_events")
+        row_ref = cursor_ref.fetchone()
+        last_refreshed = row_ref[0] if (row_ref and row_ref[0]) else datetime.now(UTC).isoformat()
+
+        return {"events": formatted_events, "last_refreshed_utc": last_refreshed}
     finally:
         conn.close()
 

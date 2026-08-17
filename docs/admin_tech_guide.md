@@ -374,7 +374,7 @@ The Storm Activity Monitor's ingestion and alerting thresholds are controlled by
 3. `STORM_INGEST_RADIUS_MILES` (default: `50.0`): The radius in miles around the office center within which storm events are ingested/saved to the database.
 4. `STORM_ALERT_RADIUS_MILES` (default: `30.0`): The radius in miles around the office center within which events must fall to trigger active WebSocket alerts to users.
 5. `STORM_ALERT_MIN_HAIL_INCHES` (default: `1.0`): The minimum hail size (in inches) required to trigger a storm alert.
-6. `STORM_ALERT_MIN_WIND_MPH` (default: `58.0`): The minimum wind speed (in mph) required to trigger a storm alert.
+6. `STORM_ALERT_MIN_WIND_MPH` (default: `50.0`): The minimum wind speed (in mph) required to trigger a storm alert.
 
 ### Verifying Worker Health
 To confirm the worker is running and processing correctly:
@@ -384,4 +384,4 @@ To confirm the worker is running and processing correctly:
 
 ---
 
-*This guide reflects the Admin workflow as of version `2.4.0`. Includes support for non-blocking 'Naked Lead' field intake (`LEAD_CAPTURED`), pre-contract Evidence Grid pitch generation, unsigned contingency agreement PDF download/email, field-app-based signature resumption flow, and NWS-integrated Storm Activity Monitor.*
+*This guide reflects the Admin workflow as of version `2.3.3`. Includes support for non-blocking 'Naked Lead' field intake (`LEAD_CAPTURED`), pre-contract Evidence Grid pitch generation, unsigned contingency agreement PDF download/email, field-app-based signature resumption flow, and NWS-integrated Storm Activity Monitor.*

@@ -94,3 +94,4 @@ venv_fresh/
 mypy_*_output.txt
 scratch/
 appendonlydir/
+logs/

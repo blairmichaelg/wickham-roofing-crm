@@ -1742,7 +1742,13 @@ def get_recent_storm_zips_detail(window_hours: int = 72, radius_miles: float = 5
         "recent_wind_max_mph": float
     }
     """
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
+
+    from app.config import get_settings
+    settings = get_settings()
+    min_hail = settings.storm_alert_min_hail_inches
+    min_wind = settings.storm_alert_min_wind_mph
+
     threshold = (datetime.now(UTC) - timedelta(hours=window_hours)).isoformat()
     conn = get_connection()
     try:
@@ -1751,14 +1757,14 @@ def get_recent_storm_zips_detail(window_hours: int = 72, radius_miles: float = 5
             FROM storm_events
             WHERE report_time_utc >= ? AND distance_miles_from_office <= ?
               AND (
-                (event_type = 'HAIL' AND hail_size_inches >= 1.0)
+                (event_type = 'HAIL' AND hail_size_inches >= ?)
                 OR
-                (event_type = 'WIND' AND wind_speed_mph >= 40.0)
+                (event_type = 'WIND' AND wind_speed_mph >= ?)
                 OR
                 (event_type NOT IN ('HAIL', 'WIND'))
               )
             GROUP BY zipcode, event_type
-        """, (threshold, radius_miles))
+        """, (threshold, radius_miles, min_hail, min_wind))
         res = {}
         for r in cursor.fetchall():
             zp = str(r["zipcode"] or "").strip()
@@ -1774,11 +1780,11 @@ def get_recent_storm_zips_detail(window_hours: int = 72, radius_miles: float = 5
                     "recent_hail_max_inches": 0.0,
                     "recent_wind_max_mph": 0.0
                 }
-            if etype == "HAIL" and max_hail >= 1.0:
+            if etype == "HAIL" and max_hail >= min_hail:
                 res[zp]["has_recent_hail"] = True
                 if max_hail > res[zp]["recent_hail_max_inches"]:
                     res[zp]["recent_hail_max_inches"] = max_hail
-            elif etype == "WIND" and max_wind >= 40.0:
+            elif etype == "WIND" and max_wind >= min_wind:
                 res[zp]["has_recent_wind"] = True
                 if max_wind > res[zp]["recent_wind_max_mph"]:
                     res[zp]["recent_wind_max_mph"] = max_wind

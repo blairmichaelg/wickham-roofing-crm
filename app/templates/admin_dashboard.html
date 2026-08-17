@@ -6,6 +6,12 @@
     <title>Admin Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/static/js/storm_radar.js"></script>
+    {% if settings %}
+    <script>
+        window.STORM_MIN_HAIL_INCHES = {{ settings.storm_alert_min_hail_inches }};
+        window.STORM_MIN_WIND_MPH = {{ settings.storm_alert_min_wind_mph }};
+    </script>
+    {% endif %}
     <style>
         .kanban-col { min-width: 300px; }
         /* Simple scrollbar for Kanban */

@@ -485,3 +485,96 @@ def test_migration_backfills_normalized_locations():
     assert rows["TEST_NORMALIZED"] == "Thomas County, GA"
 
 
+def test_new_storm_business_logic():
+    """Test target_zips aggregation, severity scoring/sorting, add_storm_flags_to_jobs helper, window_hours / since_hours, and field storms zipcode endpoint."""
+    from datetime import datetime, UTC
+    from app.core.database import add_storm_flags_to_jobs, get_recent_storm_zips_detail, get_connection
+    from app.api.auth import create_access_token
+    
+    # 1. Setup clean test data
+    conn = get_connection()
+    conn.execute("DELETE FROM storm_events")
+    now_utc = datetime.now(UTC)
+    
+    # Insert a high-wind event in ZIP 31792 (55 mph wind, 0" hail)
+    conn.execute(
+        "INSERT INTO storm_events (id, zipcode, event_type, event_date, hail_size_inches, wind_speed_mph, latitude, longitude, county, report_time_utc, distance_miles_from_office) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("WIND_ZIP", "31792", "WIND", now_utc.strftime("%Y-%m-%d"), 0.0, 55.0, 30.8, -84.1, "Thomas County", now_utc.isoformat(), 15.0)
+    )
+    
+    # Insert a high-hail event in ZIP 31757 (1.2" hail, 0 mph wind)
+    conn.execute(
+        "INSERT INTO storm_events (id, zipcode, event_type, event_date, hail_size_inches, wind_speed_mph, latitude, longitude, county, report_time_utc, distance_miles_from_office) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("HAIL_ZIP", "31757", "HAIL", now_utc.strftime("%Y-%m-%d"), 1.2, 0.0, 30.8, -84.1, "Decatur County", now_utc.isoformat(), 10.0)
+    )
+    
+    # Insert a low-magnitude event in ZIP 31792 that should be filtered out (45 mph wind, 0.5" hail)
+    conn.execute(
+        "INSERT INTO storm_events (id, zipcode, event_type, event_date, hail_size_inches, wind_speed_mph, latitude, longitude, county, report_time_utc, distance_miles_from_office) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("NOISE_ZIP", "31792", "WIND", now_utc.strftime("%Y-%m-%d"), 0.5, 45.0, 30.8, -84.1, "Thomas County", now_utc.isoformat(), 15.0)
+    )
+    
+    conn.commit()
+    conn.close()
+    
+    # 2. Test database helpers: get_recent_storm_zips_detail() and add_storm_flags_to_jobs()
+    zips_detail = get_recent_storm_zips_detail()
+    assert "31792" in zips_detail
+    assert zips_detail["31792"]["has_recent_wind"] is True
+    assert zips_detail["31792"]["recent_wind_max_mph"] == 55.0
+    assert zips_detail["31792"]["has_recent_hail"] is False
+    
+    assert "31757" in zips_detail
+    assert zips_detail["31757"]["has_recent_hail"] is True
+    assert zips_detail["31757"]["recent_hail_max_inches"] == 1.2
+    assert zips_detail["31757"]["has_recent_wind"] is False
+    
+    jobs = [
+        {"homeowner_name": "Bob", "postal_code": "31792"},
+        {"homeowner_name": "Alice", "postal_code": "31757"},
+        {"homeowner_name": "Charlie", "postal_code": "90210"}
+    ]
+    enriched = add_storm_flags_to_jobs(jobs)
+    assert enriched[0]["has_recent_wind"] is True
+    assert enriched[0]["recent_wind_max_mph"] == 55.0
+    assert enriched[1]["has_recent_hail"] is True
+    assert enriched[1]["recent_hail_max_inches"] == 1.2
+    assert enriched[2]["has_recent_hail"] is False
+    assert enriched[2]["has_recent_wind"] is False
+    
+    # 3. Test API GET /api/storms/summary with window_hours and since_hours, verifying severity ranking
+    token = create_access_token("admin")
+    client.cookies.set("auth_token", token)
+    
+    # Default window (72 hours)
+    response = client.get("/api/storms/summary")
+    assert response.status_code == 200
+    res_data = response.json()
+    assert "target_zips" in res_data
+    target_zips = res_data["target_zips"]
+    
+    # Sorting order check:
+    # 31792: 55 mph wind -> wind_score = 55 / 50 = 1.1.
+    # 31757: 1.2" hail -> hail_score = 1.2 / 1.0 = 1.2.
+    # 1.2 > 1.1, so ZIP 31757 should rank above ZIP 31792!
+    assert len(target_zips) >= 2
+    assert target_zips[0]["zip"] == "31757"
+    assert target_zips[1]["zip"] == "31792"
+    
+    # Test since_hours fallback parameter
+    response_since = client.get("/api/storms/summary?since_hours=72")
+    assert response_since.status_code == 200
+    assert response_since.json()["target_zips"] == target_zips
+    
+    # 4. Test field API GET /api/field/storms/{zipcode} returns wrapped events
+    field_token = create_access_token("field")
+    response_field = client.get("/api/field/storms/31792", headers={"x-internal-token": field_token})
+    assert response_field.status_code == 200
+    field_json = response_field.json()
+    assert "events" in field_json
+    assert "last_refreshed_utc" in field_json
+    events = field_json["events"]
+    assert len(events) == 1
+    assert events[0]["wind_speed_mph"] == 55.0
+
+

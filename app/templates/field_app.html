@@ -9,6 +9,12 @@
     <link rel="apple-touch-icon" href="/static/icon-192.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/static/js/storm_radar.js"></script>
+    {% if settings %}
+    <script>
+        window.STORM_MIN_HAIL_INCHES = {{ settings.storm_alert_min_hail_inches }};
+        window.STORM_MIN_WIND_MPH = {{ settings.storm_alert_min_wind_mph }};
+    </script>
+    {% endif %}
     <style>
         /* Hide scrollbar for a native app feel */
         ::-webkit-scrollbar { display: none; }
@@ -477,7 +483,8 @@
                             headers: { 'x-internal-token': FIELD_TOKEN }
                         });
                         if (sRes.ok) {
-                            const storms = await sRes.json();
+                            const stormData = await sRes.json();
+                            const storms = stormData.events || [];
                             if (storms && storms.length > 0) {
                                 const topStorm = storms.slice().sort((a, b) => {
                                     const aHail = a.hail_size_inches || 0;

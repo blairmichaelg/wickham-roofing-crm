@@ -108,7 +108,7 @@ class Settings(BaseSettings):
         description="Minimum hail size in inches to trigger a storm alert."
     )
     storm_alert_min_wind_mph: float = Field(
-        default=40.0,
+        default=50.0,
         description="Minimum wind speed in mph to trigger a storm alert."
     )
     storm_ingest_interval_minutes: int = Field(

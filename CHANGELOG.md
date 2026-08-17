@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.3.3] - 2026-08-17
+### Finalized & Configured (Storm Activity Monitor Finalization)
+- **Removed Obsolete Parameters**: Fully deprecated and removed the unused `require_magnitude` parameter from the recent and summary storm endpoints.
+- **Config-Driven Thresholds**: Refactored hardcoded 1.0" hail and 40 mph wind thresholds across database, frontend, and field routes to reference settings in `app/config.py`. Raised default wind speed threshold to 50.0 mph for higher actionability.
+- **Standardized Field API Response**: Wrapped `/api/field/storms/{zip}` in the standardized JSON envelope (`{events: [...]}`) for backend/client consistency.
+- **Severity-Based Ranking**: Overhauled target ZIP code ranking logic using a normalized severity score based on configuration-defined thresholds.
+- **Test Suite Expansion**: Added unit and integration tests covering ZIP ranking, job enrichment helper functions, and endpoint contract changes.
+
 ## [2.3.2] - 2026-08-17
 ### Refactored & Integrated (Unified Storm Activity Sales Targeting)
 - **Centralized JS Logic**: Implemented the unified `storm_radar.js` frontend module for fetching, rendering storm cards, and filtering live web socket alerts.
