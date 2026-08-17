@@ -197,18 +197,53 @@
     <div id="toastContainer" class="fixed top-4 right-4 z-50 flex flex-col space-y-2 pointer-events-none"></div>
     
     <script>
-        // Simple auto-refresh on new events for Kanban
         const AUTH_TOKEN = "{{ auth_token }}";
+        // WebSocket setup with reconnection
+        let ws;
+        let wsReconnectAttempts = 0;
 
-        const ws = new WebSocket((window.location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + window.location.host + '/ws/office?token=' + encodeURIComponent(AUTH_TOKEN));
-        ws.onmessage = function(event) {
-            const data = JSON.parse(event.data);
-            if (data.type === 'new_lead' || data.type === 'stale' || data.type === 'contingency_signed') {
-                window.location.reload();
-            } else if (data.type === 'storm_alert') {
-                handleAdminIncomingStormAlert(data);
-            }
-        };
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const host = window.location.host;
+            const wsUrl = `${protocol}//${host}/ws/office?token=${encodeURIComponent(AUTH_TOKEN)}`;
+            
+            console.log("Connecting to Office WebSocket...");
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = () => {
+                console.log("Office WebSocket connected.");
+                wsReconnectAttempts = 0;
+            };
+            
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'new_lead' || data.type === 'stale' || data.type === 'contingency_signed') {
+                        window.location.reload();
+                    } else if (data.type === 'storm_alert') {
+                        handleAdminIncomingStormAlert(data);
+                    } else if (data.type === 'ping') {
+                        ws.send('pong');
+                    }
+                } catch (e) {
+                    console.error("Error parsing WebSocket message:", e);
+                }
+            };
+            
+            ws.onclose = (e) => {
+                console.log(`Office WebSocket closed: ${e.reason}. Reconnecting...`);
+                const delay = Math.min(1000 * Math.pow(2, wsReconnectAttempts) + Math.random() * 1000, 30000);
+                wsReconnectAttempts++;
+                setTimeout(connectWebSocket, delay);
+            };
+            
+            ws.onerror = (err) => {
+                console.error("WebSocket error:", err);
+                ws.close();
+            };
+        }
+
+        connectWebSocket();
 
         let isRadarOpen = false;
         function toggleStormRadar() {
