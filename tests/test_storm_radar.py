@@ -181,7 +181,9 @@ def test_storm_rest_endpoints():
     # Test GET /api/storms/recent (default parameters: since_hours=72, radius_miles=50.0)
     response = client.get("/api/storms/recent")
     assert response.status_code == 200
-    recent_data = response.json()
+    res_json = response.json()
+    assert "events" in res_json
+    recent_data = res_json["events"]
     # Should only return TEST_H1 and TEST_W1 (within 72 hours)
     assert len(recent_data) == 2
     assert recent_data[0]["id"] == "TEST_H1"
@@ -190,21 +192,23 @@ def test_storm_rest_endpoints():
     # Test GET /api/storms/recent with radius filter (radius_miles=20.0)
     response = client.get("/api/storms/recent?radius_miles=20.0")
     assert response.status_code == 200
-    recent_data = response.json()
+    recent_data = response.json()["events"]
     assert len(recent_data) == 1
     assert recent_data[0]["id"] == "TEST_H1"
     
     # Test GET /api/storms/recent with event_types filter
     response = client.get("/api/storms/recent?event_types=WIND")
     assert response.status_code == 200
-    recent_data = response.json()
+    recent_data = response.json()["events"]
     assert len(recent_data) == 1
     assert recent_data[0]["id"] == "TEST_W1"
     
     # Test GET /api/storms/summary
     response = client.get("/api/storms/summary")
     assert response.status_code == 200
-    summary_data = response.json()
+    res_summary = response.json()
+    assert "summary" in res_summary
+    summary_data = res_summary["summary"]
     
     assert "Thomas County" in summary_data
     thomas_stats = summary_data["Thomas County"]
@@ -279,7 +283,9 @@ def test_storm_recent_require_magnitude_filter():
     # Request with require_magnitude=true
     response = client.get("/api/storms/recent?require_magnitude=true")
     assert response.status_code == 200
-    recent_data = response.json()
+    res_json = response.json()
+    assert "events" in res_json
+    recent_data = res_json["events"]
     
     returned_ids = {r["id"] for r in recent_data}
     assert "TEST_POS_WIND" in returned_ids
@@ -417,18 +423,18 @@ def test_storm_summary_filtering():
     # Request summary without magnitude filter, but with default distance (50 miles)
     response = client.get("/api/storms/summary")
     assert response.status_code == 200
-    summary_data = response.json()
+    summary_data = response.json()["summary"]
     
-    # Under Thomas County, should see 2 hail and 2 wind events
+    # Under Thomas County, should see 1 hail and 1 wind event (since 1.0" and 40mph are strictly enforced)
     assert "Thomas County" in summary_data
     stats = summary_data["Thomas County"]
-    assert stats["hail_count"] == 2
-    assert stats["wind_count"] == 2
+    assert stats["hail_count"] == 1
+    assert stats["wind_count"] == 1
     
     # Request summary with require_magnitude=true
     response_filtered = client.get("/api/storms/summary?require_magnitude=true")
     assert response_filtered.status_code == 200
-    summary_data_filtered = response_filtered.json()
+    summary_data_filtered = response_filtered.json()["summary"]
     
     # Under Thomas County, should now only see 1 hail and 1 wind event
     assert "Thomas County" in summary_data_filtered
@@ -439,7 +445,7 @@ def test_storm_summary_filtering():
     # Request summary with radius_miles=10 (none match since distance is 15)
     response_radius = client.get("/api/storms/summary?radius_miles=10")
     assert response_radius.status_code == 200
-    assert response_radius.json() == {}
+    assert response_radius.json()["summary"] == {}
 
 
 def test_migration_backfills_normalized_locations():

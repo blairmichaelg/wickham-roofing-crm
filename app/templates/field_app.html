@@ -8,6 +8,7 @@
     <link rel="manifest" href="/static/manifest.json">
     <link rel="apple-touch-icon" href="/static/icon-192.png">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/static/js/storm_radar.js"></script>
     <style>
         /* Hide scrollbar for a native app feel */
         ::-webkit-scrollbar { display: none; }
@@ -251,6 +252,18 @@
                 <div id="stormAlertsList" class="space-y-3 max-h-60 overflow-y-auto pr-1">
                     <p class="text-gray-400 text-sm text-center py-4">No severe storm events in the last 72 hours.</p>
                 </div>
+
+                <!-- Storm-Target ZIPs -->
+                <div id="stormTargetZipsSection" class="mt-4 pt-4 border-t border-gray-700/80 space-y-2">
+                    <h3 class="text-[10px] font-bold text-purple-300 uppercase tracking-wider">🔥 Recent Storm-Target ZIPs</h3>
+                    <div id="targetZipsList" class="flex flex-wrap gap-2">
+                        <p class="text-gray-500 italic text-xs">No storm-target ZIPs in service area.</p>
+                    </div>
+                    <div id="activeZipFilterContainer" class="hidden flex justify-between items-center bg-purple-950/40 p-2 rounded text-xs border border-purple-800/50 mt-2">
+                        <span class="text-purple-300">Filtering jobs by ZIP: <strong id="activeZipFilterVal"></strong></span>
+                        <button type="button" onclick="clearZipFilter()" class="text-red-400 font-bold hover:underline">Clear Filter</button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -332,65 +345,110 @@
             updateSubmitButtonState();
         }
 
+        let activeZipFilter = null;
+        
+        function filterJobsByZip(zip) {
+            activeZipFilter = zip;
+            document.getElementById('activeZipFilterVal').textContent = zip;
+            document.getElementById('activeZipFilterContainer').classList.remove('hidden');
+            renderJobsList();
+        }
+        
+        function clearZipFilter() {
+            activeZipFilter = null;
+            document.getElementById('activeZipFilterContainer').classList.add('hidden');
+            renderJobsList();
+        }
+
         async function loadMyJobs() {
             const listEl = document.getElementById('myJobsList');
+            if (!listEl) return;
             try {
                 const res = await fetch('/api/field/jobs', { headers: { 'x-internal-token': FIELD_TOKEN } });
+                if (!res.ok) throw new Error('Failed to fetch jobs');
                 const jobs = await res.json();
-                if (jobs.length === 0) {
-                    listEl.innerHTML = '<p class="text-gray-500">No recent jobs found.</p>';
-                    return;
-                }
-                listEl.innerHTML = '';
-                for (const job of jobs) {
-                    const isNakedLead = job.status === 'LEAD_CAPTURED';
-                    const statusBadge = isNakedLead 
-                        ? `<span class="px-2.5 py-1 bg-amber-600/80 text-amber-100 border border-amber-500 text-xs font-bold rounded-full flex items-center gap-1">📝 Naked Lead — Unsigned</span>`
-                        : `<span class="px-2.5 py-1 bg-green-700/80 text-green-100 border border-green-500 text-xs font-bold rounded-full flex items-center gap-1">✅ ${job.status}</span>`;
-
-                    const card = document.createElement('div');
-                    card.className = `bg-gray-800 border ${isNakedLead ? 'border-amber-600/60' : 'border-gray-700'} p-4 rounded-lg shadow-md space-y-3`;
-                    card.innerHTML = `
-                        <div class="flex justify-between items-start">
-                            <div>
-                                <h3 class="text-white font-bold text-lg">${job.homeowner_name}</h3>
-                                <p class="text-gray-400 text-sm">${job.address_line1}</p>
-                            </div>
-                            ${statusBadge}
-                        </div>
-                        <div class="flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-gray-700/80">
-                            <div class="flex items-center gap-2 flex-wrap">
-                                <button onclick="loadDocuments('${job.id}', this)" class="text-blue-400 text-xs font-semibold hover:text-blue-300 bg-gray-900 px-2.5 py-1.5 rounded border border-gray-700">
-                                    Docs &darr;
-                                </button>
-                                <a href="/api/field/jobs/${job.id}/evidence_grid" target="_blank" class="text-emerald-300 hover:text-white text-xs font-bold bg-emerald-950/80 px-2.5 py-1.5 rounded border border-emerald-700/80 flex items-center gap-1">
-                                    📄 Evidence Grid
-                                </a>
-                                ${isNakedLead ? `
-                                <a href="/api/field/jobs/${job.id}/docs/contingency" target="_blank" class="text-blue-300 hover:text-white text-xs font-bold bg-blue-950/80 px-2.5 py-1.5 rounded border border-blue-700/80 flex items-center gap-1">
-                                    ✉️ Unsigned PDF
-                                </a>
-                                <button onclick="emailUnsignedAgreement('${job.id}', '${encodeURIComponent(job.homeowner_name)}', '${encodeURIComponent(job.email || '')}')" class="text-amber-300 hover:text-white text-xs font-bold bg-amber-950/80 px-2.5 py-1.5 rounded border border-amber-700/80 flex items-center gap-1">
-                                    ✉️ Email Client
-                                </button>
-                                ` : ''}
-                            </div>
-                            ${isNakedLead ? `
-                            <button onclick="resumeLead('${job.id}')" class="text-purple-200 hover:text-white text-xs font-bold bg-purple-900 hover:bg-purple-800 px-3.5 py-1.5 rounded-lg border border-purple-500 shadow flex items-center gap-1">
-                                ✍️ Resume & Sign &rarr;
-                            </button>
-                            ` : `
-                            <a href="/office/jobs/${job.id}" class="text-purple-300 hover:text-white text-xs font-bold bg-purple-950/80 hover:bg-purple-900 px-3 py-1.5 rounded border border-purple-700/80 flex items-center gap-1">
-                                ⚡ View Overview &rarr;
-                            </a>
-                            `}
-                        </div>
-                        <div id="docs-${job.id}" class="hidden mt-2 space-y-2 border-t border-gray-700 pt-3"></div>
-                    `;
-                    listEl.appendChild(card);
-                }
+                window.allJobs = jobs; // Cache jobs globally for instant filtering
+                renderJobsList();
             } catch (err) {
                 listEl.innerHTML = '<p class="text-red-400 text-sm">Failed to load jobs.</p>';
+            }
+        }
+
+        function renderJobsList() {
+            const listEl = document.getElementById('myJobsList');
+            if (!listEl || !window.allJobs) return;
+            
+            let filteredJobs = window.allJobs;
+            if (activeZipFilter) {
+                filteredJobs = window.allJobs.filter(j => (j.postal_code || '').trim() === activeZipFilter);
+            }
+            
+            if (filteredJobs.length === 0) {
+                listEl.innerHTML = activeZipFilter 
+                    ? `<p class="text-gray-400 text-sm py-4">No jobs found in ZIP ${activeZipFilter}.</p>`
+                    : '<p class="text-gray-400 text-sm">No recent jobs found.</p>';
+                return;
+            }
+            
+            listEl.innerHTML = '';
+            for (const job of filteredJobs) {
+                const isNakedLead = job.status === 'LEAD_CAPTURED';
+                const statusBadge = isNakedLead 
+                    ? `<span class="px-2.5 py-1 bg-amber-600/80 text-amber-100 border border-amber-500 text-xs font-bold rounded-full flex items-center gap-1">📝 Naked Lead — Unsigned</span>`
+                    : `<span class="px-2.5 py-1 bg-green-700/80 text-green-100 border border-green-500 text-xs font-bold rounded-full flex items-center gap-1">✅ ${job.status}</span>`;
+                
+                // Storm target badges for jobs located in high-risk ZIPs
+                let stormBadges = '';
+                if (job.has_recent_hail && job.recent_hail_max_inches > 0) {
+                    stormBadges += `<span class="inline-block text-[10px] bg-amber-950/80 text-amber-300 border border-amber-700/80 px-2 py-0.5 rounded font-bold mr-1">☄️ HAIL ${job.recent_hail_max_inches.toFixed(2)}"</span>`;
+                }
+                if (job.has_recent_wind && job.recent_wind_max_mph > 0) {
+                    stormBadges += `<span class="inline-block text-[10px] bg-blue-950/80 text-blue-300 border border-blue-700/80 px-2 py-0.5 rounded font-bold mr-1">💨 WIND ${Math.round(job.recent_wind_max_mph)}mph</span>`;
+                }
+
+                const card = document.createElement('div');
+                card.className = `bg-gray-800 border ${isNakedLead ? 'border-amber-600/60' : 'border-gray-700'} p-4 rounded-lg shadow-md space-y-3`;
+                card.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <div class="flex items-center gap-2 flex-wrap mb-1">
+                                <h3 class="text-white font-bold text-lg">${job.homeowner_name}</h3>
+                                ${stormBadges}
+                            </div>
+                            <p class="text-gray-400 text-sm">${job.address_line1} (${job.postal_code || ''})</p>
+                        </div>
+                        ${statusBadge}
+                    </div>
+                    <div class="flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-gray-700/80">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <button onclick="loadDocuments('${job.id}', this)" class="text-blue-400 text-xs font-semibold hover:text-blue-300 bg-gray-900 px-2.5 py-1.5 rounded border border-gray-700">
+                                Docs &darr;
+                            </button>
+                            <a href="/api/field/jobs/${job.id}/evidence_grid" target="_blank" class="text-emerald-300 hover:text-white text-xs font-bold bg-emerald-950/80 px-2.5 py-1.5 rounded border border-emerald-700/80 flex items-center gap-1">
+                                📄 Evidence Grid
+                            </a>
+                            ${isNakedLead ? `
+                            <a href="/api/field/jobs/${job.id}/docs/contingency" target="_blank" class="text-blue-300 hover:text-white text-xs font-bold bg-blue-950/80 px-2.5 py-1.5 rounded border border-blue-700/80 flex items-center gap-1">
+                                ✉️ Unsigned PDF
+                            </a>
+                            <button onclick="emailUnsignedAgreement('${job.id}', '${encodeURIComponent(job.homeowner_name)}', '${encodeURIComponent(job.email || '')}')" class="text-amber-300 hover:text-white text-xs font-bold bg-amber-950/80 px-2.5 py-1.5 rounded border border-amber-700/80 flex items-center gap-1">
+                                ✉️ Email Client
+                            </button>
+                            ` : ''}
+                        </div>
+                        ${isNakedLead ? `
+                        <button onclick="resumeLead('${job.id}')" class="text-purple-200 hover:text-white text-xs font-bold bg-purple-900 hover:bg-purple-800 px-3.5 py-1.5 rounded-lg border border-purple-500 shadow flex items-center gap-1">
+                            ✍️ Resume & Sign &rarr;
+                        </button>
+                        ` : `
+                        <a href="/office/jobs/${job.id}" class="text-purple-300 hover:text-white text-xs font-bold bg-purple-950/80 hover:bg-purple-900 px-3 py-1.5 rounded border border-purple-700/80 flex items-center gap-1">
+                            ⚡ View Overview &rarr;
+                        </a>
+                        `}
+                    </div>
+                    <div id="docs-${job.id}" class="hidden mt-2 space-y-2 border-t border-gray-700 pt-3"></div>
+                `;
+                listEl.appendChild(card);
             }
         }
 
@@ -412,6 +470,40 @@
                 if (document.getElementById('job_type')) document.getElementById('job_type').value = job.job_type || 'INSURANCE';
                 if (document.getElementById('loss_date')) document.getElementById('loss_date').value = job.loss_date || '';
 
+                let stormStatusText = '';
+                if (job.status === 'LEAD_CAPTURED' && job.postal_code) {
+                    try {
+                        const sRes = await fetch(`/api/field/storms/${encodeURIComponent(job.postal_code.trim())}`, {
+                            headers: { 'x-internal-token': FIELD_TOKEN }
+                        });
+                        if (sRes.ok) {
+                            const storms = await sRes.json();
+                            if (storms && storms.length > 0) {
+                                const topStorm = storms.slice().sort((a, b) => {
+                                    const aHail = a.hail_size_inches || 0;
+                                    const bHail = b.hail_size_inches || 0;
+                                    if (aHail !== bHail) return bHail - aHail;
+                                    const aWind = a.wind_speed_mph || 0;
+                                    const bWind = b.wind_speed_mph || 0;
+                                    return bWind - aWind;
+                                })[0];
+                                const formattedDate = StormRadar.formatShortDate(topStorm.event_date);
+                                if (topStorm.event_type === 'HAIL' || topStorm.hail_size_inches > 0) {
+                                    stormStatusText = `⚡ Storm-relevant: Hail ${topStorm.hail_size_inches.toFixed(2)}" reported ${formattedDate} in ZIP ${job.postal_code}`;
+                                } else if (topStorm.event_type === 'WIND' || topStorm.wind_speed_mph > 0) {
+                                    stormStatusText = `⚡ Storm-relevant: Wind ${topStorm.wind_speed_mph} mph reported ${formattedDate} in ZIP ${job.postal_code}`;
+                                } else {
+                                    stormStatusText = `⚡ Storm-relevant: ${topStorm.event_type} reported ${formattedDate} in ZIP ${job.postal_code}`;
+                                }
+                            } else {
+                                stormStatusText = `⚪ No recent storm events in ZIP ${job.postal_code}`;
+                            }
+                        }
+                    } catch (err) {
+                        console.error("Failed to check storm status for lead resume", err);
+                    }
+                }
+
                 let banner = document.getElementById('resumeNoticeBanner');
                 if (!banner) {
                     banner = document.createElement('div');
@@ -424,6 +516,7 @@
                     <div>
                         <span class="font-bold text-base text-white">📝 Resuming Saved Lead for ${job.homeowner_name}</span>
                         <p class="text-xs text-blue-200">Pre-populated saved contact info. Present terms & sign below.</p>
+                        ${stormStatusText ? `<p class="text-xs text-purple-200 font-bold mt-1">${stormStatusText}</p>` : ''}
                     </div>
                     <button type="button" onclick="cancelResume()" class="text-xs bg-gray-800 hover:bg-gray-700 text-white font-bold px-3 py-1.5 rounded border border-gray-600">
                         ✕ Cancel / New Lead
@@ -1124,15 +1217,12 @@
 
         async function loadStormRadar() {
             try {
-                const recentResp = await fetch('/api/storms/recent?require_magnitude=true', {
-                    headers: { 'x-internal-token': FIELD_TOKEN }
-                });
-                const recent = recentResp.ok ? await recentResp.json() : [];
+                const data = await StormRadar.fetchRecentStorms(72, FIELD_TOKEN);
+                const recent = data.events || [];
                 
-                const summaryResp = await fetch('/api/storms/summary?require_magnitude=true', {
-                    headers: { 'x-internal-token': FIELD_TOKEN }
-                });
-                const summary = summaryResp.ok ? await summaryResp.json() : {};
+                const summaryData = await StormRadar.fetchStormSummary(72, FIELD_TOKEN);
+                const summary = summaryData.summary || {};
+                const targetZips = summaryData.target_zips || [];
                 
                 let totalHail = 0;
                 let totalWind = 0;
@@ -1146,74 +1236,63 @@
                 const listEl = document.getElementById('stormAlertsList');
                 if (recent.length === 0) {
                     listEl.innerHTML = '<p class="text-gray-400 text-sm text-center py-4">No severe storm events in the last 72 hours.</p>';
-                    return;
+                } else {
+                    const displayItems = recent.slice(0, 5);
+                    listEl.innerHTML = displayItems.map(alert => StormRadar.renderAlertItem(alert, false)).join('');
+                    if (recent.length > 5) {
+                        listEl.innerHTML += '<p class="text-gray-400 text-[10px] text-center mt-1">Showing 5 most recent significant reports</p>';
+                    }
                 }
-                
-                const displayItems = recent.slice(0, 5);
-                listEl.innerHTML = displayItems.map(alert => renderAlertItem(alert)).join('');
-                if (recent.length > 5) {
-                    listEl.innerHTML += '<p class="text-gray-400 text-[10px] text-center mt-1">Showing 5 most recent significant reports</p>';
+
+                // Render Storm-Target ZIPs
+                const zipsListEl = document.getElementById('targetZipsList');
+                if (targetZips.length === 0) {
+                    zipsListEl.innerHTML = '<p class="text-gray-500 italic text-xs">No storm-target ZIPs in service area.</p>';
+                } else {
+                    zipsListEl.innerHTML = targetZips.slice(0, 5).map(tz => {
+                        let severityInfo = [];
+                        if (tz.max_hail_inches > 0) severityInfo.push(`${tz.max_hail_inches.toFixed(2)}" Hail`);
+                        if (tz.max_wind_mph > 0) severityInfo.push(`${Math.round(tz.max_wind_mph)}mph Wind`);
+                        const sevText = severityInfo.join(', ');
+                        return `
+                            <button type="button" onclick="filterJobsByZip('${tz.zip}')" class="bg-purple-900/40 hover:bg-purple-800/60 border border-purple-700/80 text-purple-200 text-[11px] font-bold px-2.5 py-1 rounded transition-colors flex items-center gap-1">
+                                📍 ${tz.zip} <span class="text-purple-400 font-normal">(${sevText})</span>
+                            </button>
+                        `;
+                    }).join('');
                 }
             } catch (err) {
                 console.error("Failed to load storm radar data:", err);
             }
         }
         
-        function renderAlertItem(alert) {
-            const timeStr = new Date(alert.report_time_utc).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            const dateStr = new Date(alert.report_time_utc).toLocaleDateString([], { month: 'short', day: 'numeric' });
-            
-            let badgeColor = 'bg-red-900/80 text-red-300 border-red-700';
-            let detailStr = '';
-            
-            if (alert.event_type === 'HAIL') {
-                badgeColor = 'bg-amber-900/80 text-amber-300 border-amber-600';
-                detailStr = `☄️ ${alert.hail_size_inches.toFixed(2)}" Hail`;
-            } else if (alert.event_type === 'WIND') {
-                badgeColor = 'bg-blue-900/80 text-blue-300 border-blue-600';
-                detailStr = `💨 ${alert.wind_speed_mph} mph Wind`;
-            } else if (alert.event_type === 'TORNADO') {
-                badgeColor = 'bg-red-950/80 text-red-400 border-red-600 animate-pulse';
-                detailStr = `🌪️ Tornado`;
+        function handleIncomingStormAlert(alert) {
+            // Enforce magnitude thresholds client-side via centralized filter
+            if (!StormRadar.filterWebSocketAlert(alert)) {
+                return;
             }
             
-            return `
-                <div class="bg-gray-900/80 border border-gray-800 p-3 rounded-lg shadow-sm hover:border-purple-500/50 transition-colors text-left">
-                    <div class="flex justify-between items-start mb-1">
-                        <span class="text-xs font-bold font-mono text-purple-400">${alert.county || 'Unknown Location'}</span>
-                        <span class="text-[10px] text-gray-500">${dateStr} ${timeStr}</span>
-                    </div>
-                    <div class="flex justify-between items-center mt-1">
-                        <div class="text-sm font-bold text-white">${detailStr}</div>
-                        <span class="text-[10px] border px-2 py-0.5 rounded-full font-bold ${badgeColor}">${alert.event_type}</span>
-                    </div>
-                    \${alert.remarks ? `<p class="text-xs text-gray-400 mt-1 italic line-clamp-2">\${alert.remarks}</p>` : ''}
-                </div>
-            `;
-        }
-        
-        function handleIncomingStormAlert(alert) {
             let title = 'Severe Weather Alert';
             let msg = '';
             if (alert.event_type === 'HAIL') {
                 title = '☄️ Severe Hail Alert';
-                msg = `\${alert.hail_size_inches.toFixed(2)}" Hail reported in \${alert.county}.`;
+                msg = `${alert.hail_size_inches.toFixed(2)}" Hail reported in ${alert.county}.`;
             } else if (alert.event_type === 'WIND') {
                 title = '💨 High Wind Alert';
-                msg = `\${alert.wind_speed_mph} mph Winds reported in \${alert.county}.`;
+                msg = `${alert.wind_speed_mph} mph Winds reported in ${alert.county}.`;
             } else if (alert.event_type === 'TORNADO') {
                 title = '🌪️ TORNADO WARNING';
-                msg = `Tornado reported in \${alert.county}! Take shelter!`;
+                msg = `Tornado reported in ${alert.county}! Take shelter!`;
             }
             
             showToastHTML(`
                 <div class="flex flex-col gap-1 w-full pointer-events-auto">
                     <div class="font-extrabold text-white text-sm uppercase tracking-wider flex justify-between items-center">
-                        <span>\${title}</span>
-                        <span class="text-[10px] bg-black/40 px-2 py-0.5 rounded-full border border-white/20">\${alert.event_type}</span>
+                        <span>${title}</span>
+                        <span class="text-[10px] bg-black/40 px-2 py-0.5 rounded-full border border-white/20">${alert.event_type}</span>
                     </div>
-                    <p class="text-xs text-white/95 font-medium">\${msg}</p>
-                    \${alert.loc_desc ? `<p class="text-[10px] text-white/70 italic">Location: \${alert.loc_desc}</p>` : ''}
+                    <p class="text-xs text-white/95 font-medium">${msg}</p>
+                    ${alert.loc_desc ? `<p class="text-[10px] text-white/70 italic">Location: ${alert.loc_desc}</p>` : ''}
                 </div>
             `, 'error');
             
@@ -1221,7 +1300,7 @@
             if (listEl.querySelector('p.text-gray-400')) {
                 listEl.innerHTML = '';
             }
-            const itemHTML = renderAlertItem(alert);
+            const itemHTML = StormRadar.renderAlertItem(alert, false);
             listEl.insertAdjacentHTML('afterbegin', itemHTML);
             
             if (alert.event_type === 'HAIL') {

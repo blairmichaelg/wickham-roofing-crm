@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import sqlite3
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 
@@ -1731,4 +1731,74 @@ def get_completed_jobs() -> list[dict]:
         return [dict(r) for r in cursor.fetchall()]
     finally:
         conn.close()
+
+
+def get_recent_storm_zips_detail(window_hours: int = 72, radius_miles: float = 50.0) -> dict[str, dict]:
+    """
+    Returns a dict mapping zipcode -> {
+        "has_recent_hail": bool,
+        "has_recent_wind": bool,
+        "recent_hail_max_inches": float,
+        "recent_wind_max_mph": float
+    }
+    """
+    from datetime import datetime, timedelta, timezone
+    threshold = (datetime.now(UTC) - timedelta(hours=window_hours)).isoformat()
+    conn = get_connection()
+    try:
+        cursor = conn.execute("""
+            SELECT zipcode, event_type, MAX(hail_size_inches) as max_hail, MAX(wind_speed_mph) as max_wind
+            FROM storm_events
+            WHERE report_time_utc >= ? AND distance_miles_from_office <= ?
+              AND (
+                (event_type = 'HAIL' AND hail_size_inches >= 1.0)
+                OR
+                (event_type = 'WIND' AND wind_speed_mph >= 40.0)
+                OR
+                (event_type NOT IN ('HAIL', 'WIND'))
+              )
+            GROUP BY zipcode, event_type
+        """, (threshold, radius_miles))
+        res = {}
+        for r in cursor.fetchall():
+            zp = str(r["zipcode"] or "").strip()
+            if not zp:
+                continue
+            etype = str(r["event_type"] or "").upper()
+            max_hail = r["max_hail"] or 0.0
+            max_wind = r["max_wind"] or 0.0
+            if zp not in res:
+                res[zp] = {
+                    "has_recent_hail": False,
+                    "has_recent_wind": False,
+                    "recent_hail_max_inches": 0.0,
+                    "recent_wind_max_mph": 0.0
+                }
+            if etype == "HAIL" and max_hail >= 1.0:
+                res[zp]["has_recent_hail"] = True
+                if max_hail > res[zp]["recent_hail_max_inches"]:
+                    res[zp]["recent_hail_max_inches"] = max_hail
+            elif etype == "WIND" and max_wind >= 40.0:
+                res[zp]["has_recent_wind"] = True
+                if max_wind > res[zp]["recent_wind_max_mph"]:
+                    res[zp]["recent_wind_max_mph"] = max_wind
+        return res
+    finally:
+        conn.close()
+
+
+def add_storm_flags_to_jobs(jobs: list[dict]) -> list[dict]:
+    """Enriches job records with recent storm attributes based on their ZIP code."""
+    storm_zips = get_recent_storm_zips_detail()
+    for job in jobs:
+        job_zip = str(job.get("postal_code") or "").strip()
+        zip_info = storm_zips.get(job_zip, {
+            "has_recent_hail": False,
+            "has_recent_wind": False,
+            "recent_hail_max_inches": 0.0,
+            "recent_wind_max_mph": 0.0
+        })
+        job.update(zip_info)
+    return jobs
+
 

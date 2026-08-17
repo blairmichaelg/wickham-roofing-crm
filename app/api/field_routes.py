@@ -294,9 +294,12 @@ async def list_my_jobs(claims: dict = Depends(get_current_claims)):
             """,
             (rep_name, rep_id)
         )
-        return [dict(r) for r in cursor.fetchall()]
+        jobs = [dict(r) for r in cursor.fetchall()]
+        from app.core.database import add_storm_flags_to_jobs
+        return add_storm_flags_to_jobs(jobs)
     finally:
         conn.close()
+
 
 @router.get("/jobs/{job_id}")
 async def get_field_job_details(job_id: str, claims: dict = Depends(get_current_claims)):
@@ -924,7 +927,21 @@ async def get_zip_storms(zipcode: str, role: str = Depends(verify_field)):
     conn = get_connection()
     try:
         cursor = conn.execute(
-            "SELECT event_date, event_type, MAX(hail_size_inches) as hail_size_inches, MAX(wind_speed_mph) as wind_speed_mph FROM storm_events WHERE zipcode = ? GROUP BY event_date, event_type ORDER BY event_date DESC LIMIT 5",
+            """
+            SELECT event_date, event_type, MAX(hail_size_inches) as hail_size_inches, MAX(wind_speed_mph) as wind_speed_mph 
+            FROM storm_events 
+            WHERE zipcode = ?
+              AND (
+                (event_type = 'HAIL' AND hail_size_inches >= 1.0)
+                OR
+                (event_type = 'WIND' AND wind_speed_mph >= 40.0)
+                OR
+                (event_type NOT IN ('HAIL', 'WIND'))
+              )
+            GROUP BY event_date, event_type 
+            ORDER BY event_date DESC 
+            LIMIT 5
+            """,
             (zipcode.strip(),)
         )
         raw_events = [dict(r) for r in cursor.fetchall()]

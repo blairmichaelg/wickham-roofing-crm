@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.2] - 2026-08-17
+### Refactored & Integrated (Unified Storm Activity Sales Targeting)
+- **Centralized JS Logic**: Implemented the unified `storm_radar.js` frontend module for fetching, rendering storm cards, and filtering live web socket alerts.
+- **Storm-Target ZIP Identification**: Integrated target ZIP list rendering in both field-app and admin dashboards. Added inline storm badges for jobs in high-risk ZIPs and dynamic ZIP lookups.
+- **Strict Magnitude Thresholds**: Enforced 1.0" hail and 40 mph wind limits directly in backend route SQL queries, WS handlers, and frontend filters.
+- **REST and Unit Test Alignment**: Aligned test fixtures and assertions in `tests/test_storm_radar.py` to the new structured JSON response format.
+
 ## [2.3.1] - 2026-08-17
 ### Fixed & Normalized (Storm Activity Monitor Final Polish)
 - **Rebranded Badge Text**: Standardized the NWS widget header badge text to "Live NWS Data" in both `admin_dashboard.html` and `field_app.html`.

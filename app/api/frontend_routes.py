@@ -228,18 +228,20 @@ async def serve_field_app(request: Request, role: str = Depends(verify_field)):
 
 
 def _fetch_active_jobs_sync() -> list[dict]:
+    from app.core.database import add_storm_flags_to_jobs
     conn = get_connection()
     try:
         cursor = conn.execute(
             """
-            SELECT id, invoice_id, homeowner_name, address_line1, city, state,
+            SELECT id, invoice_id, homeowner_name, address_line1, city, state, postal_code,
                    status, created_at, canvasser_name, supplement_sent_at, carrier_sla_days
             FROM jobs
             WHERE status != 'CLOSED'
             ORDER BY created_at DESC
             """
         )
-        return [dict(r) for r in cursor]
+        jobs = [dict(r) for r in cursor]
+        return add_storm_flags_to_jobs(jobs)
     finally:
         conn.close()
 
@@ -553,42 +555,36 @@ async def serve_job_detail(
 
 @router.get("/api/storms/recent", tags=["storms"])
 async def get_recent_storms(
-    since_hours: int = 72,
+    window_hours: int = 72,
     radius_miles: float = 50.0,
     event_types: str | None = None,
     require_magnitude: bool = False,
     role: str = Depends(get_current_role)
 ):
     """
-    Fetch storm events filtered by time, distance, and type, ordered by most recent.
-    
-    Args:
-        since_hours (int): Number of hours back to query. Default is 72.
-        radius_miles (float): Distance filter in miles from the office. Default is 50.0.
-        event_types (str | None): Comma-separated list of event types (e.g. "HAIL,TORNADO").
-        require_magnitude (bool): Filter to exclude zero/NULL magnitude events.
-        role (str): Role dependency.
+    Fetch storm events filtered by time, distance, and type, ordered by most recent,
+    enforcing hard magnitude thresholds.
     """
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     from app.core.database import get_connection
     
-    threshold = (datetime.now(UTC) - timedelta(hours=since_hours)).isoformat()
+    threshold = (datetime.now(UTC) - timedelta(hours=window_hours)).isoformat()
     conn = get_connection()
     try:
         query = """
             SELECT id, event_type, hail_size_inches, wind_speed_mph, latitude, longitude, county, report_time_utc, distance_miles_from_office, ingested_at
             FROM storm_events
             WHERE report_time_utc >= ? AND distance_miles_from_office <= ?
+              AND (
+                (event_type = 'HAIL' AND hail_size_inches >= 1.0)
+                OR
+                (event_type = 'WIND' AND wind_speed_mph >= 40.0)
+                OR
+                (event_type NOT IN ('HAIL', 'WIND'))
+              )
         """
         params = [threshold, radius_miles]
-        
-        if require_magnitude:
-            query += """ AND NOT (
-                (event_type = 'WIND' AND (wind_speed_mph IS NULL OR wind_speed_mph <= 0))
-                OR
-                (event_type = 'HAIL' AND (hail_size_inches IS NULL OR hail_size_inches <= 0))
-            )"""
         
         if event_types:
             types_list = [t.strip().upper() for t in event_types.split(",") if t.strip()]
@@ -600,40 +596,46 @@ async def get_recent_storms(
         query += " ORDER BY report_time_utc DESC"
         
         cursor = conn.execute(query, tuple(params))
-        return [dict(r) for r in cursor.fetchall()]
+        events = [dict(r) for r in cursor.fetchall()]
+        
+        cursor_ref = conn.execute("SELECT MAX(ingested_at) FROM storm_events")
+        row_ref = cursor_ref.fetchone()
+        last_refreshed = row_ref[0] if (row_ref and row_ref[0]) else datetime.now(UTC).isoformat()
+        
+        return {"events": events, "last_refreshed_utc": last_refreshed}
     finally:
         conn.close()
 
 
 @router.get("/api/storms/summary", tags=["storms"])
 async def get_storms_summary(
-    since_hours: int = 72,
+    window_hours: int = 72,
     radius_miles: float = 50.0,
     event_types: str | None = None,
     require_magnitude: bool = False,
     role: str = Depends(get_current_role)
 ):
-    """Fetch summary of storm activity grouped by county/location, filtered by time, distance, and type."""
-    from datetime import datetime, timedelta, timezone
+    """Fetch summary of storm activity and ranked target ZIPs, enforcing hard magnitude thresholds."""
+    from datetime import datetime, timedelta
 
     from app.core.database import get_connection
     
-    threshold = (datetime.now(UTC) - timedelta(hours=since_hours)).isoformat()
+    threshold = (datetime.now(UTC) - timedelta(hours=window_hours)).isoformat()
     conn = get_connection()
     try:
         query = """
-            SELECT county, event_type, hail_size_inches, wind_speed_mph
+            SELECT zipcode, county, event_type, hail_size_inches, wind_speed_mph, report_time_utc
             FROM storm_events
             WHERE report_time_utc >= ? AND distance_miles_from_office <= ? AND county IS NOT NULL AND county != ''
+              AND (
+                (event_type = 'HAIL' AND hail_size_inches >= 1.0)
+                OR
+                (event_type = 'WIND' AND wind_speed_mph >= 40.0)
+                OR
+                (event_type NOT IN ('HAIL', 'WIND'))
+              )
         """
         params = [threshold, radius_miles]
-        
-        if require_magnitude:
-            query += """ AND NOT (
-                (event_type = 'WIND' AND (wind_speed_mph IS NULL OR wind_speed_mph <= 0))
-                OR
-                (event_type = 'HAIL' AND (hail_size_inches IS NULL OR hail_size_inches <= 0))
-            )"""
             
         if event_types:
             types_list = [t.strip().upper() for t in event_types.split(",") if t.strip()]
@@ -644,15 +646,22 @@ async def get_storms_summary(
                 
         cursor = conn.execute(query, tuple(params))
         rows = cursor.fetchall()
+        
+        cursor_ref = conn.execute("SELECT MAX(ingested_at) FROM storm_events")
+        row_ref = cursor_ref.fetchone()
+        last_refreshed = row_ref[0] if (row_ref and row_ref[0]) else datetime.now(UTC).isoformat()
     finally:
         conn.close()
         
     summary = {}
+    zips = {}
     for r in rows:
         county = r["county"]
         etype = r["event_type"]
         hail = r["hail_size_inches"] or 0.0
         wind = r["wind_speed_mph"] or 0.0
+        zp = str(r["zipcode"] or "").strip()
+        time_utc = r["report_time_utc"]
         
         if county not in summary:
             summary[county] = {
@@ -676,4 +685,34 @@ async def get_storms_summary(
         elif etype == "TORNADO":
             stats["tornado_count"] += 1
             
-    return summary
+        if zp:
+            if zp not in zips:
+                zips[zp] = {
+                    "zip": zp,
+                    "county": county,
+                    "hail_events": 0,
+                    "max_hail_inches": 0.0,
+                    "wind_events": 0,
+                    "max_wind_mph": 0.0,
+                    "most_recent_event_utc": time_utc
+                }
+            z = zips[zp]
+            if etype == "HAIL":
+                z["hail_events"] += 1
+                if hail > z["max_hail_inches"]:
+                    z["max_hail_inches"] = hail
+            elif etype == "WIND":
+                z["wind_events"] += 1
+                if wind > z["max_wind_mph"]:
+                    z["max_wind_mph"] = wind
+            if time_utc > z["most_recent_event_utc"]:
+                z["most_recent_event_utc"] = time_utc
+                
+    target_zips = list(zips.values())
+    target_zips.sort(key=lambda z: (z["max_hail_inches"], z["max_wind_mph"], z["most_recent_event_utc"]), reverse=True)
+    
+    return {
+        "summary": summary,
+        "target_zips": target_zips,
+        "last_refreshed_utc": last_refreshed
+    }

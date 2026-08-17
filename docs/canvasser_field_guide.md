@@ -351,11 +351,13 @@ The field app contains a live **Storm Activity Monitor** widget located below th
 
 ### What it displays
 - **Hail Events & Wind Events Counts**: These counts represent the total number of verified hail and wind reports recorded by the National Weather Service (NWS) within a 50-mile radius of the main office in the last 72 hours.
+- **Storm-Target ZIPs**: Displays a list of top storm-impacted ZIP codes. Clicking any of these ZIP codes instantly filters your job list to show only leads within that area.
 - **Recent Alerts List**: Displays the 5 most recent significant storm reports with details (county, magnitude like hail size/wind speed, and time).
 
 ### Actionable Rep Response
 When you see a live, severe in-app banner alert (WebSocket toast) or see high event counts in specific areas on the Storm Activity Monitor card:
-- **Target Canvassing**: Prioritize canvassing and door-knocking in those affected neighborhoods/zipcodes. High-magnitude storms indicate a higher likelihood of property damage and interested homeowners.
+- **Target Canvassing & ZIP Filtering**: Filter your active job list by clicking a high-impact ZIP in the Storm-Target list to target your follow-ups. Look for the visual **☄️ HAIL** and **💨 WIND** indicators on your job cards.
+- **ZIP Verification**: During intake or when resuming a lead, look for the inline storm risk warning block showing recent hail/wind activity for that ZIP code.
 - **Leverage Evidence Grid**: Use the NOAA storm dates and report data to pitch to homeowners in that immediate area, establishing credibility and generating new leads.
 
 ---
