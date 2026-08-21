@@ -1,6 +1,6 @@
 # Testing Guide — Wickham Roofing CRM
 
-This guide documents the **50 test modules** comprising the Wickham Roofing CRM test suite, mapping each module to the business guarantee it protects, documenting how to run the suite with coverage, and specifying the enforced threshold targets.
+This guide documents the **57 test modules** (351 assertions) comprising the Wickham Roofing CRM test suite, mapping each module to the business guarantee it protects, documenting how to run the suite with coverage, and specifying the enforced threshold targets.
 
 ---
 
@@ -27,7 +27,7 @@ This guide documents the **50 test modules** comprising the Wickham Roofing CRM 
 | `app/core/` | ≥ 90% |
 | `app/services/` | ≥ 90% |
 | Rest of `app/` | ≥ 75% |
-| Overall | ≥ 75% (enforced via `fail_under = 75` in `pyproject.toml`) |
+| Overall | ≥ 75% (enforced via `fail_under = 75` in `pyproject.toml`; current: **75.27%**) |
 
 ---
 
@@ -83,6 +83,13 @@ This guide documents the **50 test modules** comprising the Wickham Roofing CRM 
 | `test_weather_and_evidence_grid.py` | NOAA forensics engine retrieves storm events and evidence grid PDF generation includes correct weather data |
 | `test_webhooks.py` | Webhook endpoints correctly validate HMAC signatures and process job status update payloads |
 | `test_worker_settings.py` | ARQ worker settings module resolves Redis connection string from environment variables |
+| `test_workers_coverage.py` | ARQ background workers (photo_processor, commission_processor) cover happy-path, error-path, and DB writeback branches |
+| `test_pipeline_additional_coverage.py` | Orchestration pipelines (retail quote, material order, rebuttal letter, supplement) cover success and edge-case branches |
+| `test_pdf_generators_coverage.py` | PDF generation helpers cover all document types including supplement, rebuttal, and commission statement outputs |
+| `test_notifications_coverage.py` | WebSocket RobustConnectionManager heartbeat loop and connection culling logic |
+| `test_database_integration.py` | Integration-level tests for core database helpers including financial writeback and job context fetch |
+| `test_ai_service_additional.py` | Additional Gemini AI client branches: batch photo analysis, SOL extraction, and error handling |
+| `test_retail_contracts_backend.py` | Retail contract API endpoints: creation, PDF generation, status transitions, and validation |
 
 ---
 

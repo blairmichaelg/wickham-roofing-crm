@@ -4,8 +4,8 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109%2B-00a393.svg)](https://fastapi.tiangolo.com/)
 [![SQLite WAL](https://img.shields.io/badge/Database-SQLite%20WAL-003B57.svg)](https://www.sqlite.org/wal.html)
 [![AI Engine: Gemini 2.5 Flash](https://img.shields.io/badge/AI%20Engine-Gemini%202.5%20Flash-8A2BE2.svg)](https://deepmind.google/technologies/gemini/)
-[![Tests: 312 Passing (100%)](https://img.shields.io/badge/Tests-312%20Passed%20(100%25)-brightgreen.svg)](https://pytest.org/)
-[![Version](https://img.shields.io/badge/Version-2.3.4-orange.svg)](https://github.com/blairmichaelg/wickham-roofing-crm)
+[![Tests: 351 Passing (100%)](https://img.shields.io/badge/Tests-351%20Passed%20(100%25)-brightgreen.svg)](https://pytest.org/)
+[![Version](https://img.shields.io/badge/Version-2.3.5-orange.svg)](https://github.com/blairmichaelg/wickham-roofing-crm)
 
 The **Wickham Roofing CRM (V4)** is a proprietary, local-first operational platform designed to automate insurance roofing production from field lead intake to financial ledger reconciliation.
 
@@ -66,7 +66,7 @@ The system isolates operational data across four distinct user roles, authentica
 | **Background Task Queue** | ARQ over Local Redis | Asynchronous background document parsing, PDF compilation, and building code RAG lookups without halting UI threads. |
 | **Document Vault Engine** | ReportLab + pdfplumber | Deterministic, precision-aligned generation of statutory legal notices, supplier POs, and evidence grids. |
 | **Frontend & UI** | Vanilla JS + Tailwind CSS | Zero-bundle bloat, offline Service Worker capabilities with IndexedDB persistence, and crisp reactive dashboards. |
-| **Quality & Assurance** | Pytest / Mypy / Ruff | **312 tests** passing at a 100% pass rate; strict static analysis zero-error compliance across all layers. |
+| **Quality & Assurance** | Pytest / Mypy / Ruff | **351 tests** passing at a 100% pass rate; 75.27% code coverage enforced by CI gate; strict static analysis zero-error compliance across all layers. |
 
 ---
 

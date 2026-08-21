@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.3.5] - 2026-08-21
+### Added & Hardened (Coverage Gate Enforcement)
+- **Real Coverage Gate**: `pyproject.toml` `fail_under = 75` now enforced by CI (`--cov-fail-under=75`); the gate was previously advisory only.
+- **Test Suite Expansion (+39 tests, 312 → 351)**: Added 7 new test modules covering previously untested code paths:
+  - `test_workers_coverage.py` — ARQ photo and commission processor workers (happy path + error branches + DB writeback).
+  - `test_pipeline_additional_coverage.py` — All four orchestration pipelines: retail quote, material order, rebuttal letter, and supplement.
+  - `test_pdf_generators_coverage.py` — ReportLab document generation for supplement, rebuttal, and commission statement types.
+  - `test_notifications_coverage.py` — WebSocket `RobustConnectionManager` heartbeat and connection-culling logic.
+  - `test_database_integration.py` — Integration-level DB helpers: financial writeback, job context fetch, and schema validation.
+  - `test_ai_service_additional.py` — Additional Gemini AI client branches including batch photo analysis and error handling.
+  - `test_retail_contracts_backend.py` — Retail contract API lifecycle: creation, PDF generation, status transitions.
+- **Coverage Reached**: Total coverage 75.27% (up from 65.84% at the prior audit commit `a95ceff`). All 351 tests green.
+- **Mypy Hardening**: Enabled strict per-module mypy for `app.core.*` and `app.services.*`; resolved all pre-existing type errors.
+- **Documentation Drift Fixed**: `docs/testing.md` and `README.md` now reflect the actual test count (351), module list (57 modules), and coverage percentage (75.27%).
+
 ## [2.3.4] - 2026-08-21
 ### Fixed & Standardized (Notice of Cancellation Mislabeling Fix)
 - **Document Standardization Fix**: Corrected a bug in `standardize_vault_filename` in `app/core/database.py` where `RETAIL_NOTICE_OF_CANCELLATION` files were mislabeled as `Retail_Contract.pdf` due to the `"RETAIL"` suffix pattern matching before `"CANCELLATION"`. Reordered matching hierarchy to prioritize cancellation documents.
