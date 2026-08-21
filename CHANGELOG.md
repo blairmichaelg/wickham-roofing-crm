@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.3.4] - 2026-08-21
+### Fixed & Standardized (Notice of Cancellation Mislabeling Fix)
+- **Document Standardization Fix**: Corrected a bug in `standardize_vault_filename` in `app/core/database.py` where `RETAIL_NOTICE_OF_CANCELLATION` files were mislabeled as `Retail_Contract.pdf` due to the `"RETAIL"` suffix pattern matching before `"CANCELLATION"`. Reordered matching hierarchy to prioritize cancellation documents.
+- **Test Alignment**: Updated unit test assertions in `tests/test_field_routes.py` to correctly expect the capitalized, standardized filename format `Notice_of_Cancellation` instead of the lowercased, raw filename.
+
 ## [2.3.3] - 2026-08-17
 ### Finalized & Configured (Storm Activity Monitor Finalization)
 - **Removed Obsolete Parameters**: Fully deprecated and removed the unused `require_magnitude` parameter from the recent and summary storm endpoints.

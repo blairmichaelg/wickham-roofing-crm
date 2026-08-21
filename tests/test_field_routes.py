@@ -612,3 +612,67 @@ def test_download_unsigned_contingency_rejects_bad_job_id():
     """GET /api/field/jobs/not-a-uuid/docs/contingency should return 400."""
     response = client.get("/api/field/jobs/not-a-valid-uuid/docs/contingency")
     assert response.status_code == 400
+
+
+def test_get_field_job_details_returns_retail_job_type():
+    """GET /api/field/jobs/{job_id} should return RETAIL job_type if inserted as such."""
+    import uuid
+    from app.core.database import get_connection
+
+    job_id = str(uuid.uuid4())
+    conn = get_connection()
+    conn.execute(
+        "INSERT INTO jobs (id, homeowner_name, address_line1, city, state, postal_code, phone, status, canvasser_name, job_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (job_id, "Retail Resume Test", "789 Retail Blvd", "Valdosta", "GA", "31601", "555-8888", "LEAD_CAPTURED", "Field Test Rep", "RETAIL")
+    )
+    conn.commit()
+    conn.close()
+
+    response = client.get(f"/api/field/jobs/{job_id}")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["job_type"] == "RETAIL"
+    assert data["homeowner_name"] == "Retail Resume Test"
+
+
+def test_retail_documents_returned_by_api():
+    """POST /api/field/jobs/{job_id}/sign-retail-contract should create RETAIL_NOTICE_OF_CANCELLATION and return it in /documents."""
+    import uuid
+    from app.core.database import get_connection
+
+    job_id = str(uuid.uuid4())
+    conn = get_connection()
+    conn.execute(
+        "INSERT INTO jobs (id, homeowner_name, address_line1, city, state, postal_code, phone) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (job_id, "Retail Document Test", "321 Retail St", "Atlanta", "GA", "30303", "555-9999")
+    )
+    conn.commit()
+    conn.close()
+
+    tiny_png_base64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+    data_uri = f"data:image/png;base64,{tiny_png_base64}"
+    
+    response = client.post(
+        f"/api/field/jobs/{job_id}/sign-retail-contract",
+        json={
+            "signature_base64": data_uri,
+            "signer_name": "Retail Document Test",
+            "ip_address": "127.0.0.1",
+            "user_agent": "Pytest",
+            "total_price": 8000.0,
+            "deposit_amount": 4000.0,
+            "scope_description": "New Roof Shingles"
+        }
+    )
+    assert response.status_code == 200
+
+    # Query documents list API
+    docs_resp = client.get(f"/api/field/jobs/{job_id}/documents")
+    assert docs_resp.status_code == 200
+    docs = docs_resp.json()
+    
+    # Verify the NOC document is present
+    noc_doc = next((d for d in docs if d["file_type"] == "RETAIL_NOTICE_OF_CANCELLATION"), None)
+    assert noc_doc is not None
+    assert "Notice_of_Cancellation" in noc_doc["filename"]
+

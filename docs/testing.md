@@ -1,6 +1,6 @@
 # Testing Guide — Wickham Roofing CRM
 
-This guide documents the **47 test modules** comprising the Wickham Roofing CRM test suite, mapping each module to the business guarantee it protects, documenting how to run the suite with coverage, and specifying the enforced threshold targets.
+This guide documents the **50 test modules** comprising the Wickham Roofing CRM test suite, mapping each module to the business guarantee it protects, documenting how to run the suite with coverage, and specifying the enforced threshold targets.
 
 ---
 

@@ -772,6 +772,8 @@ def standardize_vault_filename(job_id: str, filename: str, category: str = "UNSP
             return f"{prefix}Homeowner_Inspection_Report{ext}"
         elif "CONTINGENCY" in cat_upper or "contingency" in fn_lower:
             return f"{prefix}Contingency_Agreement{ext}"
+        elif "CANCELLATION" in cat_upper or "cancellation" in fn_lower:
+            return f"{prefix}Notice_of_Cancellation{ext}"
         elif "RETAIL" in cat_upper or "retail" in fn_lower:
             return f"{prefix}Retail_Contract{ext}"
         elif "SUPPLEMENT" in cat_upper or "supplement" in fn_lower:
@@ -780,8 +782,6 @@ def standardize_vault_filename(job_id: str, filename: str, category: str = "UNSP
             return f"{prefix}Invoice{ext}"
         elif "MATERIAL" in cat_upper or "po" in fn_lower or "material_order" in fn_lower:
             return f"{prefix}Material_Order{ext}"
-        elif "CANCELLATION" in cat_upper or "cancellation" in fn_lower:
-            return f"{prefix}Notice_of_Cancellation{ext}"
         elif "EAGLEVIEW" in cat_upper or "hover" in cat_upper or "measurement" in cat_upper:
             return f"{prefix}Measurement_Report{ext}"
         elif "STATEMENT_OF_LOSS" in cat_upper or "sol" in fn_lower:

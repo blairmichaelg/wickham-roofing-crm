@@ -85,7 +85,7 @@ Because this CRM runs natively on local office hardware without third-party clou
 
 A defect in a standard web application might simply break an interactive button; a mathematical defect in our calculating engine results in severe material short-ordering or financial liability during insurance negotiations.
 
-Therefore, **we strictly enforce a 100% green test baseline across all 298 test assertions**.
+Therefore, **we strictly enforce a 100% green test baseline across all 312 test assertions**.
 - **Every Feature Requires Tests**: No pull request or code commit will be approved without accompanying pytest functions covering successful executions and defensive failure paths.
 - **Math Kernel Preservation**: Any changes to `app/services/supplement_engine.py` require exhaustive unit assertions proving determinism across extreme inputs (e.g., zero-clamped dimensions, missing properties, floating-point rounding precision).
 

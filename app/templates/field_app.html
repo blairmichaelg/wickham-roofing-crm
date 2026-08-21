@@ -198,16 +198,42 @@
                 </div>
             </div>
 
+            <!-- Retail Contract Details (shown only if job type is RETAIL) -->
+            <div id="retailDetailsSection" class="hidden pt-4 border-t border-gray-700 space-y-4">
+                <h3 class="text-md font-bold text-white mb-2">💰 Retail Contract Pricing & Scope</h3>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-2">Total Contract Price ($)</label>
+                        <input type="number" step="0.01" id="retail_total_price" class="w-full p-4 rounded-lg bg-gray-800 text-white border border-gray-700 focus:outline-none focus:border-blue-500 text-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-2">Deposit Amount ($)</label>
+                        <input type="number" step="0.01" id="retail_deposit_amount" class="w-full p-4 rounded-lg bg-gray-800 text-white border border-gray-700 focus:outline-none focus:border-blue-500 text-lg">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">Scope of Work / Description</label>
+                    <textarea id="retail_scope_description" rows="3" class="w-full p-4 rounded-lg bg-gray-800 text-white border border-gray-700 focus:outline-none focus:border-blue-500 text-lg" placeholder="e.g. Replace shingle roof with GAF Architectural Shingles, color Weathered Wood."></textarea>
+                </div>
+            </div>
+
             <div id="signatureSection" class="pt-4 border-t border-gray-700">
-                <label class="block text-sm font-medium text-gray-400 mb-2">Homeowner Signature (Contingency Agreement)</label>
+                <label id="signatureLabel" class="block text-sm font-medium text-gray-400 mb-2">Homeowner Signature (Contingency Agreement)</label>
 
                 <!-- Legal Text Presentation -->
                 <div class="bg-gray-800 border border-gray-600 rounded-lg p-4 mb-4 h-48 overflow-y-auto text-xs text-gray-300">
-                    <h4 class="font-bold text-white mb-2 text-sm">INSURANCE CONTINGENCY AGREEMENT</h4>
-                    <p class="mb-2"><strong>Scope of Work & Payment:</strong> Contractor agrees to repair or replace the roof at the provided address. The final scope of work and price shall be strictly determined by the insurance carrier's approved estimate. Any additional work or upgrades require a signed change order.</p>
-                    <p class="mb-2 text-red-400 font-bold">WARNING: It is a violation of Georgia law (O.C.G.A. § 33-24-59.27) for a contractor to pay, waive, rebate, or promise to pay or rebate all or part of an insurance deductible. The homeowner is strictly responsible for the payment of the deductible.</p>
-                    <p class="mb-2"><strong>Public Adjuster Restriction:</strong> The contractor is not a public adjuster and does not represent or negotiate on behalf of the owner for the insurance claim.</p>
-                    <p class="mb-2 text-red-400 font-bold">STATUTORY CANCELLATION: You may cancel this contract within five (5) business days after you receive written notice from your insurer that all or any part of your claim is not a covered loss under your insurance policy.</p>
+                    <div id="insuranceLegalText">
+                        <h4 class="font-bold text-white mb-2 text-sm">INSURANCE CONTINGENCY AGREEMENT</h4>
+                        <p class="mb-2"><strong>Scope of Work & Payment:</strong> Contractor agrees to repair or replace the roof at the provided address. The final scope of work and price shall be strictly determined by the insurance carrier's approved estimate. Any additional work or upgrades require a signed change order.</p>
+                        <p class="mb-2 text-red-400 font-bold">WARNING: It is a violation of Georgia law (O.C.G.A. § 33-24-59.27) for a contractor to pay, waive, rebate, or promise to pay or rebate all or part of an insurance deductible. The homeowner is strictly responsible for the payment of the deductible.</p>
+                        <p class="mb-2"><strong>Public Adjuster Restriction:</strong> The contractor is not a public adjuster and does not represent or negotiate on behalf of the owner for the insurance claim.</p>
+                        <p class="mb-2 text-red-400 font-bold">STATUTORY CANCELLATION: You may cancel this contract within five (5) business days after you receive written notice from your insurer that all or any part of your claim is not a covered loss under your insurance policy.</p>
+                    </div>
+                    <div id="retailLegalText" class="hidden">
+                        <h4 class="font-bold text-white mb-2 text-sm">RESIDENTIAL ROOFING CONTRACT (RETAIL CASH)</h4>
+                        <p class="mb-2"><strong>Retail Sales Agreement:</strong> Contractor agrees to perform residential roofing services at the provided address. Homeowner agrees to pay the contract price in accordance with the specified payment terms. All workmanship is covered by our standard 1-Year Workmanship Warranty.</p>
+                        <p class="mb-2 text-red-400 font-bold">NOTICE OF RIGHT TO CANCEL: You, the buyer, may cancel this transaction at any time before midnight of the THIRD BUSINESS DAY after the date of this transaction. See the attached Notice of Cancellation form for an explanation of this right.</p>
+                    </div>
                 </div>
 
                 <div class="flex items-start mb-4">
@@ -301,8 +327,19 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                 </svg>
             </div>
-            <h3 class="text-2xl font-bold text-white mb-2">Lead Captured</h3>
-            <p class="text-gray-400 mb-6">The office has been notified.</p>
+            <h3 id="successModalTitle" class="text-2xl font-bold text-white mb-2">Lead Captured</h3>
+            <p id="successModalText" class="text-gray-400 mb-6">The office has been notified.</p>
+            
+            <div id="successModalRetailActions" class="hidden mb-6 p-4 bg-gray-900 border border-gray-700 rounded-lg space-y-2 text-left">
+                <p class="text-xs text-gray-400 font-bold mb-2">Homeowner Copy (statutory requirement):</p>
+                <button id="successDownloadNocBtn" type="button" class="w-full bg-emerald-700 text-white py-2 px-3 rounded text-sm font-semibold hover:bg-emerald-600 flex items-center justify-center gap-1">
+                    📄 Download Notice of Cancellation
+                </button>
+                <button id="successEmailNocBtn" type="button" class="w-full bg-amber-700 text-white py-2 px-3 rounded text-sm font-semibold hover:bg-amber-600 flex items-center justify-center gap-1">
+                    ✉️ Email Notice of Cancellation
+                </button>
+            </div>
+
             <button onclick="resetFormState()" class="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold text-lg hover:bg-blue-700">Add Another</button>
         </div>
     </div>
@@ -324,13 +361,32 @@
             const submitBtn = document.getElementById('submitBtn');
             const ackCheckbox = document.getElementById('agreement_ack');
             const isResuming = (inProgressJobId !== null);
+            const isRetail = (document.getElementById('job_type').value === 'RETAIL');
             
+            const retailTotalPriceInput = document.getElementById('retail_total_price');
+            const retailDepositAmountInput = document.getElementById('retail_deposit_amount');
+            const retailScopeDescriptionInput = document.getElementById('retail_scope_description');
+
             if (isSignatureLocked) {
                 ackCheckbox.required = true;
                 submitBtn.innerText = isResuming ? '✓ Update Lead & Submit Agreement' : 'Submit Lead & Agreement';
+                
+                if (isRetail) {
+                    retailTotalPriceInput.required = true;
+                    retailDepositAmountInput.required = true;
+                    retailScopeDescriptionInput.required = true;
+                } else {
+                    retailTotalPriceInput.required = false;
+                    retailDepositAmountInput.required = false;
+                    retailScopeDescriptionInput.required = false;
+                }
             } else {
                 ackCheckbox.required = false;
                 submitBtn.innerText = isResuming ? '✓ Update Naked Lead' : 'Save Naked Lead';
+                
+                retailTotalPriceInput.required = false;
+                retailDepositAmountInput.required = false;
+                retailScopeDescriptionInput.required = false;
             }
         }
 
@@ -347,6 +403,15 @@
             photoFiles = [];
             renderPhotoGrid();
             document.getElementById('successModal').classList.add('hidden');
+            
+            // Hide success modal retail actions & reset text
+            document.getElementById('successModalRetailActions').classList.add('hidden');
+            document.getElementById('successModalTitle').innerText = 'Lead Captured';
+            document.getElementById('successModalText').innerText = 'The office has been notified.';
+
+            // Reset job type UI
+            document.getElementById('job_type').dispatchEvent(new Event('change'));
+
             loadMyJobs();
             updateSubmitButtonState();
         }
@@ -441,6 +506,14 @@
                                 ✉️ Email Client
                             </button>
                             ` : ''}
+                            ${job.status === 'RETAIL_CONTRACT_SIGNED' ? `
+                            <button onclick="downloadRetailNoticeOfCancellation('${job.id}')" class="text-emerald-300 hover:text-white text-xs font-bold bg-emerald-950/80 px-2.5 py-1.5 rounded border border-emerald-700/80 flex items-center gap-1">
+                                📄 NOC PDF
+                            </button>
+                            <button onclick="emailRetailNoticeOfCancellation('${job.id}', '${encodeURIComponent(job.homeowner_name)}', '${encodeURIComponent(job.email || '')}')" class="text-amber-300 hover:text-white text-xs font-bold bg-amber-950/80 px-2.5 py-1.5 rounded border border-amber-700/80 flex items-center gap-1">
+                                ✉️ Email NOC
+                            </button>
+                            ` : ''}
                         </div>
                         ${isNakedLead ? `
                         <button onclick="resumeLead('${job.id}')" class="text-purple-200 hover:text-white text-xs font-bold bg-purple-900 hover:bg-purple-800 px-3.5 py-1.5 rounded-lg border border-purple-500 shadow flex items-center gap-1">
@@ -473,7 +546,10 @@
                 document.getElementById('phone').value = job.phone || '';
                 if (document.getElementById('claim_number')) document.getElementById('claim_number').value = job.claim_number || '';
                 if (document.getElementById('insurer_name')) document.getElementById('insurer_name').value = job.insurer_name || '';
-                if (document.getElementById('job_type')) document.getElementById('job_type').value = job.job_type || 'INSURANCE';
+                if (document.getElementById('job_type')) {
+                    document.getElementById('job_type').value = job.job_type || 'INSURANCE';
+                    document.getElementById('job_type').dispatchEvent(new Event('change'));
+                }
                 if (document.getElementById('loss_date')) document.getElementById('loss_date').value = job.loss_date || '';
 
                 let stormStatusText = '';
@@ -558,6 +634,43 @@
             
             const mailtoUrl = `mailto:${email}?subject=${subject}&body=${body}`;
             window.location.href = mailtoUrl;
+        }
+
+        async function downloadRetailNoticeOfCancellation(jobId) {
+            try {
+                const res = await fetch(`/api/field/jobs/${jobId}/documents`, { headers: { 'x-internal-token': FIELD_TOKEN } });
+                if (!res.ok) throw new Error('Failed to retrieve documents list');
+                const docs = await res.json();
+                const doc = docs.find(d => d.file_type === 'RETAIL_NOTICE_OF_CANCELLATION' || d.filename.includes('notice_of_cancellation'));
+                if (doc) {
+                    window.open(`/api/field/jobs/${jobId}/documents/${doc.id}/download`, '_blank');
+                } else {
+                    showToast('Notice of Cancellation document not found. Tap "Docs" to check manually.', 'error');
+                }
+            } catch (err) {
+                showToast('Error downloading Notice of Cancellation: ' + err.message, 'error');
+            }
+        }
+
+        async function emailRetailNoticeOfCancellation(jobId, homeownerNameEnc, emailEnc) {
+            try {
+                const homeownerName = decodeURIComponent(homeownerNameEnc);
+                const email = decodeURIComponent(emailEnc);
+                const res = await fetch(`/api/field/jobs/${jobId}/documents`, { headers: { 'x-internal-token': FIELD_TOKEN } });
+                if (!res.ok) throw new Error('Failed to retrieve documents list');
+                const docs = await res.json();
+                const doc = docs.find(d => d.file_type === 'RETAIL_NOTICE_OF_CANCELLATION' || d.filename.includes('notice_of_cancellation'));
+                if (doc) {
+                    const downloadUrl = `${window.location.origin}/api/field/jobs/${jobId}/documents/${doc.id}/download`;
+                    const subject = encodeURIComponent(`Wickham Roofing - Notice of Cancellation (${homeownerName})`);
+                    const body = encodeURIComponent(`Dear ${homeownerName},\n\nPlease find linked your statutory Notice of Cancellation copy for the retail contract signed today.\n\nYou can download the document copy here:\n${downloadUrl}\n\nThank you,\nWickham Roofing LLC`);
+                    window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
+                } else {
+                    showToast('Notice of Cancellation document not found.', 'error');
+                }
+            } catch (err) {
+                showToast('Error emailing Notice of Cancellation: ' + err.message, 'error');
+            }
         }
 
         // NOTE: Depends on standard envelope shape {"events": [...], "last_refreshed_utc": ...} from /api/field/storms/{zipcode}
@@ -855,10 +968,32 @@
             }
 
             if (record.payload.signature) {
-                const sigResp = await fetch(`/api/field/jobs/${jobId}/contingency-sign`, {
+                const isRetail = (record.payload.lead.job_type === 'RETAIL');
+                let sigUrl, sigPayload;
+
+                if (isRetail) {
+                    sigUrl = `/api/field/jobs/${jobId}/sign-retail-contract`;
+                    sigPayload = {
+                        signature_base64: record.payload.signature,
+                        signer_name: record.payload.signer_name,
+                        user_agent: navigator.userAgent,
+                        total_price: record.payload.total_price || 0,
+                        deposit_amount: record.payload.deposit_amount || 0,
+                        scope_description: record.payload.scope_description || ''
+                    };
+                } else {
+                    sigUrl = `/api/field/jobs/${jobId}/contingency-sign`;
+                    sigPayload = {
+                        signature_base64: record.payload.signature,
+                        signer_name: record.payload.signer_name,
+                        user_agent: navigator.userAgent
+                    };
+                }
+
+                const sigResp = await fetch(sigUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'x-internal-token': FIELD_TOKEN },
-                    body: JSON.stringify({ signature_base64: record.payload.signature, signer_name: record.payload.signer_name, user_agent: navigator.userAgent })
+                    body: JSON.stringify(sigPayload)
                 });
                 if (!sigResp.ok) {
                     const err = new Error('Replay signature upload failed');
@@ -965,12 +1100,30 @@
         const signatureSection = document.getElementById('signatureSection');
         
         jobTypeSelect.addEventListener('change', (e) => {
-            if(e.target.value === 'INSURANCE') {
-                signatureSection.classList.remove('hidden');
-                initCanvasScale();
-            } else {
-                signatureSection.classList.add('hidden');
+            const isInsurance = (e.target.value === 'INSURANCE');
+            const isRetail = (e.target.value === 'RETAIL');
+            
+            const signatureLabel = document.getElementById('signatureLabel');
+            const insuranceText = document.getElementById('insuranceLegalText');
+            const retailText = document.getElementById('retailLegalText');
+            const retailFields = document.getElementById('retailDetailsSection');
+
+            // The signature section stays visible for both
+            signatureSection.classList.remove('hidden');
+            initCanvasScale();
+
+            if (isInsurance) {
+                signatureLabel.innerText = "Homeowner Signature (Contingency Agreement)";
+                insuranceText.classList.remove('hidden');
+                retailText.classList.add('hidden');
+                retailFields.classList.add('hidden');
+            } else if (isRetail) {
+                signatureLabel.innerText = "Homeowner Signature (Retail Sales Contract)";
+                insuranceText.classList.add('hidden');
+                retailText.classList.remove('hidden');
+                retailFields.classList.remove('hidden');
             }
+            updateSubmitButtonState();
         });
         
         // Trigger initial state
@@ -980,13 +1133,22 @@
             return new Promise((resolve, reject) => {
                 const tx = idb.transaction("offline_queue", "readwrite");
                 const store = tx.objectStore("offline_queue");
+                
+                const isRetail = (payload.job_type === 'RETAIL');
+                const totalPrice = isRetail ? parseFloat(document.getElementById('retail_total_price').value) || 0 : 0;
+                const depositAmount = isRetail ? parseFloat(document.getElementById('retail_deposit_amount').value) || 0 : 0;
+                const scopeDescription = isRetail ? document.getElementById('retail_scope_description').value : '';
+
                 const req = store.add({
                     payload: {
                         lead: payload,
                         photos: photoFiles,
                         signature: signatureBase64,
                         signer_name: signerName,
-                        existing_job_id: existingJobId
+                        existing_job_id: existingJobId,
+                        total_price: totalPrice,
+                        deposit_amount: depositAmount,
+                        scope_description: scopeDescription
                     },
                     timestamp: Date.now(),
                     status: 'pending_sync'
@@ -1057,9 +1219,28 @@
                 }
 
                 try {
-                    await processSubmissionCore(payload, photoFiles, signatureBase64, signerName);
+                    const finalJobId = await processSubmissionCore(payload, photoFiles, signatureBase64, signerName);
                     
                     loadingProgress.style.width = '100%';
+
+                    // Handle Notice of Cancellation actions dynamically
+                    const successModalRetailActions = document.getElementById('successModalRetailActions');
+                    const successDownloadNocBtn = document.getElementById('successDownloadNocBtn');
+                    const successEmailNocBtn = document.getElementById('successEmailNocBtn');
+                    
+                    if (payload.job_type === 'RETAIL' && signatureBase64) {
+                        successDownloadNocBtn.onclick = () => downloadRetailNoticeOfCancellation(finalJobId);
+                        successEmailNocBtn.onclick = () => emailRetailNoticeOfCancellation(finalJobId, encodeURIComponent(payload.homeowner_name), encodeURIComponent(payload.email || ''));
+                        
+                        successModalRetailActions.classList.remove('hidden');
+                        document.getElementById('successModalTitle').innerText = 'Retail Agreement Signed';
+                        document.getElementById('successModalText').innerText = 'The contract has been generated and the office has been notified.';
+                    } else {
+                        successModalRetailActions.classList.add('hidden');
+                        document.getElementById('successModalTitle').innerText = 'Lead Captured';
+                        document.getElementById('successModalText').innerText = 'The office has been notified.';
+                    }
+
                     setTimeout(() => {
                         loadingModal.classList.add('hidden');
                         document.getElementById('successModal').classList.remove('hidden');
@@ -1152,13 +1333,29 @@
                 if (loadingTitle) loadingTitle.innerText = 'Generating Contract...';
                 if (loadingProgress) loadingProgress.style.width = '90%';
                 
-                const sigPayload = {
-                    signature_base64: signatureBase64,
-                    signer_name: signerName,
-                    user_agent: navigator.userAgent
-                };
+                const isRetail = (payload.job_type === 'RETAIL');
+                let sigUrl, sigPayload;
+
+                if (isRetail) {
+                    sigUrl = `/api/field/jobs/${jobId}/sign-retail-contract`;
+                    sigPayload = {
+                        signature_base64: signatureBase64,
+                        signer_name: signerName,
+                        user_agent: navigator.userAgent,
+                        total_price: parseFloat(document.getElementById('retail_total_price').value) || 0,
+                        deposit_amount: parseFloat(document.getElementById('retail_deposit_amount').value) || 0,
+                        scope_description: document.getElementById('retail_scope_description').value
+                    };
+                } else {
+                    sigUrl = `/api/field/jobs/${jobId}/contingency-sign`;
+                    sigPayload = {
+                        signature_base64: signatureBase64,
+                        signer_name: signerName,
+                        user_agent: navigator.userAgent
+                    };
+                }
                 
-                const sigResponse = await fetch(`/api/field/jobs/${jobId}/contingency-sign`, {
+                const sigResponse = await fetch(sigUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1176,10 +1373,12 @@
             }
 
             // SUCCESS — clear in-progress state
+            const finalJobId = jobId;
             inProgressJobId = null;
             inProgressStep = null;
             uploadedPhotoIndices = new Set();
             signatureUploaded = false;
+            return finalJobId;
         }
 
         // WebSocket and Storm Radar Integration
