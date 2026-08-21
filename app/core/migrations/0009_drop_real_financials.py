@@ -1,7 +1,7 @@
 import sqlite3
 
 
-def up(conn):
+def up(conn: sqlite3.Connection) -> None:
     """Drop the legacy REAL columns from the financials table."""
     conn.execute("DROP VIEW IF EXISTS financial_delta_view;")
     for col in ["revenue", "carrier_rcv", "material_cost", "labor_cost", "permits_fee"]:

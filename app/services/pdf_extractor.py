@@ -39,7 +39,7 @@ async def extract_eagleview_data(pdf_path: str | Path) -> tuple[EagleViewData, s
 
     log.info("eagleview_extraction_started")
 
-    def _extract():
+    def _extract() -> tuple[EagleViewData, str]:
         import hashlib
         sha256_hash = hashlib.sha256(pdf_path.read_bytes()).hexdigest()
         

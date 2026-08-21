@@ -9,13 +9,13 @@ logger = structlog.get_logger("app.core.notifications")
 
 class RobustConnectionManager:
     """RobustConnectionManager definition."""
-    def __init__(self):
+    def __init__(self) -> None:
         # Maps websocket -> dict with 'client_id', 'role', 'last_pong'
         self.active_connections: dict[WebSocket, dict[str, Any]] = {}
         # Start the loop lazily on the first connection
-        self._heartbeat_task = None
+        self._heartbeat_task: asyncio.Task[None] | None = None
 
-    async def connect(self, websocket: WebSocket, client_id: str = "unknown", role: str = "unknown"):
+    async def connect(self, websocket: WebSocket, client_id: str = "unknown", role: str = "unknown") -> None:
         """
         Connect functionality.
         
@@ -38,7 +38,7 @@ class RobustConnectionManager:
         if self._heartbeat_task is None:
             self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
 
-    def disconnect(self, websocket: WebSocket):
+    def disconnect(self, websocket: WebSocket) -> None:
         """
         Disconnect functionality.
         
@@ -52,7 +52,7 @@ class RobustConnectionManager:
             meta = self.active_connections.pop(websocket)
             logger.info("websocket_client_disconnected", client_id=meta["client_id"], active_count=len(self.active_connections))
 
-    async def broadcast(self, message: dict):
+    async def broadcast(self, message: dict[str, Any]) -> None:
         """
         Broadcast functionality.
         
@@ -74,12 +74,12 @@ class RobustConnectionManager:
         for dead_conn in dead_connections:
             self.disconnect(dead_conn)
 
-    def update_pong(self, websocket: WebSocket):
+    def update_pong(self, websocket: WebSocket) -> None:
         """Update the last_pong timestamp when a pong is received from the client."""
         if websocket in self.active_connections:
             self.active_connections[websocket]["last_pong"] = time.time()
 
-    async def _heartbeat_loop(self):
+    async def _heartbeat_loop(self) -> None:
         """Background loop to ping connections and disconnect zombies."""
         while True:
             await asyncio.sleep(30)

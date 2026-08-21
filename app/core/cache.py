@@ -8,6 +8,7 @@ we do not burn duplicate API tokens for images already processed.
 """
 
 import sqlite3
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -21,7 +22,7 @@ DB_PATH = Path("data/cache.db")
 
 
 @contextmanager
-def _get_connection():
+def _get_connection() -> Iterator[sqlite3.Connection]:
     """Provide a WAL-mode, crash-safe transactional connection to the cache DB."""
     conn = sqlite3.connect(DB_PATH, check_same_thread=False, timeout=15)
     conn.row_factory = sqlite3.Row

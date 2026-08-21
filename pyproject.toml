@@ -58,6 +58,19 @@ disallow_incomplete_defs = true
 check_untyped_defs = true
 warn_return_any = true
 
+# Phase 1 of an incremental strict rollout
+[[tool.mypy.overrides]]
+module = "app.core.*"
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+warn_return_any = true
+
+[[tool.mypy.overrides]]
+module = "app.services.*"
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+warn_return_any = true
+
 # Third-party stubs that are intentionally missing — suppress noise
 [[tool.mypy.overrides]]
 module = [

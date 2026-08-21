@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 from pathlib import Path
+from typing import Any, cast
 
 import structlog
 from reportlab.lib import colors
@@ -36,7 +37,7 @@ class InvoiceGenerator(PDFEngine):
         job_dir.mkdir(parents=True, exist_ok=True)
         filepath = str(job_dir / "Retail_Quote.pdf")
 
-        def build_pdf():
+        def build_pdf() -> None:
             """
             Build Pdf functionality.
             
@@ -46,7 +47,7 @@ class InvoiceGenerator(PDFEngine):
             import datetime as _dt
             doc = self._get_doc_template(filepath,
                                          job_id=job_id)
-            story = []
+            story: list[Any] = []
 
             story.append(Paragraph(
                 "ROOFING REPLACEMENT QUOTE",
@@ -164,7 +165,7 @@ class InvoiceGenerator(PDFEngine):
         filepath = str(FIELD_DOCS_DIR / f"Monthly_Financial_Summary_{year}_{month:02d}.pdf")
         Path(filepath).parent.mkdir(parents=True, exist_ok=True)
         
-        def build_pdf():
+        def build_pdf() -> None:
             """
             Build Pdf functionality.
             
@@ -172,7 +173,7 @@ class InvoiceGenerator(PDFEngine):
                 Any: The resulting output.
             """
             doc = self._get_doc_template(filepath, top_margin=120, job_id="MONTHLY", doc_type="MONTHLY_SUMMARY")
-            story = []
+            story: list[Any] = []
             
             story.append(Paragraph(f"Monthly Financial Summary - {year}-{month:02d}", self.custom_styles["Title"]))
             story.append(Spacer(1, 20))
@@ -285,7 +286,7 @@ class InvoiceGenerator(PDFEngine):
         filepath = str(FIELD_DOCS_DIR / job["id"] / f"PO_{supplier_name.replace(' ', '_')}.pdf")
         Path(filepath).parent.mkdir(parents=True, exist_ok=True)
 
-        def build_pdf():
+        def build_pdf() -> None:
             """
             Build Pdf functionality.
             
@@ -293,7 +294,7 @@ class InvoiceGenerator(PDFEngine):
                 Any: The resulting output.
             """
             doc = self._get_doc_template(filepath, job_id=job["id"], doc_type="MATERIAL_PO")
-            story = []
+            story: list[Any] = []
             
             # --- 1. Order Details ---
             po_number = f"PO-{job['id'][:8].upper()}-{datetime.date.today().isoformat()}"
@@ -348,7 +349,7 @@ class InvoiceGenerator(PDFEngine):
                 ('BACKGROUND', (0,8), (-1,8), colors.lightgrey),
                 ('FONTNAME', (0,8), (-1,8), 'Helvetica-Bold'),
             ]
-            t.setStyle(TableStyle(base_style + row_colors))
+            t.setStyle(TableStyle(cast(list[Any], base_style + row_colors)))
             story.append(t)
             story.append(Spacer(1, 20))
             
@@ -381,7 +382,7 @@ class InvoiceGenerator(PDFEngine):
         job_dir.mkdir(parents=True, exist_ok=True)
         filepath = str(job_dir / "estimate.pdf")  # Close so ReportLab can write to it
 
-        def build_pdf():
+        def build_pdf() -> None:
             """
             Build Pdf functionality.
             
@@ -389,7 +390,7 @@ class InvoiceGenerator(PDFEngine):
                 Any: The resulting output.
             """
             doc = self._get_doc_template(filepath, job_id=job_id, doc_type="ESTIMATE")
-            story = []
+            story: list[Any] = []
             
             # Styles
             normal_style = self.styles["Normal"]

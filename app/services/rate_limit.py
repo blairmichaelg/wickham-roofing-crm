@@ -43,7 +43,7 @@ async def check_rate_limit(request: Request) -> str:
         
     return client_ip
 
-def reset_rate_limits():
+def reset_rate_limits() -> None:
     """For testing purposes."""
     global _request_history
     _request_history.clear()

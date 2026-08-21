@@ -1,7 +1,10 @@
 """Migration 0015: Add ev_ordered_at, adjuster_meeting_at, claim_filed_at columns to jobs table."""
 
 
-def up(conn):
+import sqlite3
+
+
+def up(conn: sqlite3.Connection) -> None:
     """Add claim pipeline timestamp columns to jobs table."""
     cursor = conn.execute("PRAGMA table_info(jobs)")
     existing_cols = {row[1] for row in cursor.fetchall()}

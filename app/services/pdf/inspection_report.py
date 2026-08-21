@@ -16,6 +16,7 @@ visibility="field_safe".
 """
 import asyncio
 from pathlib import Path
+from typing import Any
 
 import structlog
 from reportlab.lib import colors
@@ -34,12 +35,12 @@ from reportlab.platypus.flowables import HRFlowable
 
 from app.config import FIELD_DOCS_DIR
 from app.core.database import get_connection
-from app.core.inspection_models import InspectionJob
+from app.core.inspection_models import InspectionJob, InspectionPhoto, PhotoAnalysis
 from app.services.pdf.engine import PDFEngine
 
 logger = structlog.get_logger("app.services.pdf.inspection_report")
 
-def _find_analysis_for_photo(photo, analyses: list, idx: int):
+def _find_analysis_for_photo(photo: InspectionPhoto, analyses: list[PhotoAnalysis], idx: int) -> PhotoAnalysis | None:
     """
     Robust multi-layered lookup to match a photo to its Gemini analysis result.
     Tries exact filename -> case-insensitive / stem match -> index position match.
@@ -151,9 +152,9 @@ class InspectionReportGenerator(PDFEngine):
 
         filepath = str(out_dir / report_filename)
 
-        def build_pdf():
+        def build_pdf() -> str:
             doc = self._get_doc_template(filepath, job_id=job_id, doc_type="HOMEOWNER_INSPECTION_REPORT")
-            story = []
+            story: list[Any] = []
 
             # Color Palette
             NAVY = colors.HexColor("#1e3a8a")
@@ -295,7 +296,7 @@ class InspectionReportGenerator(PDFEngine):
             story.append(Paragraph("3. Photographic Documentation", style_heading))
             story.append(Spacer(1, 0.1 * inch))
 
-            photo_cells = []
+            photo_cells: list[Any] = []
 
             for idx, photo in enumerate(job.photos):
                 # Resize image for PDF
@@ -344,7 +345,7 @@ class InspectionReportGenerator(PDFEngine):
             story.append(Spacer(1, 0.15 * inch))
 
             # ── 6. SECTION 4: PROFESSIONAL RECOMMENDATION ───────────────────
-            rec_story = []
+            rec_story: list[Any] = []
             rec_story.append(Paragraph("4. Professional Recommendation", style_heading))
             # Signal-driven copy: only state what the data actually shows
             _signals = getattr(job, "damage_signals", None) or []
@@ -392,7 +393,7 @@ class InspectionReportGenerator(PDFEngine):
             rec_story.append(Spacer(1, 0.15 * inch))
 
             # Sign-off block
-            sign_data = [
+            sign_data: list[list[Any]] = [
                 [Paragraph("<b>Report Prepared By:</b>", style_body)],
                 [Spacer(1, 4)],
                 [Paragraph(disp_inspector, style_body)],

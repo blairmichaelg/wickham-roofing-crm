@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json as _json
+import sqlite3
 import uuid
 from pathlib import Path
 from typing import Any
@@ -16,6 +17,7 @@ from app.core.database import (
     insert_job_document,
     update_job_status,
 )
+from app.core.ingestion_models import UniversalClaimAST
 from app.core.reconciliation import reconcile
 from app.core.supplement_models import EagleViewData, StatementOfLoss
 from app.services.ai_service import get_ai_client
@@ -645,7 +647,7 @@ def _fetch_latest_report_sync(job_id: str) -> dict | None:
     finally:
         conn.close()
 
-def _writeback_sol_claim_info(conn, job_id: str, sol_data) -> None:
+def _writeback_sol_claim_info(conn: sqlite3.Connection, job_id: str, sol_data: UniversalClaimAST) -> None:
     """
     Write claim_number/insurer_name from a parsed SoL into the jobs table,
     ONLY if those fields are currently NULL/empty on the job. This handles
@@ -653,15 +655,15 @@ def _writeback_sol_claim_info(conn, job_id: str, sol_data) -> None:
     first SoL document contains it. Never overwrites office-entered data.
     """
     updates = {}
-    if getattr(sol_data, "claim_number", None) and getattr(sol_data.claim_number, "value", None):
+    if sol_data.claim_number is not None and sol_data.claim_number.value:
         updates["claim_number"] = sol_data.claim_number.value
-    if getattr(sol_data, "insurer_name", None) and getattr(sol_data.insurer_name, "value", None):
+    if sol_data.insurer_name is not None and sol_data.insurer_name.value:
         updates["insurer_name"] = sol_data.insurer_name.value
 
     # Shingle material info (only populate if currently NULL — never overwrite manual entry)
-    if getattr(sol_data, "shingle_type", None):
+    if sol_data.shingle_type is not None:
         updates["shingle_type"] = sol_data.shingle_type
-    if getattr(sol_data, "shingle_color", None):
+    if sol_data.shingle_color is not None:
         updates["shingle_color"] = sol_data.shingle_color
 
     if not updates:
@@ -674,7 +676,7 @@ def _writeback_sol_claim_info(conn, job_id: str, sol_data) -> None:
     conn.execute(f"UPDATE jobs SET {set_clause} WHERE id = ?", values)
     logger.info("sol_claim_info_written_back", job_id=job_id, fields=list(updates.keys()))
 
-def _writeback_sol_financials(conn, job_id: str, sol_data) -> None:
+def _writeback_sol_financials(conn: sqlite3.Connection, job_id: str, sol_data: UniversalClaimAST) -> None:
     """
     Write parsed SoL financial fields into the financials table.
     Uses INSERT OR IGNORE to create the row if it doesn't exist,
@@ -734,7 +736,7 @@ def _writeback_sol_financials(conn, job_id: str, sol_data) -> None:
 
     logger.info("sol_financials_written_back", job_id=job_id, fields=list(updates.keys()))
 
-def _writeback_ev_geometry(conn, job_id: str, ev_data) -> None:
+def _writeback_ev_geometry(conn: sqlite3.Connection, job_id: str, ev_data: EagleViewData) -> None:
     """
     Write EagleView/Hover roof geometry back to the jobs table.
     Confirmed column names use ev_ prefix per PRAGMA table_info(jobs).

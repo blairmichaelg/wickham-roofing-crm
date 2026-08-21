@@ -1,7 +1,10 @@
 """Migration 0016: Add payment tracking flags to financials table and support new payment status columns."""
 
 
-def up(conn):
+import sqlite3
+
+
+def up(conn: sqlite3.Connection) -> None:
     """Add ACV, depreciation, retail payment timestamps and deductible paid flag to financials."""
     cursor = conn.execute("PRAGMA table_info(financials)")
     existing_cols = {row[1] for row in cursor.fetchall()}

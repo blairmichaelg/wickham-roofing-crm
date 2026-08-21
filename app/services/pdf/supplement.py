@@ -125,9 +125,9 @@ class SupplementGenerator(PDFEngine):
             elif sig_r.exists():
                 signature_path = str(sig_r)
 
-        def build_pdf():
+        def build_pdf() -> None:
             doc = self._get_doc_template(filepath, top_margin=110, job_id=job_id, doc_type="EVIDENCE_GRID")
-            story = []
+            story: list[Any] = []
 
             # Color Palette
             NAVY = colors.HexColor("#1E3A8A")
@@ -350,7 +350,7 @@ class SupplementGenerator(PDFEngine):
                 )
             story.append(Paragraph(auth_heading, auth_title_style))
             
-            auth_content = [Paragraph(legal_attestation, body_style)]
+            auth_content: list[Any] = [Paragraph(legal_attestation, body_style)]
             
             if _is_signed and signature_path and Path(signature_path).exists():
                 try:
@@ -387,7 +387,7 @@ class SupplementGenerator(PDFEngine):
         job_dir.mkdir(parents=True, exist_ok=True)
         filepath = str(job_dir / "inspection_letter.pdf")
         
-        def build_pdf():
+        def build_pdf() -> None:
             """
             Build Pdf functionality.
             
@@ -395,7 +395,7 @@ class SupplementGenerator(PDFEngine):
                 Any: The resulting output.
             """
             doc = self._get_doc_template(filepath, top_margin=120, job_id=job_id, doc_type="INSPECTION_LETTER")
-            story = []
+            story: list[Any] = []
             
             story.append(Paragraph("FORMAL ROOF INSPECTION REPORT", self.custom_styles["Title"]))
             story.append(Spacer(1, 20))
@@ -510,7 +510,7 @@ class SupplementGenerator(PDFEngine):
         job_dir.mkdir(parents=True, exist_ok=True)
         filepath = str(job_dir / "Rebuttal_Letter.pdf")
 
-        def build_pdf():
+        def build_pdf() -> None:
             """
             Build Pdf functionality.
             
@@ -520,7 +520,7 @@ class SupplementGenerator(PDFEngine):
             import html as _html
             doc = self._get_doc_template(filepath,
                                          job_id=job_id)
-            story = []
+            story: list[Any] = []
 
             story.append(Paragraph(
                 "SUPPLEMENT REBUTTAL LETTER",
@@ -615,7 +615,7 @@ class SupplementGenerator(PDFEngine):
         job_dir.mkdir(parents=True, exist_ok=True)
         filepath = str(job_dir / "Escalation_Demand_Letter.pdf")
 
-        def build_pdf():
+        def build_pdf() -> None:
             """
             Build Pdf functionality.
             
@@ -623,7 +623,7 @@ class SupplementGenerator(PDFEngine):
                 Any: The resulting output.
             """
             doc = self._get_doc_template(filepath, job_id=job_id, doc_type="ESCALATION_LETTER")
-            story = []
+            story: list[Any] = []
 
             story.append(
                 Paragraph(
@@ -694,9 +694,9 @@ class SupplementGenerator(PDFEngine):
         job_dir.mkdir(parents=True, exist_ok=True)
         filepath = str(job_dir / "Supplement_Request.pdf")
 
-        def build_pdf():
+        def build_pdf() -> None:
             doc = self._get_doc_template(filepath, top_margin=120, job_id=job_id, doc_type="SUPPLEMENT")
-            story = []
+            story: list[Any] = []
             
             # Styles
             normal_style = self.custom_styles["BodyText"]

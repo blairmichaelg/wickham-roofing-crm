@@ -153,6 +153,9 @@ Before committing modifications or pushing to remote git servers, you are requir
 
 All commands must complete with **zero errors and zero failing assertions**.
 
+> [!NOTE]
+> We enforce strict mypy typing (`disallow_untyped_defs = true`, `disallow_incomplete_defs = true`, `warn_return_any = true`) for `app.core.*` and `app.services.*` as part of Phase 1 of our incremental strict type rollout. Other packages (e.g. `app.api.*`, `app.workers.*`) are slated for strict rollout in the next phase.
+
 ---
 
 ## 6. Security Hygiene & Authorization Boundaries

@@ -80,7 +80,7 @@ async def extract_hover_data(pdf_path: str | Path) -> tuple[EagleViewData, str]:
 
     log.info("hover_extraction_started")
 
-    def _extract():
+    def _extract() -> tuple[EagleViewData, str]:
         import hashlib
         sha256_hash = hashlib.sha256(pdf_path.read_bytes()).hexdigest()
         

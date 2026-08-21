@@ -20,7 +20,7 @@ import json
 import random
 import time
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import structlog
 from google import genai
@@ -110,7 +110,7 @@ class GeminiClient(AiClient):
                 temperature=0.0,
             )
         )
-        return response.text
+        return cast(str, response.text)
 
 
 
@@ -129,11 +129,11 @@ class GeminiClient(AiClient):
 
     async def upload_media_file(self, file_path: str) -> str:
         uploaded_file = await asyncio.to_thread(self._call_with_backoff, self.client.files.upload, file=file_path)
-        return uploaded_file.name
+        return cast(str, uploaded_file.name)
 
     async def get_file_status(self, file_name: str) -> str:
         file_info = await asyncio.to_thread(self._call_with_backoff, self.client.files.get, name=file_name)
-        return file_info.state.name
+        return cast(str, file_info.state.name)
 
     async def delete_file(self, file_name: str) -> None:
         try:
@@ -142,7 +142,7 @@ class GeminiClient(AiClient):
             logger.warning("gemini_file_cleanup_failed", file_name=file_name, error=str(e))
 
 
-    def _call_with_backoff(self, func, *args, max_retries: int = 5, **kwargs):
+    def _call_with_backoff(self, func: Any, *args: Any, max_retries: int = 5, **kwargs: Any) -> Any:
         """
         Rate-limit-aware wrapper for Gemini API calls.
 
@@ -291,7 +291,7 @@ Rules:
                 temperature=0.0,
             ),
         )
-        result = response.text.strip().lower()
+        result = cast(str, response.text).strip().lower()
         usage = getattr(response.usage_metadata, "total_token_count", 0)
         if usage > 0:
             log_ai_usage(job_id, usage, self.model_name, "classify_carrier")
@@ -413,8 +413,8 @@ Rules:
                     ),
                 )
                 
-                parsed = response.parsed
-                parsed.source_system = source_system
+                parsed = cast(StatementOfLoss, response.parsed)
+                parsed.source_system = cast(Literal["xactimate", "symbility", "unknown"], source_system)
 
                 usage = getattr(response.usage_metadata, "total_token_count", 0)
                 if usage > 0:
@@ -459,8 +459,8 @@ Rules:
                     ),
                 )
                 
-                parsed = response.parsed
-                parsed.source_system = source_system
+                parsed = cast(StatementOfLoss, response.parsed)
+                parsed.source_system = cast(Literal["xactimate", "symbility", "unknown"], source_system)
 
                 usage = getattr(response.usage_metadata, "total_token_count", 0)
                 if usage > 0:
@@ -520,7 +520,7 @@ Rules:
                 await asyncio.to_thread(log_ai_usage, report.job_id, usage, self.model_name, "generate_supplement_narrative")
             
             log.info("supplement_narrative_complete")
-            return response.text
+            return cast(str, response.text)
         except Exception as exc:
             log.warning("supplement_narrative_fallback_used", error=str(exc))
             # Deterministic Defensive Summary fallback
@@ -762,7 +762,7 @@ Rules:
                     if usage > 0:
                         await asyncio.to_thread(log_ai_usage, job_id, usage, self.model_name, "photo_analysis_batch")
                     batch_result = response.parsed  # type: ignore
-                    return batch_result.analyses
+                    return cast(list[PhotoAnalysis], batch_result.analyses)
                 except Exception as batch_err:
                     log.warning("batch_inline_analysis_failed_falling_back_to_sequential", error=str(batch_err))
                     results = []
@@ -811,7 +811,7 @@ Rules:
                     if usage > 0:
                         await asyncio.to_thread(log_ai_usage, job_id, usage, self.model_name, "photo_analysis_batch")
                     batch_result = response.parsed  # type: ignore
-                    return batch_result.analyses
+                    return cast(list[PhotoAnalysis], batch_result.analyses)
                 except Exception as batch_err:
                     log.warning("batch_files_api_analysis_failed_falling_back_to_sequential", error=str(batch_err))
                     results = []
@@ -855,7 +855,7 @@ Rules:
             if usage > 0:
                 await asyncio.to_thread(log_ai_usage, job_id, usage, self.model_name, "photo_analysis_batch")
             batch_result = response.parsed  # type: ignore
-            return batch_result.analyses
+            return cast(list[PhotoAnalysis], batch_result.analyses)
 
     async def generate_text(
         self,
@@ -903,7 +903,7 @@ Rules:
                     log_ai_usage, job_id, usage, self.model_name, operation_type
                 )
             log.info("generate_text_complete")
-            return response.text.strip()
+            return cast(str, response.text).strip()
         except Exception as exc:
             log.error("generate_text_failed", error=str(exc))
             raise

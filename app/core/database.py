@@ -869,7 +869,7 @@ def insert_job_document(job_id: str, filename: str, file_type: str, storage_path
                         (filename, file_type, storage_path, visibility, category, row["id"])
                     )
                     conn.execute("COMMIT")
-                    return row["id"]
+                    return str(row["id"])
             else:
                 # 2. If sha256_hash is absent, match by exact job_id, filename, category & storage_path
                 cursor = conn.execute(
@@ -879,7 +879,7 @@ def insert_job_document(job_id: str, filename: str, file_type: str, storage_path
                 row = cursor.fetchone()
                 if row:
                     conn.execute("COMMIT")
-                    return row["id"]
+                    return str(row["id"])
 
         doc_id = str(uuid.uuid4())
         conn.execute(

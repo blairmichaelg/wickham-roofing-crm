@@ -1,4 +1,5 @@
 import asyncio
+from typing import Any
 
 import structlog
 from reportlab.lib import colors
@@ -37,7 +38,7 @@ class CommissionGenerator(PDFEngine):
             job_dir / "Commission_Statement.pdf"
         )
 
-        def build_pdf():
+        def build_pdf() -> None:
             """
             Build Pdf functionality.
             
@@ -47,7 +48,7 @@ class CommissionGenerator(PDFEngine):
             doc   = self._get_doc_template(
                 filepath, job_id=job_id, doc_type="COMMISSION_STATEMENT"
             )
-            story = []
+            story: list[Any] = []
 
             story.append(Paragraph(
                 "INDEPENDENT CONTRACTOR "
