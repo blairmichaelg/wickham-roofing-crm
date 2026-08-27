@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.3.6] - 2026-08-27
+### Added & Enhanced (Sales Pipeline & Canvassing Intelligence)
+- **Database Schema Migration**: Implemented migration `0020_add_sales_and_review_fields` adding `severity_score` to `storm_events`, and `review_requested_at`, `review_requested_by`, `referral_code`, and `referral_source` to `jobs` for review/referral tracking.
+- **Canvassing Intelligence & Storm Targets**: Implemented severity score computation and ranking of canvassing target areas, surfacing them in both the office dashboard and the field app via a ranked list.
+- **Sales Pipeline widget**: Implemented an admin dashboard Sales Pipeline summary widget with stage counts, representative performance metrics, and automated "speed-to-lead" monitoring.
+- **AI-Generated Sales Narratives**: Added support for grounded sales summaries and door-knocking scripts using the existing Gemini AI integration, cached in the vault.
+- **Neighbor Outreach Campaigns**: Added ReportLab-based neighbor outreach letter generation on the field app once a job status reaches `INSTALL_COMPLETED`.
+- **Test Suite Expansion (+49 tests, 351 → 400)**: Created 5 new test modules covering the entire backend and API lifecycle of these new features:
+  - `test_storm_targets.py`
+  - `test_sales_pipeline.py`
+  - `test_review_referral.py`
+  - `test_neighbor_letter.py`
+  - `test_sales_narrative.py`
+- **Coverage Retained**: Maintained coverage above 75%, all 400 tests passing.
+
 ## [2.3.5] - 2026-08-21
 ### Added & Hardened (Coverage Gate Enforcement)
 - **Real Coverage Gate**: `pyproject.toml` `fail_under = 75` now enforced by CI (`--cov-fail-under=75`); the gate was previously advisory only.

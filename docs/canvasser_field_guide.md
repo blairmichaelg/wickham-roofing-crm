@@ -362,6 +362,23 @@ When you see a live, severe in-app banner alert (WebSocket toast) or see high ev
 
 ---
 
-*This guide reflects the field app as of version `2.4.0`. If the app's
+## 13. AI Sales Tools & Neighbor Outreach Letters
+
+To help close deals faster and streamline nearby jobsite canvassing, the Field App now integrates two powerful tools on job cards:
+
+### 1. 🤖 AI Sales Tools Card
+- **Personalized Narratives**: Tap the **Sales Tools** button on any of your active job cards.
+- **Sales Summary**: Instantly generates a grounded, 2–3 sentence narrative summarizing the homeowner's status and nearby storm events. This provides a quick talking-point checklist before knocking.
+- **Door-Knocking Script**: Generates a short, conversational door script referencing real nearby storm events (hail/wind sizes and dates) without any placeholder brackets, making it ready to pitch immediately.
+- **Credit Conservation**: Generated tools are automatically cached securely in the document vault. Tap it again to retrieve the cached version instantly.
+
+### 2. 🏘️ Neighbor Outreach Letter PDF
+- **Dynamic Campaign Creation**: Once a job reaches **`INSTALL_COMPLETED`** status, a **Neighbor Letter** button will automatically appear on the job card.
+- **Storm-Grounded Pitch**: Generates a professionally designed, single-page PDF letter featuring our corporate letterhead. The letter references the exact completed job address and highlights NWS storm events that occurred nearby.
+- **Call-to-Action**: Invites neighbors to book a free roofing inspection. You can download and print these to drop at adjacent houses, maximizing lead gen around completed installs.
+
+---
+
+*This guide reflects the field app as of version `2.4.1`. If the app's
 screens, buttons, or error messages change in a future update, this
 guide should be reviewed and updated to match.*

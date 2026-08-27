@@ -61,6 +61,54 @@ def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return R * c
 
 
+def is_qualifying(
+    event_type: str,
+    hail_size_inches: float,
+    wind_speed_mph: float,
+    min_hail: float = 1.0,
+    min_wind: float = 50.0,
+) -> bool:
+    """Return True if the event meets the configurable damage threshold.
+
+    Qualifying criteria (roofing damage relevance):
+    - HAIL:    hail_size_inches >= min_hail  (default 1.0″ — roof-damaging size)
+    - WIND:    wind_speed_mph   >= min_wind  (default 50 mph — uplift threshold)
+    - TORNADO: always qualifies (always actionable for canvassing)
+    """
+    if event_type == "HAIL":
+        return hail_size_inches >= min_hail
+    if event_type == "WIND":
+        return wind_speed_mph >= min_wind
+    if event_type == "TORNADO":
+        return True
+    return False
+
+
+def compute_severity_score(
+    event_type: str,
+    hail_size_inches: float,
+    wind_speed_mph: float,
+    min_hail: float = 1.0,
+    min_wind: float = 50.0,
+) -> float:
+    """Compute a normalized severity score for canvassing prioritization.
+
+    Score is the max of the normalized hail and wind components:
+    - hail component = hail_size_inches / min_hail   (e.g. 2.0″ hail → 2.0 when min=1.0)
+    - wind component = wind_speed_mph  / min_wind    (e.g. 75 mph  → 1.5 when min=50)
+    - TORNADO always scores 10.0 (highest priority)
+    - Events below both thresholds score 0.0
+    """
+    if event_type == "TORNADO":
+        return 10.0
+    hail_norm = min_hail if min_hail > 0 else 1.0
+    wind_norm = min_wind if min_wind > 0 else 50.0
+    hail_score = hail_size_inches / hail_norm if event_type == "HAIL" else 0.0
+    wind_score = wind_speed_mph / wind_norm if event_type == "WIND" else 0.0
+    score = max(hail_score, wind_score)
+    return round(score, 4)
+
+
 class NWSLiveStormFeed:
     """Service to fetch and parse public storm data from NOAA NWS ArcGIS REST service."""
     

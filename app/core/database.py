@@ -284,8 +284,14 @@ def run_migrations() -> None:
             m19.up(conn)
             conn.execute("UPDATE schema_version SET version = 19, applied_at = CURRENT_TIMESTAMP WHERE id = 1")
 
+        if current_version < 20:
+            import importlib
+            m20 = importlib.import_module("app.core.migrations.0020_add_sales_and_review_fields")
+            m20.up(conn)
+            conn.execute("UPDATE schema_version SET version = 20, applied_at = CURRENT_TIMESTAMP WHERE id = 1")
+
         conn.execute("COMMIT")
-        logger.info("migrations_applied", current_version=current_version, target_version=19)
+        logger.info("migrations_applied", current_version=current_version, target_version=20)
         
         # Since seed logic was removed from up(), do it here outside the transaction
         if current_version < 1:
@@ -1808,3 +1814,268 @@ def add_storm_flags_to_jobs(jobs: list[dict]) -> list[dict]:
     return jobs
 
 
+# ============================================================
+# STORM CANVASSING TARGETS  (Step 1)
+# ============================================================
+
+def get_storm_target_summaries(
+    window_hours: int = 72,
+    limit: int = 10,
+    min_hail: float | None = None,
+    min_wind: float | None = None,
+) -> list[dict]:
+    """
+    Return the top-N canvassing target areas ranked by max severity score.
+
+    Each entry contains:
+      - location (county/loc_desc string)
+      - zipcode
+      - event_count
+      - max_severity_score
+      - max_hail_inches
+      - max_wind_mph
+      - has_tornado (bool)
+      - last_event_utc (ISO string)
+      - event_types (comma-separated list of distinct types)
+
+    Only qualifying events within the configured alert radius and
+    within `window_hours` of now are included.
+    """
+    from datetime import datetime, timedelta
+
+    settings = get_settings()
+    if min_hail is None:
+        min_hail = settings.storm_alert_min_hail_inches
+    if min_wind is None:
+        min_wind = settings.storm_alert_min_wind_mph
+
+    cutoff = (datetime.now(UTC) - timedelta(hours=window_hours)).isoformat()
+    conn = get_connection()
+    try:
+        cursor = conn.execute("""
+            SELECT
+                county                                       AS location,
+                zipcode,
+                COUNT(*)                                     AS event_count,
+                MAX(COALESCE(severity_score, 0.0))           AS max_severity_score,
+                MAX(COALESCE(hail_size_inches, 0.0))         AS max_hail_inches,
+                MAX(COALESCE(wind_speed_mph, 0.0))           AS max_wind_mph,
+                MAX(CASE WHEN event_type = 'TORNADO' THEN 1 ELSE 0 END) AS has_tornado,
+                MAX(report_time_utc)                         AS last_event_utc,
+                GROUP_CONCAT(DISTINCT event_type)            AS event_types
+            FROM storm_events
+            WHERE report_time_utc >= ?
+              AND distance_miles_from_office <= ?
+              AND (
+                (event_type = 'HAIL'    AND hail_size_inches >= ?)
+                OR
+                (event_type = 'WIND'    AND wind_speed_mph  >= ?)
+                OR
+                (event_type = 'TORNADO')
+              )
+            GROUP BY county, zipcode
+            ORDER BY max_severity_score DESC, event_count DESC
+            LIMIT ?
+        """, (
+            cutoff,
+            settings.storm_ingest_radius_miles,
+            min_hail,
+            min_wind,
+            limit,
+        ))
+        rows = cursor.fetchall()
+        results = []
+        for r in rows:
+            results.append({
+                "location": r["location"] or "Unknown",
+                "zipcode": r["zipcode"] or "",
+                "event_count": r["event_count"],
+                "max_severity_score": round(r["max_severity_score"] or 0.0, 3),
+                "max_hail_inches": round(r["max_hail_inches"] or 0.0, 2),
+                "max_wind_mph": round(r["max_wind_mph"] or 0.0, 1),
+                "has_tornado": bool(r["has_tornado"]),
+                "last_event_utc": r["last_event_utc"] or "",
+                "event_types": r["event_types"] or "",
+            })
+        return results
+    finally:
+        conn.close()
+
+
+# ============================================================
+# SALES PIPELINE SUMMARY  (Step 2)
+# ============================================================
+
+def get_sales_pipeline_summary() -> dict:
+    """
+    Return a pipeline snapshot for the admin Sales Pipeline widget.
+
+    Returns:
+      {
+        "stage_counts": {status_str: count, ...},
+        "rep_metrics": [
+          {"rep_name": str, "leads": int, "contingencies": int, "contracts": int},
+          ...
+        ],
+        "avg_speed_to_lead_hours": float | None,
+        "total_active": int,
+      }
+    """
+    import json
+    from datetime import datetime
+
+    SALES_STAGES = [
+        "LEAD_CAPTURED",
+        "INSPECTION_SCHEDULED",
+        "INSPECTION_COMPLETE",
+        "CONTINGENCY_SIGNED",
+        "CLAIM_FILED",
+        "RETAIL_CONTRACT_SIGNED",
+        "ADJUSTER_MEETING_COMPLETED",
+        "SUPPLEMENT_GENERATED",
+        "SUPPLEMENT_APPROVED",
+        "SCOPE_APPROVED",
+        "INSTALL_COMPLETED",
+        "INVOICED",
+        "CLOSED",
+    ]
+
+    conn = get_connection()
+    try:
+        # --- Stage counts ---
+        cursor = conn.execute(
+            "SELECT status, COUNT(*) AS cnt FROM jobs GROUP BY status"
+        )
+        stage_counts: dict[str, int] = {s: 0 for s in SALES_STAGES}
+        total_active = 0
+        for r in cursor.fetchall():
+            stage_counts[r["status"]] = r["cnt"]
+            if r["status"] not in ("CLOSED", "CLAIM_DENIED", "SUPPLEMENT_DENIED"):
+                total_active += r["cnt"]
+
+        # --- Per-rep metrics ---
+        cursor = conn.execute("""
+            SELECT
+                canvasser_name,
+                COUNT(*) AS leads,
+                SUM(CASE WHEN status = 'CONTINGENCY_SIGNED' THEN 1 ELSE 0 END) AS contingencies,
+                SUM(CASE WHEN status = 'RETAIL_CONTRACT_SIGNED' THEN 1 ELSE 0 END) AS contracts
+            FROM jobs
+            WHERE canvasser_name IS NOT NULL AND canvasser_name != ''
+            GROUP BY canvasser_name
+            ORDER BY leads DESC
+        """)
+        rep_metrics = [
+            {
+                "rep_name": r["canvasser_name"],
+                "leads": r["leads"],
+                "contingencies": r["contingencies"] or 0,
+                "contracts": r["contracts"] or 0,
+            }
+            for r in cursor.fetchall()
+        ]
+
+        # --- Average speed-to-lead (hours from LEAD_CAPTURED to first advancement) ---
+        cursor = conn.execute(
+            "SELECT status_history FROM jobs WHERE status != 'LEAD_CAPTURED' AND status_history IS NOT NULL"
+        )
+        durations: list[float] = []
+        for r in cursor.fetchall():
+            try:
+                history = json.loads(r["status_history"] or "[]")
+                if len(history) < 2:
+                    continue
+                t0 = history[0].get("timestamp", "")
+                t1 = history[1].get("timestamp", "")
+                if not t0 or not t1:
+                    continue
+                # Parse ISO timestamps (strip trailing Z if present)
+                dt0 = datetime.fromisoformat(t0.rstrip("Z"))
+                dt1 = datetime.fromisoformat(t1.rstrip("Z"))
+                delta_hours = (dt1 - dt0).total_seconds() / 3600.0
+                if delta_hours >= 0:
+                    durations.append(delta_hours)
+            except Exception:
+                continue
+
+        avg_speed = round(sum(durations) / len(durations), 2) if durations else None
+
+        return {
+            "stage_counts": stage_counts,
+            "rep_metrics": rep_metrics,
+            "avg_speed_to_lead_hours": avg_speed,
+            "total_active": total_active,
+        }
+    finally:
+        conn.close()
+
+
+# ============================================================
+# REVIEW & REFERRAL TRACKING  (Step 3)
+# ============================================================
+
+def request_review(job_id: str, requested_by: str) -> dict:
+    """
+    Mark that a review has been requested for a job.
+    Appends a note to status_history for auditing.
+    Idempotent — re-calling updates the timestamp.
+    """
+    import json
+    conn = get_connection()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute("SELECT id FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        if not row:
+            raise ValueError(f"Job {job_id} not found.")
+
+        timestamp_str = datetime.now(UTC).replace(tzinfo=None).isoformat() + "Z"
+        conn.execute(
+            "UPDATE jobs SET review_requested_at = ?, review_requested_by = ? WHERE id = ?",
+            (timestamp_str, requested_by, job_id)
+        )
+        # Append audit entry to status_history
+        conn.execute(
+            """
+            UPDATE jobs
+            SET status_history = json_insert(
+                COALESCE(status_history, '[]'),
+                '$[#]',
+                json_object('status', 'REVIEW_REQUESTED', 'timestamp', ?, 'note', ?)
+            )
+            WHERE id = ?
+            """,
+            (timestamp_str, f"Review requested by {requested_by}", job_id)
+        )
+        conn.execute("COMMIT")
+        logger.info("review_requested", job_id=job_id, by=requested_by)
+        return {"status": "success", "job_id": job_id, "review_requested_at": timestamp_str}
+    except Exception:
+        conn.execute("ROLLBACK")
+        raise
+    finally:
+        conn.close()
+
+
+def add_referral(job_id: str, referral_code: str, source: str = "") -> dict:
+    """
+    Log a referral code and source on a job record.
+    Idempotent — re-calling overwrites the referral fields.
+    """
+    conn = get_connection()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute("SELECT id FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        if not row:
+            raise ValueError(f"Job {job_id} not found.")
+        conn.execute(
+            "UPDATE jobs SET referral_code = ?, referral_source = ? WHERE id = ?",
+            (referral_code.strip(), source.strip(), job_id)
+        )
+        conn.execute("COMMIT")
+        logger.info("referral_added", job_id=job_id, code=referral_code)
+        return {"status": "success", "job_id": job_id, "referral_code": referral_code}
+    except Exception:
+        conn.execute("ROLLBACK")
+        raise
+    finally:
+        conn.close()

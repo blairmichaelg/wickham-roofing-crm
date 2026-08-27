@@ -26,7 +26,7 @@ from fastapi import (
 )
 from fastapi.responses import FileResponse
 from PIL import Image
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.api.auth import get_current_claims, get_current_role, verify_field
 from app.config import FIELD_DOCS_DIR
@@ -83,6 +83,16 @@ class RetailContractSignaturePayload(BaseModel):
     total_price: float
     deposit_amount: float
     scope_description: str
+
+    @model_validator(mode='after')
+    def validate_pricing(self) -> 'RetailContractSignaturePayload':
+        if self.total_price <= 0:
+            raise ValueError("Total price must be greater than zero.")
+        if self.deposit_amount < 0:
+            raise ValueError("Deposit amount cannot be negative.")
+        if self.deposit_amount > self.total_price:
+            raise ValueError("Deposit amount cannot exceed total price.")
+        return self
 
 
 class FieldClaimInfoPayload(BaseModel):
@@ -1068,3 +1078,240 @@ async def download_field_evidence_grid(job_id: str, claims: dict = Depends(get_c
     return await download_evidence_grid(job_id)
 
 
+# ============================================================
+# SALES INTELLIGENCE FIELD ENDPOINTS  (Steps 3–5)
+# ============================================================
+
+class FieldReviewRequestPayload(BaseModel):
+    requested_by: str = ""
+
+
+@router.post("/jobs/{job_id}/request-review")
+async def field_request_review(
+    job_id: str,
+    payload: FieldReviewRequestPayload,
+    claims: dict = Depends(get_current_claims),
+):
+    """
+    Field rep: mark that a review has been requested for this completed job.
+    Idempotent — safe to call multiple times.
+    """
+    try:
+        job_id = str(uuid.UUID(job_id))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid job_id format.")
+
+    assert_field_rep_owns_job(claims, job_id)
+
+    rep_name = claims.get("name") or payload.requested_by or "field_rep"
+    from app.core.database import request_review
+    try:
+        result = await asyncio.to_thread(request_review, job_id, rep_name)
+        return result
+    except ValueError as ve:
+        raise HTTPException(status_code=404, detail=str(ve))
+    except Exception as exc:
+        logger.error("field_request_review_failed", job_id=job_id, error=str(exc))
+        raise HTTPException(status_code=500, detail="Failed to record review request.")
+
+
+class FieldReferralPayload(BaseModel):
+    referral_code: str
+    source: str = ""
+
+
+@router.post("/jobs/{job_id}/referral")
+async def field_add_referral(
+    job_id: str,
+    payload: FieldReferralPayload,
+    claims: dict = Depends(get_current_claims),
+):
+    """
+    Field rep: attach a referral code and optional source to a job.
+    Idempotent — overwrites existing referral fields.
+    """
+    try:
+        job_id = str(uuid.UUID(job_id))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid job_id format.")
+
+    assert_field_rep_owns_job(claims, job_id)
+
+    from app.core.database import add_referral
+    try:
+        result = await asyncio.to_thread(add_referral, job_id, payload.referral_code, payload.source)
+        return result
+    except ValueError as ve:
+        raise HTTPException(status_code=404, detail=str(ve))
+    except Exception as exc:
+        logger.error("field_add_referral_failed", job_id=job_id, error=str(exc))
+        raise HTTPException(status_code=500, detail="Failed to record referral.")
+
+
+@router.get("/jobs/{job_id}/docs/neighbor-letter")
+async def get_neighbor_letter(job_id: str, claims: dict = Depends(get_current_claims)):
+    """
+    Generate (or retrieve from vault) the neighbor outreach letter for a completed job.
+    Only available once the job has reached INSTALL_COMPLETED or later.
+    """
+    try:
+        job_id = str(uuid.UUID(job_id))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid job_id format.")
+
+    assert_field_rep_owns_job(claims, job_id)
+
+    conn = get_connection()
+    try:
+        job_row = conn.execute(
+            "SELECT * FROM jobs WHERE id = ?", (job_id,)
+        ).fetchone()
+        if not job_row:
+            raise HTTPException(status_code=404, detail="Job not found.")
+        job = dict(job_row)
+
+        VALID_STATUSES = {
+            "INSTALL_COMPLETED", "FINAL_INSPECTION", "FINAL_INSPECTION_COMPLETED",
+            "INVOICED", "CLOSED", "SUPPLEMENT_APPROVED", "SCOPE_APPROVED",
+        }
+        if job.get("status") not in VALID_STATUSES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Neighbor letter is only available for completed jobs (current status: {job.get('status')})."
+            )
+
+        # Check vault for an existing letter
+        existing = conn.execute(
+            "SELECT storage_path FROM job_documents WHERE job_id = ? AND category = 'NEIGHBOR_LETTER' ORDER BY created_at DESC LIMIT 1",
+            (job_id,)
+        ).fetchone()
+    finally:
+        conn.close()
+
+    if existing and Path(existing["storage_path"]).exists():
+        from app.services.security import sanitize_download_filename
+        return FileResponse(
+            path=existing["storage_path"],
+            filename=sanitize_download_filename(f"Neighbor_Letter_{job_id[:8]}.pdf"),
+            media_type="application/pdf",
+        )
+
+    # Fetch nearby storm events for context
+    from app.core.database import get_storm_target_summaries
+    storm_events = await asyncio.to_thread(
+        get_storm_target_summaries,
+        window_hours=168,  # 1 week
+        limit=3,
+    )
+
+    from app.services.pdf.neighbor_letter import NeighborLetterGenerator
+    gen = NeighborLetterGenerator()
+    pdf_path = await gen.generate(job, storm_events)
+
+    # Register in vault
+    await asyncio.to_thread(
+        insert_job_document,
+        job_id,
+        f"Neighbor_Letter_{job_id[:8]}.pdf",
+        "application/pdf",
+        pdf_path,
+        None,
+        "field_safe",
+        "NEIGHBOR_LETTER",
+        True,
+    )
+
+    from app.services.security import sanitize_download_filename
+    return FileResponse(
+        path=pdf_path,
+        filename=sanitize_download_filename(f"Neighbor_Letter_{job_id[:8]}.pdf"),
+        media_type="application/pdf",
+    )
+
+
+@router.get("/jobs/{job_id}/sales-tools")
+async def get_sales_tools(job_id: str, claims: dict = Depends(get_current_claims)):
+    """
+    Return AI-generated sales summary and door-knocking script for a job.
+
+    Results are cached in the document vault (as JSON text) to avoid repeated
+    AI calls. Cached results are returned on subsequent requests.
+
+    Returns:
+      {
+        "sales_summary": "...",
+        "door_script": "...",
+        "cached": bool
+      }
+    """
+    try:
+        job_id = str(uuid.UUID(job_id))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid job_id format.")
+
+    assert_field_rep_owns_job(claims, job_id)
+
+    conn = get_connection()
+    try:
+        job_row = conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        if not job_row:
+            raise HTTPException(status_code=404, detail="Job not found.")
+        job = dict(job_row)
+
+        # Check for cached sales tools
+        cached_doc = conn.execute(
+            "SELECT storage_path FROM job_documents WHERE job_id = ? AND category = 'SALES_TOOLS' ORDER BY created_at DESC LIMIT 1",
+            (job_id,)
+        ).fetchone()
+    finally:
+        conn.close()
+
+    if cached_doc:
+        cache_path = Path(cached_doc["storage_path"])
+        if cache_path.exists():
+            try:
+                import json as _json
+                cached = _json.loads(cache_path.read_text(encoding="utf-8"))
+                cached["cached"] = True
+                return cached
+            except Exception:
+                pass  # Fall through to regenerate if cache is corrupt
+
+    # Fetch nearby storm events for grounding
+    from app.core.database import get_storm_target_summaries
+    storm_events = await asyncio.to_thread(
+        get_storm_target_summaries,
+        window_hours=168,
+        limit=3,
+    )
+
+    from app.services.sales_narrative import generate_sales_summary, generate_door_script
+    summary, script = await asyncio.gather(
+        generate_sales_summary(job, storm_events),
+        generate_door_script(job, storm_events),
+    )
+
+    result = {"sales_summary": summary, "door_script": script, "cached": False}
+
+    # Persist to vault as a JSON text file
+    import json as _json
+    cache_dir = Path("data/field_docs") / job_id
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_path = cache_dir / "sales_tools.json"
+    try:
+        cache_path.write_text(_json.dumps(result, indent=2), encoding="utf-8")
+        await asyncio.to_thread(
+            insert_job_document,
+            job_id,
+            "sales_tools.json",
+            "application/json",
+            str(cache_path),
+            None,
+            "field_safe",
+            "SALES_TOOLS",
+            True,
+        )
+    except Exception as cache_exc:
+        logger.warning("sales_tools_cache_write_failed", job_id=job_id, error=str(cache_exc))
+
+    return result

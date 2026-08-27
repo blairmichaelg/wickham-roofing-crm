@@ -184,11 +184,47 @@
                             <div class="text-[9px] text-gray-500 uppercase font-bold">Wind</div>
                         </div>
                     </div>
-                    <!-- List -->
-                    <div id="adminStormList" class="flex-1 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                    <!-- Recent Events List -->
+                    <div id="adminStormList" class="flex-1 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
                         <p class="text-gray-500 text-xs text-center py-2 col-span-full">No storms in the last 72 hours.</p>
                     </div>
                 </div>
+                <!-- Canvassing Targets List -->
+                <div class="mt-3 border-t border-gray-800 pt-3">
+                    <div class="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-2">📍 Canvassing Targets (ranked by severity)</div>
+                    <div id="adminCanvassingTargets" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                        <p class="text-gray-500 text-xs col-span-full">Loading targets…</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sales Pipeline Summary Widget -->
+    <div id="adminPipelineWidget" class="mx-6 mb-4 bg-gray-900 border border-purple-900/60 rounded-xl shadow-lg overflow-hidden">
+        <button onclick="togglePipeline()" class="w-full flex justify-between items-center p-4 bg-gray-950 border-b border-gray-800 font-bold hover:bg-gray-900 transition-colors">
+            <span class="flex items-center gap-2 text-white font-semibold">
+                <span>📈</span> Sales Pipeline
+            </span>
+            <div class="flex items-center gap-2">
+                <span id="pipelineTotalBadge" class="text-[10px] bg-purple-900/80 text-purple-300 border border-purple-700 px-2 py-0.5 rounded-full font-bold">Loading…</span>
+                <span id="pipelineArrow" class="text-xs text-gray-400">&darr;</span>
+            </div>
+        </button>
+        <div id="pipelineContent" class="p-4 hidden">
+            <div class="flex flex-col gap-4">
+                <!-- Stage counts -->
+                <div>
+                    <div class="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-2">Stage Breakdown</div>
+                    <div id="pipelineStages" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 text-xs"></div>
+                </div>
+                <!-- Rep metrics -->
+                <div>
+                    <div class="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-2">Rep Performance</div>
+                    <div id="pipelineReps" class="overflow-x-auto"></div>
+                </div>
+                <!-- Speed to lead -->
+                <div id="pipelineSpeedBlock" class="text-xs text-gray-400"></div>
             </div>
         </div>
     </div>
@@ -245,6 +281,85 @@
 
         connectWebSocket();
 
+        // ── Pipeline Widget ──────────────────────────────────────────────────
+        let isPipelineOpen = false;
+        function togglePipeline() {
+            const content = document.getElementById('pipelineContent');
+            const arrow = document.getElementById('pipelineArrow');
+            isPipelineOpen = !isPipelineOpen;
+            content.classList.toggle('hidden', !isPipelineOpen);
+            arrow.innerHTML = isPipelineOpen ? '&uarr;' : '&darr;';
+            if (isPipelineOpen) loadPipelineSummary();
+        }
+
+        async function loadPipelineSummary() {
+            try {
+                const resp = await fetch('/api/office/pipeline/summary', {
+                    headers: { 'Authorization': 'Bearer ' + AUTH_TOKEN }
+                });
+                if (!resp.ok) return;
+                const d = await resp.json();
+
+                document.getElementById('pipelineTotalBadge').textContent = `${d.total_active || 0} Active`;
+
+                // Stage counts
+                const KEY_STAGES = [
+                    ['LEAD_CAPTURED', '🎯 Leads'], ['CONTINGENCY_SIGNED', '📝 Contingency'],
+                    ['CLAIM_FILED', '📋 Claim Filed'], ['SUPPLEMENT_APPROVED', '✅ Supp Approved'],
+                    ['INSTALL_COMPLETED', '🏠 Installed'], ['INVOICED', '💵 Invoiced'], ['CLOSED', '🔒 Closed']
+                ];
+                document.getElementById('pipelineStages').innerHTML = KEY_STAGES.map(([k, label]) => `
+                    <div class="bg-gray-950/70 border border-gray-800 rounded p-2 text-center">
+                        <div class="text-base font-extrabold text-white">${(d.stage_counts || {})[k] || 0}</div>
+                        <div class="text-[9px] text-gray-400 uppercase font-bold mt-0.5">${label}</div>
+                    </div>
+                `).join('');
+
+                // Rep metrics
+                const reps = d.rep_metrics || [];
+                if (reps.length === 0) {
+                    document.getElementById('pipelineReps').innerHTML = '<p class="text-gray-500 text-xs">No rep data yet.</p>';
+                } else {
+                    document.getElementById('pipelineReps').innerHTML = `
+                        <table class="w-full text-xs border-collapse">
+                            <thead><tr class="text-gray-500 border-b border-gray-800">
+                                <th class="text-left py-1 pr-3 font-semibold">Rep</th>
+                                <th class="text-right py-1 pr-3 font-semibold">Leads</th>
+                                <th class="text-right py-1 pr-3 font-semibold">Contingencies</th>
+                                <th class="text-right py-1 font-semibold">Contracts</th>
+                            </tr></thead>
+                            <tbody>${reps.slice(0, 8).map(r => `
+                                <tr class="border-b border-gray-900/50 hover:bg-gray-800/40">
+                                    <td class="py-1 pr-3 font-medium text-white">${r.rep_name}</td>
+                                    <td class="py-1 pr-3 text-right text-yellow-400">${r.leads}</td>
+                                    <td class="py-1 pr-3 text-right text-blue-400">${r.contingencies}</td>
+                                    <td class="py-1 text-right text-green-400">${r.contracts}</td>
+                                </tr>`).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                }
+
+                // Speed to lead
+                const speed = d.avg_speed_to_lead_hours;
+                document.getElementById('pipelineSpeedBlock').textContent =
+                    speed != null ? `⚡ Avg. speed-to-lead: ${speed.toFixed(1)} hrs` : '';
+
+            } catch (e) { console.error('Pipeline load error:', e); }
+        }
+
+        // Load pipeline badge on page load
+        (async () => {
+            try {
+                const resp = await fetch('/api/office/pipeline/summary', { headers: { 'Authorization': 'Bearer ' + AUTH_TOKEN } });
+                if (resp.ok) {
+                    const d = await resp.json();
+                    document.getElementById('pipelineTotalBadge').textContent = `${d.total_active || 0} Active`;
+                }
+            } catch(e) {}
+        })();
+
+        // ── Storm Radar / Canvassing Targets ──────────────────────────────────
         let isRadarOpen = false;
         function toggleStormRadar() {
             const content = document.getElementById('stormRadarContent');
@@ -254,15 +369,16 @@
                 content.classList.remove('hidden');
                 arrow.innerHTML = '&uarr;';
                 loadAdminStormRadar();
+                loadCanvassingTargets();
             } else {
                 content.classList.add('hidden');
                 arrow.innerHTML = '&darr;';
             }
         }
-        
+
         // Initial load for static widget
         loadAdminStormRadar();
-        
+        loadCanvassingTargets();
         async function loadAdminStormRadar() {
             try {
                 const data = await StormRadar.fetchRecentStorms(72);
@@ -295,7 +411,44 @@
                 console.error("Failed to load storm radar data:", err);
             }
         }
-        
+
+        async function loadCanvassingTargets() {
+            const el = document.getElementById('adminCanvassingTargets');
+            if (!el) return;
+            try {
+                const resp = await fetch('/api/office/storms/targets?window_hours=72&limit=8', {
+                    headers: { 'Authorization': 'Bearer ' + AUTH_TOKEN }
+                });
+                if (!resp.ok) { el.innerHTML = '<p class="text-gray-500 text-xs col-span-full">Could not load targets.</p>'; return; }
+                const data = await resp.json();
+                const targets = data.targets || [];
+                if (targets.length === 0) {
+                    el.innerHTML = '<p class="text-gray-500 text-xs col-span-full">No qualifying canvassing targets in the last 72 hours.</p>';
+                    return;
+                }
+                el.innerHTML = targets.map((t, i) => {
+                    const badge = t.has_tornado
+                        ? '<span class="bg-red-900 text-red-300 border border-red-700 px-1 py-0.5 rounded text-[8px] font-bold">🌪️ TORNADO</span>'
+                        : t.max_hail_inches > 0
+                            ? `<span class="bg-amber-950 text-amber-300 border border-amber-700 px-1 py-0.5 rounded text-[8px] font-bold">☄️ ${t.max_hail_inches}"</span>`
+                            : `<span class="bg-blue-950 text-blue-300 border border-blue-700 px-1 py-0.5 rounded text-[8px] font-bold">💨 ${t.max_wind_mph}mph</span>`;
+                    const rank = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}`;
+                    return `
+                    <div class="bg-gray-950/60 border border-gray-800 rounded p-2 text-xs">
+                        <div class="flex items-center justify-between gap-1 mb-1">
+                            <span class="text-[9px] text-gray-500 font-bold">${rank}</span>
+                            ${badge}
+                        </div>
+                        <div class="font-bold text-white text-[11px] leading-tight">${t.location || 'Unknown'}</div>
+                        <div class="text-gray-400 text-[9px] mt-0.5">ZIP ${t.zipcode || '—'} · ${t.event_count} event${t.event_count !== 1 ? 's' : ''}</div>
+                        <div class="text-purple-400 text-[9px] font-bold mt-0.5">Score: ${t.max_severity_score.toFixed(1)}</div>
+                    </div>`;
+                }).join('');
+            } catch (e) {
+                console.error('Canvassing targets error:', e);
+                el.innerHTML = '<p class="text-gray-500 text-xs col-span-full">Error loading targets.</p>';
+            }
+        }
         function handleAdminIncomingStormAlert(alert) {
             // Enforce magnitude thresholds client-side via centralized filter
             if (!StormRadar.filterWebSocketAlert(alert)) {

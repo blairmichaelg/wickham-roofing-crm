@@ -1854,3 +1854,105 @@ async def mark_commission_paid(job_id: str, bg_tasks: BackgroundTasks):
         logger.error("mark_commission_paid_status_failed", error=str(e))
         raise HTTPException(status_code=500, detail=f"Failed to transition job status: {e!s}")
 
+
+# ============================================================
+# SALES INTELLIGENCE ENDPOINTS  (Steps 1–3)
+# ============================================================
+
+@router.get("/storms/targets", dependencies=[Depends(verify_field)])
+async def get_storm_canvassing_targets(
+    window_hours: int = 72,
+    limit: int = 10,
+):
+    """
+    Return the top-N canvassing target areas ranked by storm severity.
+
+    Query params:
+      - window_hours (int, default 72): look-back window in hours.
+      - limit (int, default 10): maximum number of target areas returned.
+
+    Returns a list of dicts with location, severity, hail/wind stats, and event count.
+    Accessible to all authenticated users (field reps and office staff).
+    """
+    from app.services.canvassing_targets import get_ranked_canvassing_targets
+    try:
+        targets = await asyncio.to_thread(
+            get_ranked_canvassing_targets,
+            window_hours=window_hours,
+            limit=limit,
+        )
+        return {"targets": targets, "window_hours": window_hours, "count": len(targets)}
+    except Exception as exc:
+        logger.error("storm_targets_fetch_failed", error=str(exc))
+        raise HTTPException(status_code=500, detail="Failed to fetch storm canvassing targets.")
+
+
+@router.get("/pipeline/summary", dependencies=[Depends(verify_admin)])
+async def get_pipeline_summary():
+    """
+    Return an admin Sales Pipeline snapshot.
+
+    Includes:
+      - stage_counts: number of jobs in each pipeline stage
+      - rep_metrics: per-canvasser lead / contingency / contract counts
+      - avg_speed_to_lead_hours: average hours from lead capture to first advancement
+      - total_active: total non-closed jobs
+    """
+    from app.core.database import get_sales_pipeline_summary
+    try:
+        summary = await asyncio.to_thread(get_sales_pipeline_summary)
+        return summary
+    except Exception as exc:
+        logger.error("pipeline_summary_failed", error=str(exc))
+        raise HTTPException(status_code=500, detail="Failed to fetch pipeline summary.")
+
+
+class ReviewRequestPayload(BaseModel):
+    requested_by: str = "office"
+
+
+@router.post("/jobs/{job_id}/request-review", dependencies=[Depends(verify_office_role)])
+async def office_request_review(job_id: str, payload: ReviewRequestPayload):
+    """
+    Admin/office: mark that a review (e.g. Google/Facebook) has been requested for this job.
+    Idempotent — safe to call multiple times.
+    """
+    try:
+        job_id = str(uuid.UUID(job_id))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid job_id format.")
+    from app.core.database import request_review
+    try:
+        result = await asyncio.to_thread(request_review, job_id, payload.requested_by)
+        return result
+    except ValueError as ve:
+        raise HTTPException(status_code=404, detail=str(ve))
+    except Exception as exc:
+        logger.error("office_request_review_failed", job_id=job_id, error=str(exc))
+        raise HTTPException(status_code=500, detail="Failed to record review request.")
+
+
+class ReferralPayload(BaseModel):
+    referral_code: str
+    source: str = ""
+
+
+@router.post("/jobs/{job_id}/referral", dependencies=[Depends(verify_office_role)])
+async def office_add_referral(job_id: str, payload: ReferralPayload):
+    """
+    Admin/office: attach a referral code and source to a job.
+    Idempotent — overwrites existing referral fields.
+    """
+    try:
+        job_id = str(uuid.UUID(job_id))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid job_id format.")
+    from app.core.database import add_referral
+    try:
+        result = await asyncio.to_thread(add_referral, job_id, payload.referral_code, payload.source)
+        return result
+    except ValueError as ve:
+        raise HTTPException(status_code=404, detail=str(ve))
+    except Exception as exc:
+        logger.error("office_add_referral_failed", job_id=job_id, error=str(exc))
+        raise HTTPException(status_code=500, detail="Failed to record referral.")

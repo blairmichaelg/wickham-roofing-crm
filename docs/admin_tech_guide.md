@@ -384,4 +384,21 @@ To confirm the worker is running and processing correctly:
 
 ---
 
-*This guide reflects the Admin workflow as of version `2.3.3`. Includes support for non-blocking 'Naked Lead' field intake (`LEAD_CAPTURED`), pre-contract Evidence Grid pitch generation, unsigned contingency agreement PDF download/email, field-app-based signature resumption flow, and NWS-integrated Storm Activity Monitor.*
+## 10. Sales Pipeline & Canvassing Intelligence Widgets
+
+Admin and office users have access to two new widgets directly in the main Office Control Center dashboard:
+
+### 1. Canvassing Targets (Storm Radar Monitor)
+- **Ranked Target ZIPs**: Below the recent storm event alerts, the Storm Activity Monitor card displays a ranked list of "Canvassing Targets".
+- **Ranking System**: Target areas (defined by location and ZIP code) are automatically ranked based on the highest computed `severity_score` (0–10 scale) of storm events occurring in that area over the last 72 hours.
+- **Tornado/Severe Badges**: High-priority storm targets are highlighted with special badges (e.g. `🌪️ TORNADO` or `☄️ HAIL 1.75"`) to help the team focus canvassing efforts where severe damage is most likely.
+
+### 2. Sales Pipeline Widget
+- **Pipeline Snapshot**: A dedicated collapsible "Sales Pipeline" widget is located below the Storm Activity Monitor.
+- **Stage Breakdown**: Displays live counts of jobs across key pipeline stages (Leads, Contingency, Claim Filed, Supp Approved, Installed, Invoiced, Closed).
+- **Rep Performance**: Displays a breakdown of leads, contingency agreements signed, and contracts secured per sales representative/canvasser.
+- **Speed-to-Lead tracking**: Computes and displays the average time (in hours) it takes for a newly captured lead to advance to its first progression milestone. Useful for monitoring responsiveness.
+
+---
+
+*This guide reflects the Admin workflow as of version `2.3.6`. Includes support for non-blocking 'Naked Lead' field intake (`LEAD_CAPTURED`), pre-contract Evidence Grid pitch generation, unsigned contingency agreement PDF download/email, field-app-based signature resumption flow, NWS-integrated Storm Activity Monitor, ranked Canvassing Targets, and the Sales Pipeline dashboard widget.*
