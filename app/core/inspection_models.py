@@ -273,7 +273,7 @@ def get_stable_photos(
             logger.warning("mtime_read_failed", file=entry.name)
             continue
 
-        age_seconds = now - mtime
+        age_seconds = max(now - mtime, 0.0)
         if age_seconds < settle_seconds:
             skipped_settling += 1
             logger.debug(

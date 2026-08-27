@@ -113,3 +113,31 @@ This guide documents the **57 test modules** (404 assertions) comprising the Wic
 1. Edit `app/core/job_costing.py` — add a new calculation branch
 2. Update `tests/test_commissions_coverage.py` with the new scenario
 3. Ensure the DB schema in `app/core/database.py` supports any new fields via a migration
+
+
+## Sales Pipeline Widget vs. Kanban Columns Semantics
+
+The Wickham Roofing CRM exposes two distinct layouts for tracking job statuses: the **Kanban Board** and the **Sales Pipeline Summary Widget**.
+
+### 1. The Visual Kanban Board
+The Kanban board on the Admin Dashboard lists all jobs categorized across the full range of active columns. This includes every single state represented in `JobStatus` (including intermediate processing, photo uploads, technical error pipeline states, and retail specific stages).
+
+### 2. The Sales Pipeline Widget
+The Sales Pipeline widget at the top of the dashboard displays aggregated counts only for **monitored sales stages**. This represents the primary milestones in the customer-facing pipeline, defined by `SALES_STAGES` in `app/core/database.py`.
+
+### Status Mapping and Coverage
+The pipeline widget tracks the following subset of status keys:
+* `LEAD_CAPTURED`
+* `CONTINGENCY_SIGNED`
+* `CLAIM_FILED`
+* `RETAIL_CONTRACT_SIGNED`
+* `ADJUSTER_MEETING_COMPLETED`
+* `SUPPLEMENT_GENERATED`
+* `SUPPLEMENT_APPROVED`
+* `SCOPE_APPROVED`
+* `INSTALL_COMPLETED`
+* `INVOICED`
+* `CLOSED`
+
+Conceptual, technical processing, or back-end only error stages (such as `PHOTOS_UPLOADED`, `EV_ORDERED`, `PENDING_OPERATOR_REVIEW`, `INSPECTION_FAILED`, `PIPELINE_FAILED`) are **excluded** from the sales pipeline summary to keep the metrics action-oriented and clean. Consequently, total counts in the pipeline widget and the active column totals in the Kanban view will differ.
+

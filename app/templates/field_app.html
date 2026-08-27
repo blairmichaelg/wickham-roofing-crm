@@ -268,6 +268,16 @@
             </div>
             
             <div class="bg-gray-800 border border-gray-700 rounded-xl p-4 shadow-xl space-y-4">
+                <div class="flex items-center justify-between text-[10px] text-gray-500 border-b border-gray-700 pb-2 flex-wrap gap-2">
+                    <div class="flex gap-2">
+                        <span>Window: last 72 hours</span>
+                        <span>·</span>
+                        <span id="fieldStormLastUpdated">Last updated: --:--</span>
+                    </div>
+                    <div>
+                        <span>Thresholds: hail ≥ {{ settings.storm_alert_min_hail_inches }}" or wind ≥ {{ settings.storm_alert_min_wind_mph }} mph</span>
+                    </div>
+                </div>
                 <!-- Summary Stats -->
                 <div id="stormSummaryContainer" class="grid grid-cols-2 gap-3 text-center">
                     <div class="p-3 bg-gray-900/60 rounded-lg border border-gray-800">
@@ -287,7 +297,10 @@
 
                 <!-- Storm-Target ZIPs -->
                 <div id="stormTargetZipsSection" class="mt-4 pt-4 border-t border-gray-700/80 space-y-2">
-                    <h3 class="text-[10px] font-bold text-purple-300 uppercase tracking-wider">🔥 Recent Storm-Target ZIPs</h3>
+                    <h3 class="text-[10px] font-bold text-purple-300 uppercase tracking-wider flex items-center justify-between flex-wrap gap-2">
+                        <span>🔥 Recent Storm-Target ZIPs</span>
+                        <span class="text-gray-500 font-normal normal-case text-[9px]">Tap a ZIP to filter your jobs in this area.</span>
+                    </h3>
                     <div id="targetZipsList" class="flex flex-wrap gap-2">
                         <p class="text-gray-500 italic text-xs">No storm-target ZIPs in service area.</p>
                     </div>
@@ -1425,6 +1438,11 @@
                 document.getElementById('summaryHailCount').innerText = totalHail;
                 document.getElementById('summaryWindCount').innerText = totalWind;
                 
+                const lastUpdatedEl = document.getElementById('fieldStormLastUpdated');
+                if (lastUpdatedEl) {
+                    lastUpdatedEl.textContent = `Last updated: ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+                }
+                
                 const listEl = document.getElementById('stormAlertsList');
                 if (recent.length === 0) {
                     listEl.innerHTML = '<p class="text-gray-400 text-sm text-center py-4">No severe storm events in the last 72 hours.</p>';
@@ -1546,12 +1564,14 @@
                 const cachedNote = d.cached
                     ? '<p class="text-[9px] text-gray-600 italic">Cached result</p>'
                     : '<p class="text-[9px] text-gray-600 italic">AI-generated · grounded in real job data</p>';
+                const trustNote = '<p class="text-[9px] text-gray-500 mt-1">🛡️ Generated from this job\'s details and recent local storms (not a generic template).</p>';
                 el.innerHTML =
                     '<div class="space-y-3">' +
                     '<div><div class="text-[10px] text-purple-400 uppercase font-bold tracking-wider mb-1">📝 Sales Summary</div>' +
                     '<p class="text-sm text-gray-200 leading-relaxed">' + (d.sales_summary || '—') + '</p></div>' +
                     '<div><div class="text-[10px] text-orange-400 uppercase font-bold tracking-wider mb-1">🚪 Door Script</div>' +
                     '<p class="text-sm text-gray-200 leading-relaxed whitespace-pre-line">' + (d.door_script || '—') + '</p></div>' +
+                    trustNote +
                     cachedNote + '</div>';
                 btn.textContent = '🤖 Hide Tools';
             } catch (e) {

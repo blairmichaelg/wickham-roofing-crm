@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.3.8] - 2026-08-27
+### Fixed & Enhanced (Field Documents, Offline Replay Tests, and Storm Monitor UI Refinements)
+- **Field Documents API Cleanup**: Removed duplicate endpoints `list_field_documents` and `download_field_document`, leaving the secure, canonical pair (`get_field_job_documents` and `download_field_job_document`) which filters visibility to `field_safe`.
+- **Pipeline vs. Kanban Semantics**: Exposed monitored sales status legend labels next to the stage breakdown widget header on the admin dashboard, and documented the status differences in `docs/testing.md`.
+- **Offline Queue Replay Hardening**: Created `tests/test_offline_queue_replay.py` containing full simulated sequences for queued lead intakes, photo uploads, and contingency or retail signatures replay, asserting DB state changes.
+- **Storm Monitor UI Polish**: Added clear window intervals ("last 72 hours"), last updated timestamps, and threshold limits ("hail ≥ X, wind ≥ Y") to both the admin dashboard and field app templates. Exposed a click-to-filter hint next to target ZIP buttons.
+- **AI Sales Tools Trust Badge**: Appended a trust notice explaining that AI summaries and scripts are tailored using local job data and storm events.
+- **Test Suite Verification (+4 tests, 404 → 408)**: Cleaned up race condition in photo settling helper where negative age floating-point values skipped settling. Verified all 408 test files run green.
+
 ## [2.3.7] - 2026-08-27
 ### Fixed & Enhanced (Job-Local Storm Tracking & Security Adjustments)
 - **Office Storm Canvassing Security**: Refactored `GET /api/office/storms/targets` endpoint authorization to require the office role `verify_office_role`, blocking field reps from viewing full target datasets.

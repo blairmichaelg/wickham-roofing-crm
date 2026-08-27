@@ -170,8 +170,17 @@
                     <span id="stormRadarArrow" class="text-xs text-gray-400">&darr;</span>
                 </div>
             </button>
-            <!-- Content -->
             <div id="stormRadarContent" class="p-4 space-y-4 max-h-48 overflow-y-auto hidden">
+                <div class="flex items-center justify-between text-[10px] text-gray-500 border-b border-gray-800 pb-2 flex-wrap gap-2">
+                    <div class="flex gap-2">
+                        <span>Window: last 72 hours</span>
+                        <span>·</span>
+                        <span id="adminStormLastUpdated">Last updated: --:--</span>
+                    </div>
+                    <div>
+                        <span>Thresholds: hail ≥ {{ settings.storm_alert_min_hail_inches }}" or wind ≥ {{ settings.storm_alert_min_wind_mph }} mph</span>
+                    </div>
+                </div>
                 <div class="flex flex-col md:flex-row gap-4">
                     <!-- Stats Card -->
                     <div class="grid grid-cols-2 gap-2 text-center text-xs w-full md:w-48 shrink-0">
@@ -221,7 +230,10 @@
             <div class="flex flex-col gap-4">
                 <!-- Stage counts -->
                 <div>
-                    <div class="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-2">Stage Breakdown</div>
+                    <div class="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-2 flex items-center justify-between">
+                        <span>Stage Breakdown</span>
+                        <span class="text-purple-400 font-normal normal-case text-[9px] cursor-help" title="Counts monitored sales stages. Conceptual-only or backend error columns in Kanban are not included.">ℹ️ Monitored stages only</span>
+                    </div>
                     <div id="pipelineStages" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 text-xs"></div>
                 </div>
                 <!-- Rep metrics -->
@@ -401,6 +413,11 @@
                 }
                 document.getElementById('adminHailCount').innerText = totalHail;
                 document.getElementById('adminWindCount').innerText = totalWind;
+                
+                const lastUpdatedEl = document.getElementById('adminStormLastUpdated');
+                if (lastUpdatedEl) {
+                    lastUpdatedEl.textContent = `Last updated: ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+                }
                 
                 const listEl = document.getElementById('adminStormList');
                 if (recent.length === 0) {
