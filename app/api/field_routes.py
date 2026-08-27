@@ -1103,7 +1103,7 @@ async def field_request_review(
 
     assert_field_rep_owns_job(claims, job_id)
 
-    rep_name = claims.get("name") or payload.requested_by or "field_rep"
+    rep_name = claims.get("rep_name") or payload.requested_by or "field_rep"
     from app.core.database import request_review
     try:
         result = await asyncio.to_thread(request_review, job_id, rep_name)
@@ -1197,11 +1197,11 @@ async def get_neighbor_letter(job_id: str, claims: dict = Depends(get_current_cl
         )
 
     # Fetch nearby storm events for context
-    from app.core.database import get_storm_target_summaries
+    from app.core.database import get_storm_events_near_job
     storm_events = await asyncio.to_thread(
-        get_storm_target_summaries,
+        get_storm_events_near_job,
+        job_id=job_id,
         window_hours=168,  # 1 week
-        limit=3,
     )
 
     from app.services.pdf.neighbor_letter import NeighborLetterGenerator
@@ -1278,14 +1278,14 @@ async def get_sales_tools(job_id: str, claims: dict = Depends(get_current_claims
                 pass  # Fall through to regenerate if cache is corrupt
 
     # Fetch nearby storm events for grounding
-    from app.core.database import get_storm_target_summaries
+    from app.core.database import get_storm_events_near_job
     storm_events = await asyncio.to_thread(
-        get_storm_target_summaries,
+        get_storm_events_near_job,
+        job_id=job_id,
         window_hours=168,
-        limit=3,
     )
 
-    from app.services.sales_narrative import generate_sales_summary, generate_door_script
+    from app.services.sales_narrative import generate_door_script, generate_sales_summary
     summary, script = await asyncio.gather(
         generate_sales_summary(job, storm_events),
         generate_door_script(job, storm_events),

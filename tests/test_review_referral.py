@@ -176,3 +176,36 @@ class TestReviewReferralOfficeEndpoints:
             headers=ADMIN_HEADERS,
         )
         assert resp.status_code == 400
+
+
+class TestReviewReferralFieldEndpoints:
+    def test_field_request_review_uses_jwt_rep_name(self):
+        import json
+        from app.api.auth import create_access_token
+        
+        job_id = _create_job()
+        token = create_access_token("field", rep_name="Johnny Canvasser")
+        headers = {"x-internal-token": token}
+        
+        # We mock assert_field_rep_owns_job to avoid ownership constraints in this test
+        from unittest.mock import patch
+        with patch("app.api.field_routes.assert_field_rep_owns_job"):
+            resp = client.post(
+                f"/api/field/jobs/{job_id}/request-review",
+                json={"requested_by": "ignored_body_val"},
+                headers=headers
+            )
+        assert resp.status_code == 200
+        
+        conn = get_connection()
+        try:
+            row = conn.execute("SELECT review_requested_by, status_history FROM jobs WHERE id = ?", (job_id,)).fetchone()
+            assert row["review_requested_by"] == "Johnny Canvasser"
+            
+            history = json.loads(row["status_history"] or "[]")
+            req_item = next((h for h in history if h.get("status") == "REVIEW_REQUESTED"), None)
+            assert req_item is not None
+            assert "Johnny Canvasser" in req_item.get("note", "")
+        finally:
+            conn.close()
+

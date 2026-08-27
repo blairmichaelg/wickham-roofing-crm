@@ -191,7 +191,13 @@
                 </div>
                 <!-- Canvassing Targets List -->
                 <div class="mt-3 border-t border-gray-800 pt-3">
-                    <div class="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-2">📍 Canvassing Targets (ranked by severity)</div>
+                    <div class="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-2 flex items-center justify-between">
+                        <span>📍 Canvassing Targets (ranked by severity)</span>
+                        <div class="text-gray-500 font-normal normal-case text-[9px]">
+                            <span>Storm window: last 72 hours</span>
+                            <span id="targetsRefreshTime"></span>
+                        </div>
+                    </div>
                     <div id="adminCanvassingTargets" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                         <p class="text-gray-500 text-xs col-span-full">Loading targets…</p>
                     </div>
@@ -422,6 +428,10 @@
                 if (!resp.ok) { el.innerHTML = '<p class="text-gray-500 text-xs col-span-full">Could not load targets.</p>'; return; }
                 const data = await resp.json();
                 const targets = data.targets || [];
+                const refreshEl = document.getElementById('targetsRefreshTime');
+                if (refreshEl) {
+                    refreshEl.textContent = ` · Refreshed: ${new Date().toLocaleTimeString()}`;
+                }
                 if (targets.length === 0) {
                     el.innerHTML = '<p class="text-gray-500 text-xs col-span-full">No qualifying canvassing targets in the last 72 hours.</p>';
                     return;

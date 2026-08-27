@@ -471,10 +471,10 @@
                 // Storm target badges for jobs located in high-risk ZIPs
                 let stormBadges = '';
                 if (job.has_recent_hail && job.recent_hail_max_inches > 0) {
-                    stormBadges += `<span class="inline-block text-[10px] bg-amber-950/80 text-amber-300 border border-amber-700/80 px-2 py-0.5 rounded font-bold mr-1">☄️ HAIL ${job.recent_hail_max_inches.toFixed(2)}"</span>`;
+                    stormBadges += `<span class="inline-block text-[10px] bg-amber-950/80 text-amber-300 border border-amber-700/80 px-2 py-0.5 rounded font-bold mr-1">⚡ Hail ${job.recent_hail_max_inches.toFixed(2)}" in last 72h</span>`;
                 }
                 if (job.has_recent_wind && job.recent_wind_max_mph > 0) {
-                    stormBadges += `<span class="inline-block text-[10px] bg-blue-950/80 text-blue-300 border border-blue-700/80 px-2 py-0.5 rounded font-bold mr-1">💨 WIND ${Math.round(job.recent_wind_max_mph)}mph</span>`;
+                    stormBadges += `<span class="inline-block text-[10px] bg-blue-950/80 text-blue-300 border border-blue-700/80 px-2 py-0.5 rounded font-bold mr-1">💨 ${Math.round(job.recent_wind_max_mph)} mph wind in last 72h</span>`;
                 }
 
                 const card = document.createElement('div');

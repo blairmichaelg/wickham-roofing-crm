@@ -10,11 +10,11 @@ from __future__ import annotations
 
 import asyncio
 import datetime
-import structlog
 
+import structlog
 from reportlab.lib import colors
 from reportlab.lib.units import inch
-from reportlab.platypus import Paragraph, Spacer, HRFlowable
+from reportlab.platypus import HRFlowable, Paragraph, Spacer
 
 from app.services.pdf.constants import COMPANY_EMAIL, COMPANY_NAME, COMPANY_PHONE, FIELD_DOCS_DIR
 from app.services.pdf.engine import PDFEngine

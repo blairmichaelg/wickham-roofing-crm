@@ -131,13 +131,9 @@ class TestStormTargetsEndpoint:
         resp = client.get("/api/office/storms/targets")
         assert resp.status_code == 401
 
-    def test_field_rep_can_access(self):
+    def test_field_rep_blocked(self):
         resp = client.get("/api/office/storms/targets", headers=FIELD_HEADERS)
-        assert resp.status_code == 200
-        data = resp.json()
-        assert "targets" in data
-        assert "count" in data
-        assert isinstance(data["targets"], list)
+        assert resp.status_code == 403
 
     def test_admin_can_access(self):
         resp = client.get("/api/office/storms/targets", headers=ADMIN_HEADERS)

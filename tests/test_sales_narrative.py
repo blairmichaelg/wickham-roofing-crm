@@ -150,3 +150,122 @@ async def test_prompt_is_grounded_with_real_data():
     # The prompt must contain the actual address — no invented data
     assert "456 Oak Lane" in prompt
     assert "Thomasville" in prompt
+
+
+@pytest.fixture(autouse=True)
+def clean_db():
+    from app.core.database import get_connection
+    conn = get_connection()
+    try:
+        conn.execute("PRAGMA foreign_keys = OFF")
+        conn.execute("DELETE FROM jobs")
+        conn.execute("DELETE FROM storm_events")
+        conn.execute("DELETE FROM job_documents")
+        conn.execute("PRAGMA foreign_keys = ON")
+        conn.commit()
+    finally:
+        conn.close()
+    yield
+    conn = get_connection()
+    try:
+        conn.execute("PRAGMA foreign_keys = OFF")
+        conn.execute("DELETE FROM jobs")
+        conn.execute("DELETE FROM storm_events")
+        conn.execute("DELETE FROM job_documents")
+        conn.execute("PRAGMA foreign_keys = ON")
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _insert_job(job_id: str, zipcode: str, status: str = "LEAD_CAPTURED") -> dict:
+    from app.core.database import get_connection
+    conn = get_connection()
+    try:
+        conn.execute("INSERT OR REPLACE INTO jobs (id, homeowner_name, address_line1, city, state, postal_code, phone, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                     (job_id, "Jane Smith", "456 Oak Lane", "Thomasville", "GA", zipcode, "5551234567", status))
+        conn.commit()
+    finally:
+        conn.close()
+    return {
+        "id": job_id,
+        "homeowner_name": "Jane Smith",
+        "address_line1": "456 Oak Lane",
+        "city": "Thomasville",
+        "state": "GA",
+        "postal_code": zipcode,
+        "status": status,
+    }
+
+
+def _insert_test_storm(zipcode: str, event_type: str, severity_score: float, county: str) -> None:
+    from app.core.database import get_connection
+    import datetime
+    from datetime import UTC
+    conn = get_connection()
+    try:
+        conn.execute("""
+            INSERT INTO storm_events (
+                id, zipcode, event_type, event_date, hail_size_inches,
+                wind_speed_mph, source, county, report_time_utc,
+                dedup_key, distance_miles_from_office, ingested_at,
+                latitude, longitude, severity_score
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            str(uuid.uuid4()), zipcode, event_type, "2026-08-27",
+            1.75 if event_type == "HAIL" else 0.0,
+            60.0 if event_type == "WIND" else 0.0,
+            "NWS", county, datetime.datetime.now(UTC).isoformat(),
+            str(uuid.uuid4()), 10.0, datetime.datetime.now(UTC).isoformat(),
+            30.85, -84.00, severity_score
+        ))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+class TestSalesNarrativeEndpoint:
+    @pytest.mark.asyncio
+    async def test_sales_tools_endpoint_uses_job_local_storms(self):
+        job_id = str(uuid.uuid4())
+        # job in 31757
+        _insert_job(job_id, "31757")
+        
+        # Local storm (in 31757)
+        _insert_test_storm("31757", "HAIL", 8.0, "Thomas County")
+        # Unrelated storm (in 30301)
+        _insert_test_storm("30301", "WIND", 9.0, "Fulton County")
+        
+        from fastapi.testclient import TestClient
+        from app.main import app
+        from app.api.auth import create_access_token
+        
+        client = TestClient(app)
+        token = create_access_token("field")
+        headers = {"x-internal-token": token}
+        
+        captured_prompts = []
+        
+        async def mock_generate(system_prompt: str, user_prompt: str) -> str:
+            captured_prompts.append(user_prompt)
+            return "mocked response"
+            
+        with patch("app.services.ai_service.GeminiClient") as MockClient, \
+             patch("app.api.field_routes.assert_field_rep_owns_job"), \
+             patch("app.api.field_routes.insert_job_document"):
+            mock_instance = MockClient.return_value
+            mock_instance.generate_text = mock_generate
+            
+            resp = client.get(f"/api/field/jobs/{job_id}/sales-tools", headers=headers)
+            
+        assert resp.status_code == 200
+        # Check that we captured the prompt generated for generate_sales_summary and/or generate_door_script
+        assert len(captured_prompts) > 0
+        for prompt in captured_prompts:
+            # Must reference the local county and storm details
+            assert "Thomas County" in prompt
+            assert "HAIL" in prompt or "1.75" in prompt
+            
+            # Must NOT reference fulton county or wind
+            assert "Fulton County" not in prompt
+

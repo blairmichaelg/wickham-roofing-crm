@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.3.7] - 2026-08-27
+### Fixed & Enhanced (Job-Local Storm Tracking & Security Adjustments)
+- **Office Storm Canvassing Security**: Refactored `GET /api/office/storms/targets` endpoint authorization to require the office role `verify_office_role`, blocking field reps from viewing full target datasets.
+- **Review Requests Rep Attribution**: Fixed field review-request endpoint to correctly resolve the claimant's identity using JWT claims (`rep_name` field), and logged rep names in the status history change audits.
+- **Job-Local Storm Context**: Implemented the localized database helper `get_storm_events_near_job` targeting a specific job's ZIP code instead of generic top targets. Integrated this helper into the neighbor letter PDF generation and AI sales narrative grounding.
+- **Sales Pipeline Alignment**: Pruned conceptual stages from the sales pipeline summary (`get_sales_pipeline_summary`), leaving only valid database-level `JobStatus` stages.
+- **UI Adjustments**: Wired time window filters and targets refresh timestamp labels on the admin dashboard, and formatted concise storm activity badges (⚡ Hail, 💨 Wind) on the field SPA job cards.
+- **Test Suite Verification (+4 tests, 400 → 404)**: Expanded unit tests in `test_neighbor_letter.py` and `test_sales_narrative.py` to ensure local storm metrics are used for specific jobs. Checked that the entire 404-test suite runs green.
+
 ## [2.3.6] - 2026-08-27
 ### Added & Enhanced (Sales Pipeline & Canvassing Intelligence)
 - **Database Schema Migration**: Implemented migration `0020_add_sales_and_review_fields` adding `severity_score` to `storm_events`, and `review_requested_at`, `review_requested_by`, `referral_code`, and `referral_source` to `jobs` for review/referral tracking.

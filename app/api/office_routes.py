@@ -1859,7 +1859,7 @@ async def mark_commission_paid(job_id: str, bg_tasks: BackgroundTasks):
 # SALES INTELLIGENCE ENDPOINTS  (Steps 1–3)
 # ============================================================
 
-@router.get("/storms/targets", dependencies=[Depends(verify_field)])
+@router.get("/storms/targets", dependencies=[Depends(verify_office_role)])
 async def get_storm_canvassing_targets(
     window_hours: int = 72,
     limit: int = 10,

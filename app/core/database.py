@@ -1902,6 +1902,89 @@ def get_storm_target_summaries(
         conn.close()
 
 
+def get_storm_events_near_job(
+    job_id: str,
+    window_hours: int = 72,
+    radius_miles: float | None = None,
+) -> list[dict]:
+    """
+    Look up storm events near a job's postal code, respecting alert thresholds.
+    """
+    from datetime import datetime, timedelta
+
+    settings = get_settings()
+    if radius_miles is None:
+        radius_miles = settings.storm_ingest_radius_miles
+    min_hail = settings.storm_alert_min_hail_inches
+    min_wind = settings.storm_alert_min_wind_mph
+
+    cutoff = (datetime.now(UTC) - timedelta(hours=window_hours)).isoformat()
+    conn = get_connection()
+    try:
+        row = conn.execute("SELECT postal_code FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        if not row:
+            return []
+        postal_code = str(row["postal_code"] or "").strip()
+        if not postal_code:
+            return []
+
+        cursor = conn.execute("""
+            SELECT
+                id,
+                zipcode,
+                event_type,
+                event_date,
+                hail_size_inches,
+                wind_speed_mph,
+                source,
+                county,
+                report_time_utc,
+                latitude,
+                longitude,
+                severity_score,
+                distance_miles_from_office
+            FROM storm_events
+            WHERE zipcode = ?
+              AND report_time_utc >= ?
+              AND distance_miles_from_office <= ?
+              AND (
+                (event_type = 'HAIL'    AND hail_size_inches >= ?)
+                OR
+                (event_type = 'WIND'    AND wind_speed_mph  >= ?)
+                OR
+                (event_type = 'TORNADO')
+              )
+            ORDER BY report_time_utc DESC
+        """, (postal_code, cutoff, radius_miles, min_hail, min_wind))
+        
+        rows = cursor.fetchall()
+        results = []
+        for r in rows:
+            results.append({
+                "id": r["id"],
+                "zipcode": r["zipcode"],
+                "event_type": r["event_type"],
+                "event_date": r["event_date"],
+                "hail_size_inches": r["hail_size_inches"],
+                "max_hail_inches": r["hail_size_inches"],
+                "wind_speed_mph": r["wind_speed_mph"],
+                "max_wind_mph": r["wind_speed_mph"],
+                "source": r["source"],
+                "county": r["county"],
+                "location": r["county"],
+                "report_time_utc": r["report_time_utc"],
+                "last_event_utc": r["report_time_utc"],
+                "latitude": r["latitude"],
+                "longitude": r["longitude"],
+                "severity_score": r["severity_score"],
+                "distance_miles_from_office": r["distance_miles_from_office"],
+            })
+        return results
+    finally:
+        conn.close()
+
+
+
 # ============================================================
 # SALES PIPELINE SUMMARY  (Step 2)
 # ============================================================
@@ -1926,8 +2009,6 @@ def get_sales_pipeline_summary() -> dict:
 
     SALES_STAGES = [
         "LEAD_CAPTURED",
-        "INSPECTION_SCHEDULED",
-        "INSPECTION_COMPLETE",
         "CONTINGENCY_SIGNED",
         "CLAIM_FILED",
         "RETAIL_CONTRACT_SIGNED",

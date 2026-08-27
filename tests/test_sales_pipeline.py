@@ -65,6 +65,14 @@ class TestGetSalesPipelineSummary:
         assert result["rep_metrics"] == []
         assert result["avg_speed_to_lead_hours"] is None
 
+    def test_stage_counts_only_contains_valid_job_statuses(self):
+        from app.core.database import JobStatus
+        result = get_sales_pipeline_summary()
+        stages = list(result["stage_counts"].keys())
+        for stage in stages:
+            assert stage in JobStatus.__members__
+
+
     def test_counts_jobs_by_stage(self):
         _create_job("LEAD_CAPTURED")
         _create_job("LEAD_CAPTURED")
