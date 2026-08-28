@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.4.3] - 2026-08-28
+### Fixed & Hardened (Office/Field Circular Import Elimination, Method-Threading Fix, Duplicate Import Cleanup)
+
+- **Router Circular Import Elimination**: Extracted the pure `get_inspection_summary` helper into a standalone service module `app/services/inspection_summary.py`, decoupling `app/api/office_routes.py` from `app/api/field_routes.py` at module level. Updated `field_routes.py`, `office_routes.py`, and `inspection_processor.py` to import from the new service module.
+- **Missed Method-Threading Call Site Fix**: Updated `download_job_document` in `app/api/office_routes.py` to accept `request: Request`, import `assert_field_rep_owns_job` from its canonical path `app.services.field_access`, and pass `request.method` (`assert_field_rep_owns_job(claims, job_id, request.method)`).
+- **Duplicate & Shadowed Local Import Removal**: Cleaned up seven redundant/shadowed local imports in `app/api/office_routes.py`:
+  - `upload_job_document`: removed redundant `from app.core.database import get_job_document_by_hash`
+  - `update_claim_info_route`: removed redundant `from app.core.database import JobStatus, _fetch_job_sync, update_job_status`
+  - `_sync_update_job_claim_info`: removed redundant `import uuid`
+  - `approve_supplement`: removed redundant `from app.core.database import JobStatus, update_job_status`
+  - `deny_supplement`: removed redundant `from app.core.database import JobStatus, update_job_status`
+  - `download_rebuttal`: removed redundant `from fastapi.responses import FileResponse`
+  - `get_storm_canvassing_targets`: removed redundant `from app.core.database import get_connection`
+- **Pyrefly Diagnostic Resolution**: Resolved the `bad-argument-type` diagnostic on `office_routes.py` (line 600) where `actual_type` was typed as `str | None`. Added explicit narrowing on `file.content_type`.
+  - Diagnostic count before: **1 error (14 warnings)**: `ERROR Argument str | None is not assignable to parameter file_type with type str in function asyncio.threads.to_thread [bad-argument-type]`
+  - Diagnostic count after: **0 errors (14 warnings)**: `INFO 0 errors (14 warnings not shown)`
+
 ## [2.4.2] - 2026-08-28
 ### Fixed & Hardened (Pyrefly Import Diagnostics, Field-Access Read-Only Enforcement)
 

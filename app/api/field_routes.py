@@ -37,6 +37,7 @@ from app.core.inspection_models import InspectionJob, get_stable_photos
 from app.core.notifications import notifier
 from app.core.upload_utils import stream_upload_safely
 from app.services.field_access import assert_field_rep_owns_job
+from app.services.inspection_summary import get_inspection_summary
 from app.services.rate_limit import check_rate_limit
 
 logger = structlog.get_logger("app.api.field_routes")
@@ -374,74 +375,6 @@ async def get_inspection_summary_route(job_id: str, request: Request, claims: di
     if isinstance(claims, dict):
         assert_field_rep_owns_job(claims, job_id, request.method)
     return await get_inspection_summary(job_id, claims)
-
-
-async def get_inspection_summary(job_id: str, claims: dict | None = Depends(get_current_claims)):
-    """
-    Retrieve the full InspectionJob summary.
-    Constructs the job by scanning the local field_photos/{job_id} directory
-    and reading available analyses directly from the SQLite cache.
-    """
-    job_dir = FIELD_PHOTOS_DIR / job_id
-
-    # Get local photos if directory exists
-    photos = []
-    if job_dir.exists() and job_dir.is_dir():
-        # Settle seconds = 0 for direct HTTP uploads (no Drive sync delay)
-        photos = await asyncio.to_thread(get_stable_photos, job_dir, 0)
-        
-        # Ensure all photos are registered in the universal document vault for all roles
-        if photos:
-            def _sync_photos_to_vault():
-                from app.core.database import insert_job_document
-                for p in photos:
-                    try:
-                        insert_job_document(
-                            job_id, p.filepath.name, "image/jpeg",
-                            str(p.filepath), p.sha256, "field_safe", "INSPECTION_PHOTO", False
-                        )
-                    except Exception:
-                        pass
-            await asyncio.to_thread(_sync_photos_to_vault)
-
-    # Retrieve all cached analyses for this job
-    analyses = await asyncio.to_thread(get_cached_analyses_for_job, job_id)
-
-    # Fetch real address and inspector from the jobs table
-    property_address = "Unknown Address"
-    inspector_name = "Wickham Roofing LLC"
-    conn = get_connection()
-    try:
-        cursor = conn.execute(
-            "SELECT address_line1, city, state, postal_code, inspector_name, canvasser_name FROM jobs WHERE id = ?",
-            (job_id,)
-        )
-        row = cursor.fetchone()
-        if row:
-            property_address = f"{row['address_line1']}, {row['city']}, {row['state']} {row['postal_code']}"
-            if row["inspector_name"]:
-                inspector_name = row["inspector_name"]
-            elif row["canvasser_name"]:
-                inspector_name = row["canvasser_name"]
-    finally:
-        conn.close()
-
-    job = InspectionJob(
-        job_id=job_id,
-        property_address=property_address,
-        inspection_date=datetime.now(),
-        inspector_name=inspector_name,
-        photos=photos,
-        analyses=analyses,
-    )
-
-    logger.info(
-        "inspection_summary_retrieved",
-        job_id=job_id,
-        photos_count=job.total_photos,
-        analyses_count=len(job.analyses),
-    )
-    return job
 
 
 @router.post("/jobs/{job_id}/resume-supplement", status_code=202, dependencies=[Depends(check_rate_limit)])

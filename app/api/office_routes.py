@@ -39,7 +39,6 @@ from app.api.auth import (
     verify_field,
     verify_office_role,
 )
-from app.api.field_routes import get_inspection_summary
 from app.config import FIELD_DOCS_DIR
 from app.core.backup import backup_database
 from app.core.database import (
@@ -60,6 +59,7 @@ from app.core.pipeline import run_full_office_pipeline, run_supplement_pipeline
 from app.core.templates import templates
 from app.core.upload_utils import stream_upload_safely
 from app.services.hover_extractor import detect_pdf_format
+from app.services.inspection_summary import get_inspection_summary
 from app.services.pdf import PDFGenerator
 from app.services.rate_limit import check_rate_limit
 
@@ -503,6 +503,7 @@ async def download_evidence_grid(job_id: str):
 def download_job_document(
     job_id: str, 
     doc_id: str, 
+    request: Request,
     role: str = Depends(get_current_role), 
     claims: dict = Depends(get_current_claims)
 ):
@@ -516,9 +517,9 @@ def download_job_document(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid job_id or doc_id format.")
 
-    from app.api.field_routes import assert_field_rep_owns_job
+    from app.services.field_access import assert_field_rep_owns_job
     if role == "field":
-        assert_field_rep_owns_job(claims, job_id)
+        assert_field_rep_owns_job(claims, job_id, request.method)
 
     conn = get_connection()
     try:
@@ -568,7 +569,7 @@ async def upload_job_document(job_id: str, file_type: str = Form(...), file: Upl
         raise HTTPException(status_code=400, detail="Invalid job_id format.")
     valid_types = ["application/pdf", "image/jpeg", "image/png"]
     actual_type = file.content_type
-    if actual_type not in valid_types:
+    if not actual_type or actual_type not in valid_types:
         raise HTTPException(status_code=400, detail="Must upload a PDF, JPEG, or PNG.")
 
     job_dir = FIELD_DOCS_DIR / job_id
@@ -586,7 +587,6 @@ async def upload_job_document(job_id: str, file_type: str = Form(...), file: Upl
             allowed_magic_bytes=[b"%PDF-", b"\xFF\xD8\xFF", b"\x89PNG\r\n\x1A\n"]
         )
         
-        from app.core.database import get_job_document_by_hash
         existing_doc = await asyncio.to_thread(get_job_document_by_hash, job_id, file_hash)
         if existing_doc:
             logger.warning("idempotent_upload_prevented", job_id=job_id, filename=safe_name, sha256=file_hash)
@@ -637,7 +637,6 @@ async def update_claim_info_route(job_id: str, payload: JobClaimInfoPayload, bg_
         )
         # Auto-advance to CLAIM_FILED if claim info provided for early stage lead
         if payload.claim_number or payload.insurer_name:
-            from app.core.database import JobStatus, _fetch_job_sync, update_job_status
             job = await asyncio.to_thread(_fetch_job_sync, job_id)
             if job and job.get("status") in (JobStatus.LEAD_CAPTURED, JobStatus.CONTINGENCY_SIGNED):
                 try:
@@ -862,7 +861,6 @@ def _sync_update_job_claim_info(job_id: str, payload: JobClaimInfoPayload):
             conn.execute(f"UPDATE jobs SET {set_clause} WHERE id = ?", values)
             
         if payload.loss_date is not None:
-            import uuid
             cursor = conn.execute("SELECT id FROM storm_verifications WHERE job_id = ?", (job_id,))
             row = cursor.fetchone()
             if row:
@@ -1466,7 +1464,6 @@ async def approve_supplement(
     Triggers a WebSocket broadcast to alert Scott and Debi.
     """
     note = payload.get("note", "Approved by operator.")
-    from app.core.database import JobStatus, update_job_status
     try:
         update_job_status(
             job_id, JobStatus.SUPPLEMENT_APPROVED, note
@@ -1502,7 +1499,6 @@ async def deny_supplement(request: Request, job_id: str,
             detail="Must provide denial_text or denial_pdf_doc_id."
         )
     note = f"Denied. Reason: {(denial_text or '')[:200]}"
-    from app.core.database import JobStatus, update_job_status
     try:
         update_job_status(
             job_id, JobStatus.SUPPLEMENT_DENIED, note
@@ -1541,7 +1537,6 @@ async def download_rebuttal(job_id: str):
         job_id = str(uuid.UUID(job_id))
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid job_id format.")
-    from fastapi.responses import FileResponse
 
     from app.core.database import get_job_documents
     docs = get_job_documents(job_id,
@@ -1874,7 +1869,6 @@ async def get_storm_canvassing_targets(
     Accessible to all authenticated users (field reps and office staff).
     """
     from app.config import get_settings
-    from app.core.database import get_connection
     from app.services.canvassing_targets import get_ranked_canvassing_targets
     
     settings = get_settings()

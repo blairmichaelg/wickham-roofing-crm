@@ -21,13 +21,13 @@ import structlog
 from arq.worker import Retry
 from PIL import Image as PILImage
 
-from app.api.field_routes import get_inspection_summary
 from app.config import FIELD_DOCS_DIR, get_settings
 from app.core.cache import get_cached_analysis, set_cached_analysis
 from app.core.database import JobStatus, insert_job_document, update_job_status
 from app.core.inspection_models import InspectionJob
 from app.core.temp_manager import create_temp_file
 from app.services.ai_service import get_ai_client
+from app.services.inspection_summary import get_inspection_summary
 from app.services.pdf import PDFGenerator
 
 logger = structlog.get_logger("app.workers.inspection_processor")
@@ -132,13 +132,14 @@ async def process_inspection(ctx: dict, job_id: str) -> InspectionJob:
 
         non_cached_photos = []
         for idx, photo in enumerate(job.photos):
-            cached = await asyncio.to_thread(get_cached_analysis, job.job_id, photo.sha256)
-            if cached:
-                cached.filename = photo.filepath.name
-                job.analyses.append(cached)
-                log.info("photo_analysis_cache_hit", photo=photo.filepath.name, damage=cached.damage_detected)
-            else:
-                non_cached_photos.append(photo)
+            if photo.sha256:
+                cached = await asyncio.to_thread(get_cached_analysis, job.job_id, photo.sha256)
+                if cached:
+                    cached.filename = photo.filepath.name
+                    job.analyses.append(cached)
+                    log.info("photo_analysis_cache_hit", photo=photo.filepath.name, damage=cached.damage_detected)
+                    continue
+            non_cached_photos.append(photo)
 
         if non_cached_photos:
             log.info("batch_processing_non_cached_photos", count=len(non_cached_photos))
@@ -178,7 +179,8 @@ async def process_inspection(ctx: dict, job_id: str) -> InspectionJob:
                     
                     analysis.filename = photo.filepath.name
                     job.analyses.append(analysis)
-                    await asyncio.to_thread(set_cached_analysis, job.job_id, photo.sha256, analysis)
+                    if photo.sha256:
+                        await asyncio.to_thread(set_cached_analysis, job.job_id, photo.sha256, analysis)
                     log.info(
                         "photo_analysis_complete_batch",
                         photo=photo.filepath.name,
