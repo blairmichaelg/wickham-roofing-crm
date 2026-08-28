@@ -203,6 +203,20 @@
                 </div>
             </div>
 
+            <!-- Voice Note Recording Section -->
+            <div id="voiceNoteSection" class="pt-4 border-t border-gray-700 space-y-3">
+                <label class="block text-sm font-medium text-gray-400">🎙️ Field Voice Memo / Notes</label>
+                <div class="flex items-center gap-3">
+                    <button type="button" id="recordVoiceBtn" class="flex items-center gap-2 px-4 py-3 bg-gray-800 hover:bg-gray-700 text-white font-bold rounded-lg border border-gray-600 transition-colors">
+                        <span id="micIcon" class="text-red-500 text-lg">●</span>
+                        <span id="recordVoiceText">Record Voice Memo</span>
+                    </button>
+                    <span id="recordTimer" class="text-xs text-gray-400 font-mono hidden">00:00</span>
+                    <audio id="voicePreview" controls class="hidden h-10 max-w-xs"></audio>
+                </div>
+                <p id="voiceStatusHint" class="text-xs text-gray-500">Record spoken field notes (transcribed offline via faster-whisper into job record).</p>
+            </div>
+
             <!-- Retail Contract Details (shown only if job type is RETAIL) -->
             <div id="retailDetailsSection" class="hidden pt-4 border-t border-gray-700 space-y-4">
                 <h3 class="text-md font-bold text-white mb-2">💰 Retail Contract Pricing & Scope</h3>
@@ -1360,6 +1374,22 @@
                 }
             }
 
+            if (record.payload.voice_note) {
+                const voiceData = new FormData();
+                voiceData.append('file', record.payload.voice_note, 'field_voice_note.webm');
+                const voiceResp = await fetch(`/api/field/jobs/${jobId}/voice-note`, {
+                    method: 'POST',
+                    headers: {'x-internal-token': FIELD_TOKEN},
+                    body: voiceData
+                });
+                if (!voiceResp.ok) {
+                    const err = new Error('Replay voice note upload failed');
+                    err.isHttpError = true;
+                    err.status = voiceResp.status;
+                    throw err;
+                }
+            }
+
             return true;
         }
         
@@ -1483,10 +1513,72 @@
             updateSubmitButtonState();
         });
         
-        // Trigger initial state
-        jobTypeSelect.dispatchEvent(new Event('change'));
+        // Voice Recording Controller
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let recordedVoiceBlob = null;
+        let recordingTimerInterval = null;
+        let recordingSeconds = 0;
 
-        async function queueFullSubmission(payload, photoFiles, signatureBase64, signerName, existingJobId = null) {
+        const recordVoiceBtn = document.getElementById('recordVoiceBtn');
+        const micIcon = document.getElementById('micIcon');
+        const recordVoiceText = document.getElementById('recordVoiceText');
+        const recordTimer = document.getElementById('recordTimer');
+        const voicePreview = document.getElementById('voicePreview');
+        const voiceStatusHint = document.getElementById('voiceStatusHint');
+
+        if (recordVoiceBtn) {
+            recordVoiceBtn.addEventListener('click', async () => {
+                if (mediaRecorder && mediaRecorder.state === 'recording') {
+                    mediaRecorder.stop();
+                    clearInterval(recordingTimerInterval);
+                    micIcon.classList.remove('animate-pulse');
+                    recordVoiceText.innerText = 'Re-record Voice Memo';
+                    recordVoiceBtn.classList.remove('bg-red-900/60', 'border-red-500');
+                    recordVoiceBtn.classList.add('bg-gray-800', 'border-gray-600');
+                } else {
+                    try {
+                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        mediaRecorder = new MediaRecorder(stream);
+                        audioChunks = [];
+
+                        mediaRecorder.ondataavailable = (e) => {
+                            if (e.data.size > 0) audioChunks.push(e.data);
+                        };
+
+                        mediaRecorder.onstop = () => {
+                            recordedVoiceBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                            voicePreview.src = URL.createObjectURL(recordedVoiceBlob);
+                            voicePreview.classList.remove('hidden');
+                            voiceStatusHint.innerText = 'Voice memo recorded and ready for upload.';
+                            stream.getTracks().forEach(t => t.stop());
+                        };
+
+                        mediaRecorder.start();
+                        recordingSeconds = 0;
+                        recordTimer.classList.remove('hidden');
+                        recordTimer.innerText = '00:00';
+                        recordingTimerInterval = setInterval(() => {
+                            recordingSeconds++;
+                            const mins = String(Math.floor(recordingSeconds / 60)).padStart(2, '0');
+                            const secs = String(recordingSeconds % 60).padStart(2, '0');
+                            recordTimer.innerText = `${mins}:${secs}`;
+                        }, 1000);
+
+                        micIcon.classList.add('animate-pulse');
+                        recordVoiceText.innerText = 'Stop Recording';
+                        recordVoiceBtn.classList.remove('bg-gray-800', 'border-gray-600');
+                        recordVoiceBtn.classList.add('bg-red-900/60', 'border-red-500');
+                        voiceStatusHint.innerText = 'Recording in progress... Click Stop when finished.';
+                    } catch (err) {
+                        console.error('Audio recording failed:', err);
+                        voiceStatusHint.innerText = 'Microphone access denied or unavailable.';
+                    }
+                }
+            });
+        }
+
+        async function queueFullSubmission(payload, photoFiles, signatureBase64, signerName, existingJobId = null, voiceBlob = null) {
             return new Promise((resolve, reject) => {
                 const tx = idb.transaction("offline_queue", "readwrite");
                 const store = tx.objectStore("offline_queue");
@@ -1503,6 +1595,7 @@
                         signature: signatureBase64,
                         signer_name: signerName,
                         existing_job_id: existingJobId,
+                        voice_note: voiceBlob || recordedVoiceBlob,
                         total_price: totalPrice,
                         deposit_amount: depositAmount,
                         scope_description: scopeDescription
@@ -1729,12 +1822,32 @@
                 signatureUploaded = true;
             }
 
+            if (recordedVoiceBlob) {
+                inProgressStep = 'voice_note';
+                if (loadingTitle) loadingTitle.innerText = 'Uploading Voice Memo...';
+                if (loadingProgress) loadingProgress.style.width = '95%';
+
+                const voiceData = new FormData();
+                voiceData.append('file', recordedVoiceBlob, 'field_voice_note.webm');
+                const voiceResp = await fetch(`/api/field/jobs/${jobId}/voice-note`, {
+                    method: 'POST',
+                    headers: {'x-internal-token': FIELD_TOKEN},
+                    body: voiceData
+                });
+                if (!voiceResp.ok) {
+                    const err = new Error('Voice memo upload failed');
+                    err.isHttpError = true;
+                    throw err;
+                }
+            }
+
             // SUCCESS — clear in-progress state
             const finalJobId = jobId;
             inProgressJobId = null;
             inProgressStep = null;
             uploadedPhotoIndices = new Set();
             signatureUploaded = false;
+            recordedVoiceBlob = null;
             return finalJobId;
         }
 

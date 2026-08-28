@@ -9,10 +9,11 @@ These endpoints allow the field inspectors to:
 
 import asyncio
 import base64
+import hashlib
 import io
 import json
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 import structlog
@@ -279,6 +280,103 @@ async def upload_field_photo(job_id: str, request: Request, file: UploadFile = F
     except Exception as e:
         logger.error("field_photo_upload_failed", job_id=job_id, error=str(e))
         raise HTTPException(status_code=500, detail="Failed to save photo")
+
+
+@router.post("/jobs/{job_id}/voice-note")
+async def upload_field_voice_note(
+    job_id: str,
+    request: Request,
+    file: UploadFile = File(...),
+    claims: dict = Depends(get_current_claims),
+):
+    """
+    Accept voice note audio recordings from field reps (WebM, WAV, MP3, OGG, M4A).
+    Stores audio securely in the document vault, runs local faster-whisper transcription,
+    and appends the transcribed notes into the job's record.
+    """
+    try:
+        job_id = str(uuid.UUID(job_id))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid job_id format.")
+
+    assert_field_rep_owns_job(claims, job_id, request.method)
+
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Filename missing")
+
+    allowed_content_types = [
+        "audio/webm",
+        "audio/wav",
+        "audio/x-wav",
+        "audio/mpeg",
+        "audio/mp3",
+        "audio/ogg",
+        "audio/m4a",
+        "audio/mp4",
+        "audio/aac",
+        "video/webm",
+        "application/octet-stream",
+    ]
+    if file.content_type and file.content_type.lower() not in allowed_content_types:
+        raise HTTPException(status_code=400, detail=f"Invalid audio format: {file.content_type}")
+
+    voice_dir = FIELD_DOCS_DIR / job_id
+    voice_dir.mkdir(parents=True, exist_ok=True)
+
+    safe_name = f"voice_note_{uuid.uuid4().hex[:8]}_{Path(file.filename).name}"
+    file_path = voice_dir / safe_name
+
+    content = await file.read()
+    if len(content) == 0:
+        raise HTTPException(status_code=400, detail="Empty audio file.")
+    if len(content) > 25 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Audio file exceeds 25MB limit.")
+
+    file_path.write_bytes(content)
+    file_hash = hashlib.sha256(content).hexdigest()
+
+    # Register in document vault
+    await asyncio.to_thread(
+        insert_job_document,
+        job_id,
+        safe_name,
+        file.content_type or "audio/webm",
+        str(file_path),
+        file_hash,
+        "field_safe",
+        "VOICE_NOTE",
+        False,
+    )
+
+    # Local transcription
+    from app.services.voice_transcription import transcribe_audio_file
+    transcription = await asyncio.to_thread(transcribe_audio_file, file_path)
+
+    # Append to job inspection_notes
+    def _append_voice_note(jid: str, text: str) -> None:
+        conn = get_connection()
+        try:
+            cur = conn.execute("SELECT inspection_notes FROM jobs WHERE id = ?", (jid,))
+            row = cur.fetchone()
+            current_notes = row["inspection_notes"] if row and row["inspection_notes"] else ""
+            timestamp_str = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
+            note_entry = f"\n[Voice Note {timestamp_str}]: {text}" if current_notes else f"[Voice Note {timestamp_str}]: {text}"
+            new_notes = current_notes + note_entry if current_notes else note_entry
+            conn.execute("UPDATE jobs SET inspection_notes = ? WHERE id = ?", (new_notes, jid))
+            conn.commit()
+        finally:
+            conn.close()
+
+    if transcription and not transcription.startswith("[Audio recorded: local transcription engine unavailable"):
+        await asyncio.to_thread(_append_voice_note, job_id, transcription)
+
+    logger.info("field_voice_note_processed", job_id=job_id, file=safe_name, transcription_len=len(transcription))
+    return {
+        "status": "success",
+        "job_id": job_id,
+        "filename": safe_name,
+        "transcription": transcription,
+    }
 
 
 @router.get("/jobs")

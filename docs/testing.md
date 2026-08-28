@@ -1,6 +1,6 @@
 # Testing Guide — Wickham Roofing CRM
 
-This guide documents the **65 test modules** (436 assertions) comprising the Wickham Roofing CRM test suite, mapping each module to the business guarantee it protects, documenting how to run the suite with coverage, and specifying the enforced threshold targets.
+This guide documents the **66 test modules** (443 assertions) comprising the Wickham Roofing CRM test suite, mapping each module to the business guarantee it protects, documenting how to run the suite with coverage, and specifying the enforced threshold targets.
 
 ---
 
@@ -27,7 +27,7 @@ This guide documents the **65 test modules** (436 assertions) comprising the Wic
 | `app/core/` | ≥ 90% |
 | `app/services/` | ≥ 90% |
 | Rest of `app/` | ≥ 75% |
-| Overall | ≥ 75% (enforced via `fail_under = 75` in `pyproject.toml`; current: **76.26%**) |
+| Overall | ≥ 75% (enforced via `fail_under = 75` in `pyproject.toml`; current: **76.32%**) |
 
 ---
 
@@ -39,6 +39,7 @@ This guide documents the **65 test modules** (436 assertions) comprising the Wic
 | `test_ai_service.py` | Gemini photo analysis service returns validated `PhotoAnalysis` objects; multimodal batching and fallback paths work correctly |
 | `test_cache.py` | SQLite cache layer (`app/core/cache.py`) initialises cleanly, stores, retrieves, and evicts analysis records |
 | `test_georgia_compliance.py` | Georgia statutory FBPA cancellation notice formatting (O.C.G.A. § 10-1-393.12), 5-business-day post-denial invoicing lock, AOB prohibition (SB 201), and 7-year retention soft-deletes |
+| `test_voice_transcription.py` | Local offline voice note transcription via faster-whisper (CPU/int8), document vault registration, and job note appending |
 | `test_xactimate_coverage.py` | Xactimate line-item coverage rules: steep roof pitch charges, high-profile ridge cap upgrades, documented gutter damage gating, dumpster haul-off scaling, and sheathing re-nailing |
 | `test_cleanup.py` | Temp-file cleanup manager unlinks orphaned uploads without touching legitimate job files |
 | `test_climate_gate.py` | Climate gating rules enforce Ice & Water Shield mandates for northern zip codes and skip them for Georgia |

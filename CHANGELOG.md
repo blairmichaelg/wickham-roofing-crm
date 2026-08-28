@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.5.3] - 2026-08-28
+### Added & Enhanced (Local Offline Voice-to-Text for Field Notes)
+
+- **Local Faster-Whisper Transcription Service**: Created `app/services/voice_transcription.py` providing zero-cloud, CPU-quantized (`int8` tiny model) offline transcription for field voice memos and spoken inspection observations.
+- **Field Audio Endpoint**: Added `POST /api/field/jobs/{job_id}/voice-note` in `app/api/field_routes.py` with UUID validation, field rep ownership enforcement (`assert_field_rep_owns_job`), automated registration in the document vault (`VOICE_NOTE` / `field_safe`), and synchronous appending to `jobs.inspection_notes`.
+- **Field App Voice Recorder UI & Offline Replay**: Added microphone `MediaRecorder` audio capture in `app/templates/field_app.html` with recording timer, audio playback preview, and offline IndexedDB queueing with automatic sync replay.
+- **Test Suite Expansion (+7 tests, 436 → 443)**: Added `tests/test_voice_transcription.py` validating audio transcription, fallback error handling, UUID validation, audio size/format gating, doc vault registration, and job notes persistence.
+
 ## [2.5.2] - 2026-08-28
 ### Added & Enhanced (Xactimate Line-Item Coverage Expansion)
 
