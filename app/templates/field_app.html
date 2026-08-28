@@ -63,9 +63,14 @@
     <!-- Toast Container -->
     <div id="toastContainer" class="fixed top-4 right-4 z-50 flex flex-col space-y-2 pointer-events-none"></div>
 
-    <!-- Pending Sync Badge -->
-    <div id="pendingSyncBadge" class="hidden fixed top-2 right-2 bg-yellow-500 text-black text-xs font-bold px-3 py-1 rounded-full z-40">
-        <span id="pendingSyncCount">0</span> pending sync
+    <!-- Pending Sync Badges Container -->
+    <div class="fixed top-2 right-2 z-45 flex flex-col gap-2 items-end">
+        <div id="pendingSyncBadge" class="hidden bg-yellow-500 text-black text-xs font-bold px-3 py-1 rounded-full shadow-lg">
+            <span id="pendingSyncCount">0</span> pending sync
+        </div>
+        <button type="button" id="syncErrorBadge" onclick="openSyncErrorModal()" class="hidden bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg flex items-center gap-1 hover:bg-red-700 transition-colors">
+            ⚠️ <span id="syncErrorCount">0</span> sync errors
+        </button>
     </div>
 
     <div class="max-w-md mx-auto p-6 pb-24">
@@ -305,8 +310,54 @@
                         <p class="text-gray-500 italic text-xs">No storm-target ZIPs in service area.</p>
                     </div>
                     <div id="activeZipFilterContainer" class="hidden flex justify-between items-center bg-purple-950/40 p-2 rounded text-xs border border-purple-800/50 mt-2">
-                        <span class="text-purple-300">Filtering jobs by ZIP: <strong id="activeZipFilterVal"></strong></span>
+                        <span class="text-purple-300 flex flex-col text-left">
+                            <span>Filtering jobs by ZIP: <strong id="activeZipFilterVal"></strong></span>
+                            <span id="stormVerifiedLeadsLabel" class="text-[10px] text-purple-400 mt-1 font-semibold"></span>
+                        </span>
                         <button type="button" onclick="clearZipFilter()" class="text-red-400 font-bold hover:underline">Clear Filter</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- My Pipeline Summary Widget -->
+        <div id="myPipelineSection" class="mt-12 pt-8 border-t border-gray-700">
+            <h2 class="text-2xl font-bold text-white mb-6">My Pipeline Summary</h2>
+            <div class="bg-gray-800 border border-gray-700 rounded-xl p-4 shadow-xl">
+                <div id="pipelineMetrics" class="grid grid-cols-2 gap-3 text-center mb-4">
+                    <div class="p-3 bg-gray-900/60 rounded-lg border border-gray-800">
+                        <div class="text-xl font-bold text-purple-400" id="repTotalActiveCount">0</div>
+                        <div class="text-[10px] text-gray-500 uppercase tracking-wider font-bold">Active Jobs</div>
+                    </div>
+                    <div class="p-3 bg-gray-900/60 rounded-lg border border-gray-800">
+                        <div class="text-xl font-bold text-orange-400" id="repAvgSpeedToLead">--h</div>
+                        <div class="text-[10px] text-gray-500 uppercase tracking-wider font-bold">Speed-to-Lead</div>
+                    </div>
+                </div>
+                <div id="repPipelineStages" class="grid grid-cols-3 gap-2 text-center text-xs">
+                    <div class="p-2 bg-gray-900/40 rounded border border-gray-850">
+                        <div class="font-extrabold text-white" id="count_LEAD_CAPTURED">0</div>
+                        <div class="text-[9px] text-gray-500 uppercase font-bold mt-1">Leads</div>
+                    </div>
+                    <div class="p-2 bg-gray-900/40 rounded border border-gray-850">
+                        <div class="font-extrabold text-white" id="count_CONTINGENCY_SIGNED">0</div>
+                        <div class="text-[9px] text-gray-500 uppercase font-bold mt-1">Contingencies</div>
+                    </div>
+                    <div class="p-2 bg-gray-900/40 rounded border border-gray-850">
+                        <div class="font-extrabold text-white" id="count_CLAIM_FILED">0</div>
+                        <div class="text-[9px] text-gray-500 uppercase font-bold mt-1">Claims Filed</div>
+                    </div>
+                    <div class="p-2 bg-gray-900/40 rounded border border-gray-850">
+                        <div class="font-extrabold text-white" id="count_RETAIL_CONTRACT_SIGNED">0</div>
+                        <div class="text-[9px] text-gray-500 uppercase font-bold mt-1">Retail Signed</div>
+                    </div>
+                    <div class="p-2 bg-gray-900/40 rounded border border-gray-850">
+                        <div class="font-extrabold text-white" id="count_INSTALL_COMPLETED">0</div>
+                        <div class="text-[9px] text-gray-500 uppercase font-bold mt-1">Installs</div>
+                    </div>
+                    <div class="p-2 bg-gray-900/40 rounded border border-gray-850">
+                        <div class="font-extrabold text-white" id="count_CLOSED">0</div>
+                        <div class="text-[9px] text-gray-500 uppercase font-bold mt-1">Closed</div>
                     </div>
                 </div>
             </div>
@@ -354,6 +405,24 @@
             </div>
 
             <button onclick="resetFormState()" class="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold text-lg hover:bg-blue-700">Add Another</button>
+        </div>
+    </div>
+
+    <!-- Sync Error Modal -->
+    <div id="syncErrorModal" class="fixed inset-0 bg-black bg-opacity-75 hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-gray-800 rounded-xl max-w-lg w-full border border-gray-700 shadow-2xl flex flex-col max-h-[80vh]">
+            <div class="p-6 border-b border-gray-700 flex justify-between items-center">
+                <h3 class="text-xl font-bold text-white flex items-center gap-2">
+                    <span>⚠️</span> Permanent Sync Errors
+                </h3>
+                <button onclick="closeSyncErrorModal()" class="text-gray-400 hover:text-white font-bold text-xl">&times;</button>
+            </div>
+            <div id="syncErrorList" class="p-6 overflow-y-auto space-y-4 flex-1">
+                <!-- Records list -->
+            </div>
+            <div class="p-4 bg-gray-900/40 border-t border-gray-700 flex justify-end">
+                <button onclick="closeSyncErrorModal()" class="bg-gray-700 hover:bg-gray-600 text-white font-bold px-4 py-2 rounded text-sm transition-colors">Close</button>
+            </div>
         </div>
     </div>
 
@@ -444,9 +513,32 @@
             renderJobsList();
         }
 
+        async function loadRepPipelineSummary() {
+            try {
+                const res = await fetch('/api/field/pipeline/summary', { headers: { 'x-internal-token': FIELD_TOKEN } });
+                if (!res.ok) throw new Error('Failed to fetch pipeline summary');
+                const data = await res.json();
+                
+                document.getElementById('repTotalActiveCount').textContent = data.total_active || 0;
+                document.getElementById('repAvgSpeedToLead').textContent = data.avg_speed_to_lead_hours !== null ? `${data.avg_speed_to_lead_hours}h` : '--h';
+                
+                const stages = data.stage_counts || {};
+                for (const key in stages) {
+                    const el = document.getElementById(`count_${key}`);
+                    if (el) {
+                        el.textContent = stages[key];
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to load rep pipeline summary:", err);
+            }
+        }
+
         async function loadMyJobs() {
             const listEl = document.getElementById('myJobsList');
             if (!listEl) return;
+            // Also refresh rep pipeline summary
+            loadRepPipelineSummary();
             try {
                 const res = await fetch('/api/field/jobs', { headers: { 'x-internal-token': FIELD_TOKEN } });
                 if (!res.ok) throw new Error('Failed to fetch jobs');
@@ -465,6 +557,16 @@
             let filteredJobs = window.allJobs;
             if (activeZipFilter) {
                 filteredJobs = window.allJobs.filter(j => (j.postal_code || '').trim() === activeZipFilter);
+                const todayStr = new Date().toDateString();
+                const leadsToday = filteredJobs.filter(j => {
+                    const isLead = j.status === 'LEAD_CAPTURED';
+                    const isToday = j.created_at ? new Date(j.created_at).toDateString() === todayStr : false;
+                    return isLead && isToday;
+                }).length;
+                const leadsLabel = document.getElementById('stormVerifiedLeadsLabel');
+                if (leadsLabel) {
+                    leadsLabel.textContent = `Storm-verified ZIP leads today: ${leadsToday}`;
+                }
             }
             
             if (filteredJobs.length === 0) {
@@ -490,6 +592,30 @@
                     stormBadges += `<span class="inline-block text-[10px] bg-blue-950/80 text-blue-300 border border-blue-700/80 px-2 py-0.5 rounded font-bold mr-1">💨 ${Math.round(job.recent_wind_max_mph)} mph wind in last 72h</span>`;
                 }
 
+                let nextActionHint = '';
+                const hasStorm = job.has_recent_hail || job.has_recent_wind;
+                if (job.status === 'LEAD_CAPTURED') {
+                    nextActionHint = hasStorm 
+                        ? 'Next: present contingency agreement and storm evidence.' 
+                        : 'Next: establish homeowner interest and explain retail options.';
+                } else if (job.status === 'CONTINGENCY_SIGNED') {
+                    nextActionHint = hasStorm
+                        ? 'Next: schedule inspection and generate evidence grid.'
+                        : 'Next: prepare contract for adjuster inspection.';
+                } else if (job.status === 'INSTALL_COMPLETED') {
+                    nextActionHint = 'Next: print/send neighbor letter.';
+                } else if (job.status === 'CLAIM_FILED') {
+                    nextActionHint = 'Next: host adjuster meeting and verify storm damage.';
+                } else if (job.status === 'RETAIL_CONTRACT_SIGNED') {
+                    nextActionHint = 'Next: coordinate installation schedule with production team.';
+                } else if (job.status === 'INVOICED') {
+                    nextActionHint = 'Next: collect final payment and request review/referral.';
+                } else if (job.status === 'CLOSED') {
+                    nextActionHint = 'Next: lead finalized! Ask for referrals.';
+                } else {
+                    nextActionHint = 'Next: monitor job progress and update status.';
+                }
+
                 const card = document.createElement('div');
                 card.className = `bg-gray-800 border ${isNakedLead ? 'border-amber-600/60' : 'border-gray-700'} p-4 rounded-lg shadow-md space-y-3`;
                 card.innerHTML = `
@@ -500,6 +626,9 @@
                                 ${stormBadges}
                             </div>
                             <p class="text-gray-400 text-sm">${job.address_line1} (${job.postal_code || ''})</p>
+                            <p class="text-xs text-purple-300 italic mt-1.5 flex items-center gap-1">
+                                💡 <span class="font-medium">${nextActionHint}</span>
+                            </p>
                         </div>
                         ${statusBadge}
                     </div>
@@ -832,16 +961,129 @@
             const badge = document.getElementById('pendingSyncBadge');
             const countEl = document.getElementById('pendingSyncCount');
 
-            if (failedCount > 0) {
-                badge.classList.remove('hidden', 'bg-yellow-500');
-                badge.classList.add('bg-red-600');
-                countEl.innerText = `${pendingCount} pending, ${failedCount} FAILED — contact office`;
-            } else if (pendingCount > 0) {
-                badge.classList.remove('hidden', 'bg-red-600');
-                badge.classList.add('bg-yellow-500');
+            if (pendingCount > 0) {
+                badge.classList.remove('hidden');
                 countEl.innerText = pendingCount;
             } else {
                 badge.classList.add('hidden');
+            }
+
+            const errBadge = document.getElementById('syncErrorBadge');
+            const errCountEl = document.getElementById('syncErrorCount');
+            if (failedCount > 0) {
+                errBadge.classList.remove('hidden');
+                errCountEl.innerText = failedCount;
+            } else {
+                errBadge.classList.add('hidden');
+            }
+        }
+
+        function openSyncErrorModal() {
+            document.getElementById('syncErrorModal').classList.remove('hidden');
+            renderSyncErrorList();
+        }
+
+        function closeSyncErrorModal() {
+            document.getElementById('syncErrorModal').classList.add('hidden');
+        }
+
+        async function renderSyncErrorList() {
+            const listEl = document.getElementById('syncErrorList');
+            if (!listEl || !idb) return;
+
+            const tx = idb.transaction('offline_queue', 'readonly');
+            const store = tx.objectStore('offline_queue');
+            const allRecords = await new Promise((resolve, reject) => {
+                const req = store.getAll();
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+
+            const failedRecords = allRecords.filter(r => r.status === 'failed_permanent');
+            if (failedRecords.length === 0) {
+                listEl.innerHTML = '<p class="text-gray-400 text-sm text-center py-4">No sync errors found.</p>';
+                closeSyncErrorModal();
+                return;
+            }
+
+            listEl.innerHTML = failedRecords.map(r => {
+                const lead = r.payload.lead || {};
+                const name = lead.homeowner_name || 'Unnamed Lead';
+                const addr = lead.address_line1 || 'No address';
+                const zip = lead.postal_code || '';
+                const reason = r.error_reason || 'Unknown error';
+                const attempt = r.last_attempt_utc ? new Date(r.last_attempt_utc).toLocaleString() : 'Never';
+                const status = r.last_http_status ? `(HTTP ${r.last_http_status})` : '';
+
+                return `
+                    <div class="p-4 bg-gray-900/60 border border-gray-800 rounded-lg space-y-2 text-left">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h4 class="font-bold text-white text-sm">${name}</h4>
+                                <p class="text-xs text-gray-400">${addr} ${zip}</p>
+                            </div>
+                            <button onclick="retrySyncErrorRecord(${r.id}, this)" class="bg-purple-600 hover:bg-purple-700 text-white font-bold px-3 py-1 rounded text-xs transition-colors">
+                                Try Again
+                            </button>
+                        </div>
+                        <div class="text-xs border-t border-gray-800 pt-2 text-red-400">
+                            <strong>Reason:</strong> ${reason} ${status}
+                        </div>
+                        <div class="text-[10px] text-gray-500 text-right">
+                            Last attempt: ${attempt}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function retrySyncErrorRecord(id, btn) {
+            btn.disabled = true;
+            btn.textContent = 'Syncing...';
+            showToast('Retrying background sync...', 'info');
+
+            const tx = idb.transaction('offline_queue', 'readonly');
+            const store = tx.objectStore('offline_queue');
+            const record = await new Promise((resolve, reject) => {
+                const req = store.get(id);
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+
+            if (!record) {
+                showToast('Record not found', 'error');
+                renderSyncErrorList();
+                return;
+            }
+
+            try {
+                await replayQueuedRecord(record);
+                // Success: Delete from IDB
+                const delTx = idb.transaction("offline_queue", "readwrite");
+                delTx.objectStore("offline_queue").delete(id);
+                await new Promise(r => { delTx.oncomplete = r; });
+
+                showToast('Offline record synced successfully!', 'success');
+                updatePendingSyncBadge();
+                renderSyncErrorList();
+                
+                // Refresh list of jobs if visible
+                if (typeof loadMyJobs === 'function') {
+                    loadMyJobs();
+                }
+                if (typeof loadRepPipelineSummary === 'function') {
+                    loadRepPipelineSummary();
+                }
+            } catch (err) {
+                record.error_reason = err.message || 'Unknown error';
+                record.last_attempt_utc = new Date().toISOString();
+                record.last_http_status = err.status || null;
+                record.status = 'failed_permanent';
+
+                await updateQueuedRecord(record);
+                showToast(`Retry failed: ${err.message}`, 'error');
+                updatePendingSyncBadge();
+                renderSyncErrorList();
             }
         }
 
@@ -911,6 +1153,10 @@
                         updatePendingSyncBadge();
                     } catch (err) {
                         item.retry_count = (item.retry_count || 0) + 1;
+                        item.error_reason = err.message || 'Unknown error';
+                        item.last_attempt_utc = new Date().toISOString();
+                        item.last_http_status = err.status || null;
+                        
                         if (err.isHttpError && err.status && err.status >= 400 && err.status < 500) {
                             item.status = 'failed_permanent'; // client errors won't fix themselves on retry
                         } else if (item.retry_count >= 5) {
@@ -1464,9 +1710,10 @@
                         if (tz.max_hail_inches > 0) severityInfo.push(`${tz.max_hail_inches.toFixed(2)}" Hail`);
                         if (tz.max_wind_mph > 0) severityInfo.push(`${Math.round(tz.max_wind_mph)}mph Wind`);
                         const sevText = severityInfo.join(', ');
+                        const prio = tz.priority_label || '🟢 Low';
                         return `
                             <button type="button" onclick="filterJobsByZip('${tz.zip}')" class="bg-purple-900/40 hover:bg-purple-800/60 border border-purple-700/80 text-purple-200 text-[11px] font-bold px-2.5 py-1 rounded transition-colors flex items-center gap-1">
-                                📍 ${tz.zip} <span class="text-purple-400 font-normal">(${sevText})</span>
+                                📍 ${tz.zip} <span class="text-purple-400 font-normal">(${prio}: ${sevText})</span>
                             </button>
                         `;
                     }).join('');
@@ -1565,6 +1812,7 @@
                     ? '<p class="text-[9px] text-gray-600 italic">Cached result</p>'
                     : '<p class="text-[9px] text-gray-600 italic">AI-generated · grounded in real job data</p>';
                 const trustNote = '<p class="text-[9px] text-gray-500 mt-1">🛡️ Generated from this job\'s details and recent local storms (not a generic template).</p>';
+                const guardrailNote = '<p class="text-[9px] text-yellow-500/80 mt-1 font-semibold">⚠️ Use this script to start conversations; do not promise deductible waivers or outcomes beyond the carrier\'s decision.</p>';
                 el.innerHTML =
                     '<div class="space-y-3">' +
                     '<div><div class="text-[10px] text-purple-400 uppercase font-bold tracking-wider mb-1">📝 Sales Summary</div>' +
@@ -1572,6 +1820,7 @@
                     '<div><div class="text-[10px] text-orange-400 uppercase font-bold tracking-wider mb-1">🚪 Door Script</div>' +
                     '<p class="text-sm text-gray-200 leading-relaxed whitespace-pre-line">' + (d.door_script || '—') + '</p></div>' +
                     trustNote +
+                    guardrailNote +
                     cachedNote + '</div>';
                 btn.textContent = '🤖 Hide Tools';
             } catch (e) {

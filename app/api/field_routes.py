@@ -863,16 +863,105 @@ async def sign_retail_contract(job_id: str, payload: RetailContractSignaturePayl
         raise HTTPException(status_code=500, detail="Failed to process retail contract signature")
 
 
+@router.get("/pipeline/summary")
+async def get_field_pipeline_summary(claims: dict = Depends(get_current_claims)):
+    """
+    Get pipeline metrics for the logged-in field representative.
+    """
+    rep_name = claims.get("rep_name")
+    if not rep_name:
+        return {
+            "stage_counts": {
+                "LEAD_CAPTURED": 0,
+                "CONTINGENCY_SIGNED": 0,
+                "CLAIM_FILED": 0,
+                "RETAIL_CONTRACT_SIGNED": 0,
+                "INSTALL_COMPLETED": 0,
+                "CLOSED": 0,
+            },
+            "total_active": 0,
+            "avg_speed_to_lead_hours": None
+        }
+
+    import json
+    from datetime import datetime
+    
+    conn = get_connection()
+    try:
+        SALES_STAGES = [
+            "LEAD_CAPTURED",
+            "CONTINGENCY_SIGNED",
+            "CLAIM_FILED",
+            "RETAIL_CONTRACT_SIGNED",
+            "INSTALL_COMPLETED",
+            "CLOSED",
+        ]
+        
+        cursor = conn.execute(
+            "SELECT status, COUNT(*) AS cnt FROM jobs WHERE canvasser_name = ? GROUP BY status",
+            (rep_name,)
+        )
+        stage_counts = {s: 0 for s in SALES_STAGES}
+        total_active = 0
+        for r in cursor.fetchall():
+            status_val = r["status"]
+            if status_val in stage_counts:
+                stage_counts[status_val] = r["cnt"]
+            if status_val not in ("CLOSED", "CLAIM_DENIED", "SUPPLEMENT_DENIED"):
+                total_active += r["cnt"]
+
+        # Calculate average speed to lead duration
+        cursor = conn.execute(
+            "SELECT status_history FROM jobs WHERE canvasser_name = ? AND status != 'LEAD_CAPTURED' AND status_history IS NOT NULL",
+            (rep_name,)
+        )
+        durations = []
+        for r in cursor.fetchall():
+            try:
+                history = json.loads(r["status_history"] or "[]")
+                if len(history) < 2:
+                    continue
+                t0 = history[0].get("timestamp", "")
+                t1 = history[1].get("timestamp", "")
+                if not t0 or not t1:
+                    continue
+                dt0 = datetime.fromisoformat(t0.rstrip("Z"))
+                dt1 = datetime.fromisoformat(t1.rstrip("Z"))
+                delta_hours = (dt1 - dt0).total_seconds() / 3600.0
+                if delta_hours >= 0:
+                    durations.append(delta_hours)
+            except Exception:
+                continue
+
+        avg_speed = round(sum(durations) / len(durations), 2) if durations else None
+
+        return {
+            "status": "success",
+            "stage_counts": stage_counts,
+            "total_active": total_active,
+            "avg_speed_to_lead_hours": avg_speed,
+        }
+    finally:
+        conn.close()
+
+
 @router.get("/storms/{zipcode}")
-async def get_zip_storms(zipcode: str, role: str = Depends(verify_field)):
+async def get_zip_storms(
+    zipcode: str,
+    window_hours: int = 72,
+    min_hail: float | None = None,
+    min_wind: float | None = None,
+    role: str = Depends(verify_field)
+):
     """Fetch recent storm events for a given zip code for field sales reps."""
-    from datetime import UTC, datetime
+    from datetime import UTC, datetime, timedelta
 
     from app.config import get_settings
     settings = get_settings()
-    min_hail = settings.storm_alert_min_hail_inches
-    min_wind = settings.storm_alert_min_wind_mph
+    hail_threshold = min_hail if min_hail is not None else settings.storm_alert_min_hail_inches
+    wind_threshold = min_wind if min_wind is not None else settings.storm_alert_min_wind_mph
 
+    cutoff = (datetime.now(UTC) - timedelta(hours=window_hours)).isoformat()
     conn = get_connection()
     try:
         cursor = conn.execute(
@@ -880,6 +969,7 @@ async def get_zip_storms(zipcode: str, role: str = Depends(verify_field)):
             SELECT event_date, event_type, MAX(hail_size_inches) as hail_size_inches, MAX(wind_speed_mph) as wind_speed_mph 
             FROM storm_events 
             WHERE zipcode = ?
+              AND report_time_utc >= ?
               AND (
                 (event_type = 'HAIL' AND hail_size_inches >= ?)
                 OR
@@ -891,7 +981,7 @@ async def get_zip_storms(zipcode: str, role: str = Depends(verify_field)):
             ORDER BY event_date DESC 
             LIMIT 5
             """,
-            (zipcode.strip(), min_hail, min_wind)
+            (zipcode.strip(), cutoff, hail_threshold, wind_threshold)
         )
         raw_events = [dict(r) for r in cursor.fetchall()]
         formatted_events = []

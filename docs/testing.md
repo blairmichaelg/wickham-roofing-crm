@@ -1,6 +1,6 @@
 # Testing Guide — Wickham Roofing CRM
 
-This guide documents the **57 test modules** (404 assertions) comprising the Wickham Roofing CRM test suite, mapping each module to the business guarantee it protects, documenting how to run the suite with coverage, and specifying the enforced threshold targets.
+This guide documents the **62 test modules** (414 assertions) comprising the Wickham Roofing CRM test suite, mapping each module to the business guarantee it protects, documenting how to run the suite with coverage, and specifying the enforced threshold targets.
 
 ---
 
@@ -56,6 +56,7 @@ This guide documents the **57 test modules** (404 assertions) comprising the Wic
 | `test_inspection_models.py` | `PhotoAnalysis` Pydantic model enforces confidence bounds and damage classification constraints |
 | `test_job_costing.py` | Job costing engine correctly computes margin, overhead, labor, and commission from raw financial inputs |
 | `test_office_routes.py` | Office API endpoints (EagleView upload, supplement trigger, financials, production) return correct responses and status codes |
+| `test_offline_queue_replay.py` | Offline queue IndexedDB replay operations, photo uploads, signature syncing, 4xx/5xx HTTP errors handling and permanent failure transitions |
 | `test_pdf_extractor.py` | PDF text extraction utilities correctly parse EagleView and SoL report formats |
 | `test_pdf_generator.py` | ReportLab PDF generation produces files for all 10 document types without errors |
 | `test_phase4_hardening.py` | Rate limiter rejects flood requests; path traversal sanitizer blocks directory escape attempts |
@@ -67,6 +68,7 @@ This guide documents the **57 test modules** (404 assertions) comprising the Wic
 | `test_property_supplement.py` | Property-based (Hypothesis) tests for SupplementEngine math: non-negative quantities, waste ≥ 100%, state machine reachability |
 | `test_qbo_export.py` | QBO CSV export contains correct line items, amounts, and customer data for all job types |
 | `test_rbac_hardening.py` | Role-based access control prevents cross-role data access across admin/operations/accounting/field endpoints |
+| `test_sales_pipeline.py` | Sales pipeline widget aggregates, rep metrics, speed-to-lead calculations, and field rep specific pipeline summary endpoint |
 | `test_reconciliation.py` | Financial reconciliation view correctly aggregates revenue, costs, margin, and deductible across multiple jobs |
 | `test_security_phase3_task1.py` | JWT tokens are rejected when algorithm is `none` or signature is invalid |
 | `test_security_phase3_task2.py` | Admin PIN is required for admin-only endpoints; accounting/operations PINs are correctly scoped |
@@ -76,6 +78,7 @@ This guide documents the **57 test modules** (404 assertions) comprising the Wic
 | `test_shingle_endpoints.py` | Shingle type/color metadata endpoints store and retrieve data correctly for all job states |
 | `test_state_machine.py` | Core state machine transition table covers all valid paths with no missing transitions |
 | `test_storm_radar.py` | NOAA/NWS storm radar ingestion, bounding box calculations, API parameter filtering, and live websocket alert broadcast validation |
+| `test_storm_targets.py` | Storm canvassing targets and severity score prioritisation calculations |
 | `test_supplement_engine.py` | Pure math kernel produces correct material quantities for standard and edge-case roof measurements |
 | `test_supplement_models.py` | Supplement Pydantic schemas validate material BOM, discrepancy lists, and code citations |
 | `test_ui_contracts.py` | HTML template rendering produces expected element structure for all dashboard pages |

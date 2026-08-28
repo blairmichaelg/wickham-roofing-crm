@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.3.9] - 2026-08-28
+### Added & Enhanced (Configurable Storm Thresholds, Offline Error Transparency, and Rep Widgets)
+- **Configurable Storm Windows & Thresholds**: Plumbed parameters through to `/api/storms/recent`, `/api/storms/summary`, `/api/field/storms/{zipcode}`, and JS fetch logic. Added an admin dashboard select widget to toggle windows and show the value dynamically in the header.
+- **Dynamic Priority Labels & Severity Score**: Updated targets queries to calculate `severity_score` and dynamic priority labels (🔥 High, ⚡ Medium, 🟢 Low) and exposed severity details on the target ZIP badges.
+- **Offline IndexedDB Error Metadata & Retry Modal**: Captured permanent failure error reasons, timestamps, and HTTP codes on background sync failure. Implemented `syncErrorBadge` and `syncErrorModal` with manual **Try Again** controls in the field app.
+- **Field Pipeline Widget & Context Hints**: Added a **My Pipeline Summary** widget displaying rep-specific aggregates and speed-to-lead times. Displayed rule-based action hints on each job card and appended conversational safety guardrails under AI generators.
+- **Test Suite & Coverage Expansion (+6 tests, 408 → 414)**: Added test cases validating per-rep metrics, speed-to-lead durations, and transient vs. permanent offline sync errors.
+
 ## [2.3.8] - 2026-08-27
 ### Fixed & Enhanced (Field Documents, Offline Replay Tests, and Storm Monitor UI Refinements)
 - **Field Documents API Cleanup**: Removed duplicate endpoints `list_field_documents` and `download_field_document`, leaving the secure, canonical pair (`get_field_job_documents` and `download_field_job_document`) which filters visibility to `field_safe`.

@@ -164,3 +164,53 @@ class TestPipelineSummaryEndpoint:
         data = resp.json()
         assert data["stage_counts"]["LEAD_CAPTURED"] >= 1
         assert data["stage_counts"]["CLOSED"] >= 1
+
+
+class TestFieldPipelineSummaryEndpoint:
+    def test_requires_auth(self):
+        resp = client.get("/api/field/pipeline/summary")
+        assert resp.status_code == 401
+
+    def test_returns_pipeline_for_logged_in_rep(self):
+        _create_job("LEAD_CAPTURED", canvasser="Alice")
+        _create_job("CONTINGENCY_SIGNED", canvasser="Alice")
+        _create_job("LEAD_CAPTURED", canvasser="Bob")
+
+        alice_token = create_access_token("field", rep_name="Alice")
+        headers = {"x-internal-token": alice_token}
+        resp = client.get("/api/field/pipeline/summary", headers=headers)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "success"
+        # Only Alice's jobs should be summarized
+        assert data["stage_counts"]["LEAD_CAPTURED"] == 1
+        assert data["stage_counts"]["CONTINGENCY_SIGNED"] == 1
+        assert data["total_active"] == 2
+
+    def test_speed_to_lead_for_rep(self):
+        # Create a job for Alice with history
+        job_id = str(uuid.uuid4())
+        t0 = datetime(2026, 1, 1, 10, 0, 0)
+        t1 = datetime(2026, 1, 1, 13, 0, 0)
+        history = json.dumps([
+            {"status": "LEAD_CAPTURED", "timestamp": t0.isoformat(), "note": ""},
+            {"status": "CONTINGENCY_SIGNED", "timestamp": t1.isoformat(), "note": ""},
+        ])
+        conn = get_connection()
+        try:
+            conn.execute(
+                """INSERT INTO jobs
+                   (id, homeowner_name, address_line1, city, state, postal_code, phone, status, canvasser_name, status_history)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (job_id, "Test Rep Job", "123 B St", "City", "GA", "31757", "5551234567", "CONTINGENCY_SIGNED", "Alice", history),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        alice_token = create_access_token("field", rep_name="Alice")
+        headers = {"x-internal-token": alice_token}
+        resp = client.get("/api/field/pipeline/summary", headers=headers)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["avg_speed_to_lead_hours"] == pytest.approx(3.0, abs=0.01)

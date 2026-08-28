@@ -565,6 +565,8 @@ async def get_recent_storms(
     since_hours: int | None = None,
     radius_miles: float = 50.0,
     event_types: str | None = None,
+    min_hail: float | None = None,
+    min_wind: float | None = None,
     role: str = Depends(get_current_role)
 ):
     """
@@ -578,8 +580,8 @@ async def get_recent_storms(
 
     hours = window_hours if window_hours is not None else (since_hours if since_hours is not None else 72)
     settings = get_settings()
-    min_hail = settings.storm_alert_min_hail_inches
-    min_wind = settings.storm_alert_min_wind_mph
+    hail_threshold = min_hail if min_hail is not None else settings.storm_alert_min_hail_inches
+    wind_threshold = min_wind if min_wind is not None else settings.storm_alert_min_wind_mph
     
     threshold = (datetime.now(UTC) - timedelta(hours=hours)).isoformat()
     conn = get_connection()
@@ -596,7 +598,7 @@ async def get_recent_storms(
                 (event_type NOT IN ('HAIL', 'WIND'))
               )
         """
-        params = [threshold, radius_miles, min_hail, min_wind]
+        params = [threshold, radius_miles, hail_threshold, wind_threshold]
         
         if event_types:
             types_list = [t.strip().upper() for t in event_types.split(",") if t.strip()]
@@ -625,6 +627,8 @@ async def get_storms_summary(
     since_hours: int | None = None,
     radius_miles: float = 50.0,
     event_types: str | None = None,
+    min_hail: float | None = None,
+    min_wind: float | None = None,
     role: str = Depends(get_current_role)
 ):
     """Fetch summary of storm activity and ranked target ZIPs, enforcing hard magnitude thresholds."""
@@ -635,8 +639,8 @@ async def get_storms_summary(
     
     hours = window_hours if window_hours is not None else (since_hours if since_hours is not None else 72)
     settings = get_settings()
-    min_hail = settings.storm_alert_min_hail_inches
-    min_wind = settings.storm_alert_min_wind_mph
+    hail_threshold = min_hail if min_hail is not None else settings.storm_alert_min_hail_inches
+    wind_threshold = min_wind if min_wind is not None else settings.storm_alert_min_wind_mph
     
     threshold = (datetime.now(UTC) - timedelta(hours=hours)).isoformat()
     conn = get_connection()
@@ -653,7 +657,7 @@ async def get_storms_summary(
                 (event_type NOT IN ('HAIL', 'WIND'))
               )
         """
-        params = [threshold, radius_miles, min_hail, min_wind]
+        params = [threshold, radius_miles, hail_threshold, wind_threshold]
             
         if event_types:
             types_list = [t.strip().upper() for t in event_types.split(",") if t.strip()]
@@ -712,6 +716,7 @@ async def get_storms_summary(
                     "max_hail_inches": 0.0,
                     "wind_events": 0,
                     "max_wind_mph": 0.0,
+                    "has_tornado": False,
                     "most_recent_event_utc": time_utc
                 }
             z = zips[zp]
@@ -723,16 +728,30 @@ async def get_storms_summary(
                 z["wind_events"] += 1
                 if wind > z["max_wind_mph"]:
                     z["max_wind_mph"] = wind
+            elif etype == "TORNADO":
+                z["has_tornado"] = True
             if time_utc > z["most_recent_event_utc"]:
                 z["most_recent_event_utc"] = time_utc
                 
-    hail_norm = min_hail if min_hail > 0 else 1.0
-    wind_norm = min_wind if min_wind > 0 else 50.0
+    hail_norm = hail_threshold if hail_threshold > 0 else 1.0
+    wind_norm = wind_threshold if wind_threshold > 0 else 50.0
 
     target_zips = list(zips.values())
+    for z in target_zips:
+        hail_score = z["max_hail_inches"] / hail_norm
+        wind_score = z["max_wind_mph"] / wind_norm
+        sev_score = 10.0 if z["has_tornado"] else max(hail_score, wind_score)
+        z["severity_score"] = round(sev_score, 4)
+        if sev_score >= 1.5:
+            z["priority_label"] = "🔥 High"
+        elif sev_score >= 1.0:
+            z["priority_label"] = "⚡ Medium"
+        else:
+            z["priority_label"] = "🟢 Low"
+
     target_zips.sort(
         key=lambda z: (
-            max(z["max_hail_inches"] / hail_norm, z["max_wind_mph"] / wind_norm),
+            z["severity_score"],
             z["most_recent_event_utc"]
         ),
         reverse=True

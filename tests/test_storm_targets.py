@@ -125,6 +125,21 @@ class TestGetStormTargetSummaries:
         assert "HAIL" in results[0]["event_types"]
         assert results[0]["event_count"] == 2
 
+    def test_priority_labels(self):
+        _insert_storm(zipcode="31701", severity_score=1.8, county="Alpha, GA")
+        _insert_storm(zipcode="31702", severity_score=1.2, county="Beta, GA")
+        _insert_storm(zipcode="31703", severity_score=0.8, county="Gamma, GA")
+
+        results = get_storm_target_summaries(window_hours=72)
+        results_by_zip = {r["zipcode"]: r for r in results}
+        
+        assert results_by_zip["31701"]["priority_label"] == "🔥 High"
+        assert results_by_zip["31701"]["severity_score"] == 1.8
+        assert results_by_zip["31702"]["priority_label"] == "⚡ Medium"
+        assert results_by_zip["31702"]["severity_score"] == 1.2
+        assert results_by_zip["31703"]["priority_label"] == "🟢 Low"
+        assert results_by_zip["31703"]["severity_score"] == 0.8
+
 
 class TestStormTargetsEndpoint:
     def test_requires_auth(self):
@@ -156,6 +171,8 @@ class TestStormTargetsEndpoint:
         assert t["location"] == "Thomasville, GA"
         assert t["max_hail_inches"] == 1.75
         assert t["max_severity_score"] == 8.0
+        assert t["severity_score"] == 8.0
+        assert t["priority_label"] == "🔥 High"
 
     def test_limit_query_param(self):
         for i in range(6):

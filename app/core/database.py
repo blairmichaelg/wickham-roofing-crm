@@ -1886,11 +1886,21 @@ def get_storm_target_summaries(
         rows = cursor.fetchall()
         results = []
         for r in rows:
+            sev = round(r["max_severity_score"] or 0.0, 3)
+            if sev >= 1.5:
+                label = "🔥 High"
+            elif sev >= 1.0:
+                label = "⚡ Medium"
+            else:
+                label = "🟢 Low"
+                
             results.append({
                 "location": r["location"] or "Unknown",
                 "zipcode": r["zipcode"] or "",
                 "event_count": r["event_count"],
-                "max_severity_score": round(r["max_severity_score"] or 0.0, 3),
+                "max_severity_score": sev,
+                "severity_score": sev,
+                "priority_label": label,
                 "max_hail_inches": round(r["max_hail_inches"] or 0.0, 2),
                 "max_wind_mph": round(r["max_wind_mph"] or 0.0, 1),
                 "has_tornado": bool(r["has_tornado"]),

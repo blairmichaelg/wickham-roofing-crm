@@ -31,12 +31,15 @@ const StormRadar = {
     /**
      * Fetches recent storm events from the backend.
      */
-    async fetchRecentStorms(windowHours = 72, token = null) {
+    async fetchRecentStorms(windowHours = 72, token = null, minHail = null, minWind = null) {
         const headers = {};
         if (token) {
             headers['x-internal-token'] = token;
         }
-        const response = await fetch(`/api/storms/recent?window_hours=${windowHours}`, { headers });
+        let url = `/api/storms/recent?window_hours=${windowHours}`;
+        if (minHail !== null) url += `&min_hail=${minHail}`;
+        if (minWind !== null) url += `&min_wind=${minWind}`;
+        const response = await fetch(url, { headers });
         if (!response.ok) {
             throw new Error(`Failed to fetch recent storms: HTTP ${response.status}`);
         }
@@ -46,12 +49,15 @@ const StormRadar = {
     /**
      * Fetches storm activity summary from the backend.
      */
-    async fetchStormSummary(windowHours = 72, token = null) {
+    async fetchStormSummary(windowHours = 72, token = null, minHail = null, minWind = null) {
         const headers = {};
         if (token) {
             headers['x-internal-token'] = token;
         }
-        const response = await fetch(`/api/storms/summary?window_hours=${windowHours}`, { headers });
+        let url = `/api/storms/summary?window_hours=${windowHours}`;
+        if (minHail !== null) url += `&min_hail=${minHail}`;
+        if (minWind !== null) url += `&min_wind=${minWind}`;
+        const response = await fetch(url, { headers });
         if (!response.ok) {
             throw new Error(`Failed to fetch storm summary: HTTP ${response.status}`);
         }
