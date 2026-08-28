@@ -1,6 +1,6 @@
 [project]
 name = "wickham-roofing-crm"
-version = "2.5.3"
+version = "2.5.4"
 description = "Local CRM and automated estimating engine."
 authors = [{name = "Wickham Roofing LLC"}]
 requires-python = ">=3.11"

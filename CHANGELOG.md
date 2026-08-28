@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.5.4] - 2026-08-28
+### Added & Enhanced (Chain-of-Thought Damage Classification Prompt Refinement)
+
+- **Forensic 3-Step Chain-of-Thought Prompting**: Refined Gemini vision prompts in `app/services/ai_service.py` (`analyze_roof_photo` and `analyze_roof_photos_batch`) to require a strict 3-step forensic observation sequence before damage classification:
+  1. *Granule Depletion Pattern*: Assesses localized/circular/pitted hail impact patterns vs. uniform age-related blistering/scuffing.
+  2. *Asphalt Substrate / Mat Condition*: Inspects underlying substrate for exposed fiberglass matting, micro-fractures, or wind creases.
+  3. *Impact Bruise Presence*: Evaluates physical substrate indentations/bruises characteristic of functional hail damage.
+- **PhotoAnalysis Schema Expansion**: Added `granule_depletion_pattern`, `substrate_condition`, and `impact_bruise_present` fields to `PhotoAnalysis` in `app/core/inspection_models.py`, preserving flat schema architecture for Gemini structured output and guaranteeing backward compatibility for legacy cached analyses.
+- **Test Suite Expansion (+3 tests, 443 → 446)**: Added `tests/test_cot_damage_classification.py` validating schema validation, backward-compatible deserialization, and AI prompt directive integrity.
+
 ## [2.5.3] - 2026-08-28
 ### Added & Enhanced (Local Offline Voice-to-Text for Field Notes)
 

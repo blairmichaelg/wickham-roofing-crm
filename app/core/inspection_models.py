@@ -94,6 +94,20 @@ class PhotoAnalysis(BaseModel):
         description="Alternative explanation or cause of the visible anomalies if confidence is not 100% (e.g. manufacturing defect, weathering, blistering, mechanical damage)."
     )
 
+    # Chain-of-Thought intermediate forensic observations
+    granule_depletion_pattern: str | None = Field(
+        default=None,
+        description="Step 1 observation: Pattern of granule loss (e.g. 'localized_circular_impact', 'widespread_uniform_weathering', 'mechanical_scuff', 'none')."
+    )
+    substrate_condition: str | None = Field(
+        default=None,
+        description="Step 2 observation: Condition of the underlying asphalt / fiberglass substrate mat (e.g. 'intact', 'exposed_fiberglass', 'fractured_mat', 'surface_crease')."
+    )
+    impact_bruise_present: bool = Field(
+        default=False,
+        description="Step 3 observation: True if a soft, indented impact bruise characteristic of functional hail damage is present."
+    )
+
     # Forensic boolean flags — structured indicators for evidence grid
     hail_hits_visible: bool = Field(
         default=False,
