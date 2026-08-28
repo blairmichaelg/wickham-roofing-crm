@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.4.2] - 2026-08-28
+### Fixed & Hardened (Pyrefly Import Diagnostics, Field-Access Read-Only Enforcement)
+
+- **Pyrefly Import Diagnostic Resolution**: All 4 `missing-import` errors reported by pyrefly on `app/api/operations_routes.py` are resolved. Root cause: pyrefly was targeting the Python 3.14 `.venv` instead of the scoop Python 3.11 environment. Added `[tool.pyrefly]` section to `pyproject.toml` pointing to the correct interpreter. Additionally, moved a mid-file `FileResponse` and `DocumentsGenerator` import block (between function definitions at line 217) to the canonical top-level import block, eliminating the rogue `fastapi.responses` re-scan that triggered the 4th diagnostic.
+- **Alex Wickham Field-Access Defense-in-Depth**: Extended method-aware read-only enforcement from `app/api/auth.py` into `app/services/field_access.py`. `assert_field_rep_owns_job` now accepts a `method: str` parameter (default `"GET"`) and independently enforces the read-only constraint: GET/HEAD/OPTIONS pass through; POST/PUT/PATCH/DELETE raise HTTP 403 with the canonical message `"Alex Wickham has read-only privileges. Read-only access: contact an admin to make this change."` This is defense-in-depth — the check in `auth.py` is still present; this adds a second enforcement point at the field-access layer.
+- **Field Route Signature Hardening**: Updated all 19 `assert_field_rep_owns_job` call sites in `app/api/field_routes.py` to pass `request.method`, adding `request: Request` to any function signature that was missing it (7 functions). Also threaded `request` through `get_inspection_summary` and its two call sites in `app/api/office_routes.py`.
+- **Test Suite Expansion (+4 tests, 418 → 422)**: Appended four field-access scope tests to `tests/test_core_rbac_split.py`: Alex Wickham GET bypass, Alex Wickham mutation block, full-access core (Michael/Scott/Debi) unrestricted, and standard field rep ownership enforcement.
+
 ## [2.4.1] - 2026-08-28
 ### Hardened & Refactored (Router Coupling, Core Team Access Separation, and Help Panel Consolidation)
 - **Router Import Coupling Refactor**: Extracted Jinja2Templates instantiation to a new shared module `app/core/templates.py` to decouple router loading and prevent circular import dependencies. Kept test client patch points intact by maintaining the necessary module-level imports.

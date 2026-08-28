@@ -1,6 +1,6 @@
 [project]
 name = "wickham-roofing-crm"
-version = "2.4.1"
+version = "2.4.2"
 description = "Local CRM and automated estimating engine."
 authors = [{name = "Wickham Roofing LLC"}]
 requires-python = ">=3.11"
@@ -103,3 +103,10 @@ show_missing = true
 
 [tool.coverage.paths]
 source = ["app"]
+
+[tool.pyrefly]
+# Point pyrefly at the scoop Python 3.11 environment where all project
+# dependencies (fastapi, pydantic, etc.) are installed. Without this,
+# pyrefly defaults to discovering the closest .venv which on this machine
+# is a Python 3.14 venv that does not have any project packages installed.
+python_interpreter = "C:/Users/Michael/scoop/apps/python311/current/python.exe"

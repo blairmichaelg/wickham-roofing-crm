@@ -226,7 +226,7 @@ async def upload_field_photo(job_id: str, request: Request, file: UploadFile = F
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid job_id format.")
 
-    assert_field_rep_owns_job(claims, job_id)
+    assert_field_rep_owns_job(claims, job_id, request.method)
     """
     Accept direct photo uploads from the iPad over LAN.
     Stores files in field_photos/{job_id}/ for downstream processing.
@@ -312,13 +312,13 @@ async def list_my_jobs(claims: dict = Depends(get_current_claims)):
 
 
 @router.get("/jobs/{job_id}")
-async def get_field_job_details(job_id: str, claims: dict = Depends(get_current_claims)):
+async def get_field_job_details(job_id: str, request: Request, claims: dict = Depends(get_current_claims)):
     """Retrieve full details of a specific job for field resumption."""
     try:
         job_id = str(uuid.UUID(job_id))
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid job_id format.")
-    assert_field_rep_owns_job(claims, job_id)
+    assert_field_rep_owns_job(claims, job_id, request.method)
     job_dict = await asyncio.to_thread(_sync_fetch_job_contingency, job_id)
     if not job_dict:
         raise HTTPException(status_code=404, detail="Job not found.")
@@ -326,14 +326,14 @@ async def get_field_job_details(job_id: str, claims: dict = Depends(get_current_
 
 
 @router.get("/jobs/{job_id}/docs/contingency")
-async def download_unsigned_contingency(job_id: str, claims: dict = Depends(get_current_claims)):
+async def download_unsigned_contingency(job_id: str, request: Request, claims: dict = Depends(get_current_claims)):
     """Dynamically generates and returns an unsigned Insurance Contingency Agreement PDF for printing or emailing to homeowners."""
     try:
         job_id = str(uuid.UUID(job_id))
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid job_id format.")
 
-    assert_field_rep_owns_job(claims, job_id)
+    assert_field_rep_owns_job(claims, job_id, request.method)
     job_dict = await asyncio.to_thread(_sync_fetch_job_contingency, job_id)
     if not job_dict:
         raise HTTPException(status_code=404, detail="Job not found.")
@@ -356,7 +356,7 @@ async def trigger_inspection_report(job_id: str, request: Request, claims: dict 
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid job_id format.")
 
-    assert_field_rep_owns_job(claims, job_id)
+    assert_field_rep_owns_job(claims, job_id, request.method)
 
     redis = getattr(request.app.state, "redis_pool", None)
     if not redis:
@@ -367,19 +367,16 @@ async def trigger_inspection_report(job_id: str, request: Request, claims: dict 
 
 
 @router.get("/jobs/{job_id}/inspection", response_model=InspectionJob)
-async def get_inspection_summary(job_id: str, claims: dict | None = Depends(get_current_claims)):
+async def get_inspection_summary_route(job_id: str, request: Request, claims: dict | None = Depends(get_current_claims)):
     """
     Get Inspection Summary functionality.
-    
-    Args:
-            job_id (str): job_id parameter.
-            claims (dict): claims parameter.
-    
-    Returns:
-        Any: The resulting output.
     """
     if isinstance(claims, dict):
-        assert_field_rep_owns_job(claims, job_id)
+        assert_field_rep_owns_job(claims, job_id, request.method)
+    return await get_inspection_summary(job_id, claims)
+
+
+async def get_inspection_summary(job_id: str, claims: dict | None = Depends(get_current_claims)):
     """
     Retrieve the full InspectionJob summary.
     Constructs the job by scanning the local field_photos/{job_id} directory
@@ -462,7 +459,7 @@ async def resume_supplement(job_id: str, request: Request, role: str = Depends(g
     Returns:
         Any: The resulting output.
     """
-    assert_field_rep_owns_job(claims, job_id)
+    assert_field_rep_owns_job(claims, job_id, request.method)
     """
     Resumes a halted supplement pipeline (e.g. from PENDING_MANUAL_REVIEW).
     Skips parsing and gating, and goes straight to Narrative/PDF generation.
@@ -501,7 +498,7 @@ def _sync_resolve_flag(job_id: str, flag_id: str, payload: FlagResolutionPayload
         conn.close()
 
 @router.patch("/jobs/{job_id}/flags/{flag_id}", status_code=200)
-async def resolve_flag(job_id: str, flag_id: str, payload: FlagResolutionPayload, claims: dict = Depends(get_current_claims)):
+async def resolve_flag(job_id: str, flag_id: str, payload: FlagResolutionPayload, request: Request, claims: dict = Depends(get_current_claims)):
     """
     Resolve Flag functionality.
     
@@ -514,7 +511,7 @@ async def resolve_flag(job_id: str, flag_id: str, payload: FlagResolutionPayload
     Returns:
         Any: The resulting output.
     """
-    assert_field_rep_owns_job(claims, job_id)
+    assert_field_rep_owns_job(claims, job_id, request.method)
     """
     Resolves a flag that was marked for manual review.
     Updates the quantity and adds a resolution note.
@@ -531,12 +528,12 @@ async def resolve_flag(job_id: str, flag_id: str, payload: FlagResolutionPayload
 
 
 @router.patch("/jobs/{job_id}/claim-info", status_code=200)
-async def update_field_claim_info(job_id: str, payload: FieldClaimInfoPayload, claims: dict = Depends(get_current_claims)):
+async def update_field_claim_info(job_id: str, payload: FieldClaimInfoPayload, request: Request, claims: dict = Depends(get_current_claims)):
     """
     Allow field reps/salesmen to update claim metadata (insurer, claim #, loss date, policy #, etc.)
     for jobs they own.
     """
-    assert_field_rep_owns_job(claims, job_id)
+    assert_field_rep_owns_job(claims, job_id, request.method)
     try:
         job_id = str(uuid.UUID(job_id))
     except ValueError:
@@ -575,12 +572,12 @@ async def update_field_claim_info(job_id: str, payload: FieldClaimInfoPayload, c
 
 @router.get("/jobs/{job_id}/inspection_report")
 @router.post("/jobs/{job_id}/generate_report")
-async def get_field_inspection_report(job_id: str, claims: dict = Depends(get_current_claims)):
+async def get_field_inspection_report(job_id: str, request: Request, claims: dict = Depends(get_current_claims)):
     """
     Generate and download the Homeowner Inspection Report directly in the field app/tablet.
     Can be used by salesmen as a pitch & conversion tool BEFORE signing the contingency agreement.
     """
-    assert_field_rep_owns_job(claims, job_id)
+    assert_field_rep_owns_job(claims, job_id, request.method)
     try:
         job_id = str(uuid.UUID(job_id))
     except ValueError:
@@ -685,7 +682,7 @@ async def contingency_sign(job_id: str, payload: ContingencySignaturePayload, re
     Returns:
         Any: The resulting output.
     """
-    assert_field_rep_owns_job(claims, job_id)
+    assert_field_rep_owns_job(claims, job_id, request.method)
     """
     Handle E-Signature for Contingency Agreements.
     Saves PNG, generates PDF, logs agreement, and updates status.
@@ -772,7 +769,7 @@ async def sign_retail_contract(job_id: str, payload: RetailContractSignaturePayl
     Handle E-Signature for Retail Contracts.
     Saves PNG, generates PDF, logs agreement, and updates status.
     """
-    assert_field_rep_owns_job(claims, job_id)
+    assert_field_rep_owns_job(claims, job_id, request.method)
 
     try:
         uuid_obj = uuid.UUID(job_id)
@@ -1017,7 +1014,7 @@ async def get_zip_storms(
 
 
 @router.get("/jobs/{job_id}/documents")
-async def get_field_job_documents(job_id: str, claims: dict = Depends(get_current_claims)):
+async def get_field_job_documents(job_id: str, request: Request, claims: dict = Depends(get_current_claims)):
     """
     Fetch list of field-safe documents for a job owned by the field representative.
     """
@@ -1027,7 +1024,7 @@ async def get_field_job_documents(job_id: str, claims: dict = Depends(get_curren
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid job_id format. Must be a valid UUID.")
 
-    assert_field_rep_owns_job(claims, job_id)
+    assert_field_rep_owns_job(claims, job_id, request.method)
 
     conn = get_connection()
     try:
@@ -1044,7 +1041,7 @@ async def get_field_job_documents(job_id: str, claims: dict = Depends(get_curren
 
 
 @router.get("/jobs/{job_id}/documents/{doc_id}/download")
-async def download_field_job_document(job_id: str, doc_id: str, claims: dict = Depends(get_current_claims)):
+async def download_field_job_document(job_id: str, doc_id: str, request: Request, claims: dict = Depends(get_current_claims)):
     """
     Download a field-safe document from the Document Vault.
     Strictly checks job ownership and field_safe visibility.
@@ -1055,7 +1052,7 @@ async def download_field_job_document(job_id: str, doc_id: str, claims: dict = D
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid job_id or doc_id format. Must be a valid UUID.")
 
-    assert_field_rep_owns_job(claims, job_id)
+    assert_field_rep_owns_job(claims, job_id, request.method)
 
     conn = get_connection()
     try:
@@ -1085,14 +1082,14 @@ async def download_field_job_document(job_id: str, doc_id: str, claims: dict = D
 
 
 @router.get("/jobs/{job_id}/evidence_grid")
-async def download_field_evidence_grid(job_id: str, claims: dict = Depends(get_current_claims)):
+async def download_field_evidence_grid(job_id: str, request: Request, claims: dict = Depends(get_current_claims)):
     """Download the field-safe Inspection Evidence Grid from the field API namespace."""
     try:
         job_id = str(uuid.UUID(job_id))
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid job_id format.")
 
-    assert_field_rep_owns_job(claims, job_id)
+    assert_field_rep_owns_job(claims, job_id, request.method)
 
     from app.api.office_routes import download_evidence_grid
     return await download_evidence_grid(job_id)
@@ -1110,6 +1107,7 @@ class FieldReviewRequestPayload(BaseModel):
 async def field_request_review(
     job_id: str,
     payload: FieldReviewRequestPayload,
+    request: Request,
     claims: dict = Depends(get_current_claims),
 ):
     """
@@ -1121,7 +1119,7 @@ async def field_request_review(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid job_id format.")
 
-    assert_field_rep_owns_job(claims, job_id)
+    assert_field_rep_owns_job(claims, job_id, request.method)
 
     rep_name = claims.get("rep_name") or payload.requested_by or "field_rep"
     from app.core.database import request_review
@@ -1144,6 +1142,7 @@ class FieldReferralPayload(BaseModel):
 async def field_add_referral(
     job_id: str,
     payload: FieldReferralPayload,
+    request: Request,
     claims: dict = Depends(get_current_claims),
 ):
     """
@@ -1155,7 +1154,7 @@ async def field_add_referral(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid job_id format.")
 
-    assert_field_rep_owns_job(claims, job_id)
+    assert_field_rep_owns_job(claims, job_id, request.method)
 
     from app.core.database import add_referral
     try:
@@ -1169,7 +1168,7 @@ async def field_add_referral(
 
 
 @router.get("/jobs/{job_id}/docs/neighbor-letter")
-async def get_neighbor_letter(job_id: str, claims: dict = Depends(get_current_claims)):
+async def get_neighbor_letter(job_id: str, request: Request, claims: dict = Depends(get_current_claims)):
     """
     Generate (or retrieve from vault) the neighbor outreach letter for a completed job.
     Only available once the job has reached INSTALL_COMPLETED or later.
@@ -1179,7 +1178,7 @@ async def get_neighbor_letter(job_id: str, claims: dict = Depends(get_current_cl
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid job_id format.")
 
-    assert_field_rep_owns_job(claims, job_id)
+    assert_field_rep_owns_job(claims, job_id, request.method)
 
     conn = get_connection()
     try:
@@ -1250,7 +1249,7 @@ async def get_neighbor_letter(job_id: str, claims: dict = Depends(get_current_cl
 
 
 @router.get("/jobs/{job_id}/sales-tools")
-async def get_sales_tools(job_id: str, claims: dict = Depends(get_current_claims)):
+async def get_sales_tools(job_id: str, request: Request, claims: dict = Depends(get_current_claims)):
     """
     Return AI-generated sales summary and door-knocking script for a job.
 
@@ -1269,7 +1268,7 @@ async def get_sales_tools(job_id: str, claims: dict = Depends(get_current_claims
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid job_id format.")
 
-    assert_field_rep_owns_job(claims, job_id)
+    assert_field_rep_owns_job(claims, job_id, request.method)
 
     conn = get_connection()
     try:
@@ -1335,3 +1334,4 @@ async def get_sales_tools(job_id: str, claims: dict = Depends(get_current_claims
         logger.warning("sales_tools_cache_write_failed", job_id=job_id, error=str(cache_exc))
 
     return result
+

@@ -10,7 +10,7 @@ import uuid
 
 import structlog
 from fastapi import APIRouter, Body, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
 from app.api.auth import verify_office_role, verify_operations
@@ -22,6 +22,7 @@ from app.core.database import (
     update_job_status,
 )
 from app.core.templates import templates
+from app.services.pdf.documents import DocumentsGenerator
 
 logger = structlog.get_logger("app.api.operations_routes")
 router = APIRouter(prefix="/api/operations", tags=["operations"])
@@ -213,10 +214,6 @@ async def assign_crew(
         f"Crew '{crew_name}' scheduled for {install_date}."
     )
     return {"status": "scheduled", "job_id": job_id}
-
-from fastapi.responses import FileResponse
-
-from app.services.pdf.documents import DocumentsGenerator
 
 
 @router.get(

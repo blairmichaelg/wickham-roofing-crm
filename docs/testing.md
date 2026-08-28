@@ -1,6 +1,6 @@
 # Testing Guide — Wickham Roofing CRM
 
-This guide documents the **63 test modules** (418 assertions) comprising the Wickham Roofing CRM test suite, mapping each module to the business guarantee it protects, documenting how to run the suite with coverage, and specifying the enforced threshold targets.
+This guide documents the **63 test modules** (422 assertions) comprising the Wickham Roofing CRM test suite, mapping each module to the business guarantee it protects, documenting how to run the suite with coverage, and specifying the enforced threshold targets.
 
 ---
 
@@ -27,7 +27,7 @@ This guide documents the **63 test modules** (418 assertions) comprising the Wic
 | `app/core/` | ≥ 90% |
 | `app/services/` | ≥ 90% |
 | Rest of `app/` | ≥ 75% |
-| Overall | ≥ 75% (enforced via `fail_under = 75` in `pyproject.toml`; current: **75.27%**) |
+| Overall | ≥ 75% (enforced via `fail_under = 75` in `pyproject.toml`; current: **75.87%**) |
 
 ---
 
