@@ -441,6 +441,10 @@ async def serve_job_detail(
                 "Roof Decking Sheathing Re-Nailing",
                 "IRC R905.2.1 Deck Fastening Compliance",
             ),
+            "RFG 300S": (
+                "Complex Geometry Shingle Waste Adjustment",
+                "IRC / Manufacturer Complex Geometry Waste Standard",
+            ),
             "MATH": (
                 "Carrier Line-Item Calculation Shortage",
                 "Audit Discrepancy Verification",

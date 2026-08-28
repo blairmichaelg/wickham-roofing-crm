@@ -337,6 +337,13 @@ def seed_default_pricing() -> None:
             ("retail_standard_per_sq", 350.0),
             ("retail_arch_per_sq", 420.0),
             ("retail_premium_per_sq", 580.0),
+            # Baseline default rates for supplemental Xactimate codes (estimates requiring local market validation)
+            ("rfg_steep_per_sq", 35.0),
+            ("rfg_ridgc_plus_per_lf", 8.50),
+            ("sfg_guta_per_lf", 12.0),
+            ("dmo_dump_per_container", 450.0),
+            ("rfg_renail_per_sq", 15.0),
+            ("rfg_waste_adjustment_per_sq", 105.0),
         ]
         conn.executemany('''
             INSERT OR IGNORE INTO pricing (item_key, default_rate, default_rate_cents)
@@ -362,6 +369,7 @@ def seed_supplement_rules() -> None:
             (str(uuid.uuid4()), "RFG TEAR", "DMO DUMP", "Debris Haul-Off & Landfill Disposal Regulations", "INTERNAL_POLICY", "eval_dmo_dump", False),
             (str(uuid.uuid4()), "RFG 300S", "SFG GUTA", "Documented Hail & Storm Gutter Impact Damage", "INTERNAL_POLICY", "eval_sfg_guta", False),
             (str(uuid.uuid4()), "RFG 300S", "RFG RENAIL", "IRC R905.2.1 Roof Sheathing Fastening Code", "IRC", "eval_rfg_renail", False),
+            (str(uuid.uuid4()), "RFG 300S", "RFG 300S", "Complex Geometry Shingle Waste Factor Adjustment (15% Baseline)", "INTERNAL_POLICY", "eval_shingle_waste", False),
         ]
         conn.executemany('''
             INSERT OR IGNORE INTO supplement_rules (id, parent_code, required_child_code, citation_text, citation_type, trigger_logic_name, climate_dependent)

@@ -172,5 +172,140 @@ def test_supplement_flags_pipeline_integration():
     assert "RFG RENAIL" in flags
     assert flags["RFG RENAIL"]["quantity_delta"] == 32.0
 
+    # Shingle waste adjustment for complex geometry (30 LF valley + 20 LF hip)
+    assert "RFG 300S" in flags
+    assert flags["RFG 300S"]["quantity_delta"] == 1.6  # 32 SQ * (15% - 10%) = 1.6 SQ
+
     # Climate gate verified: RFG IWS must NOT be present when ice_barrier_required=False
     assert "RFG IWS" not in flags
+
+
+def test_shingle_waste_pipeline_simple_geometry_no_flag():
+    job_id = str(uuid.uuid4())
+    conn = get_connection()
+    try:
+        conn.execute(
+            """INSERT INTO jobs (id, homeowner_name, address_line1, city, state, postal_code, phone, status, shingle_type, damage_signals) 
+            VALUES (?, 'Simple Gable', '200 Flat Way', 'Thomasville', 'GA', '31792', '229-555-0200', 'LEAD_CAPTURED', '3-Tab Shingles', '[]')""",
+            (job_id,)
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    seed_supplement_rules()
+
+    # Simple gable roof: 0 valleys, 0 hips
+    ev_data = EagleViewData(
+        total_area_sf=2000.0,
+        predominant_pitch="4/12",
+        ridge_lf=40.0,
+        hip_lf=0.0,
+        valley_lf=0.0,
+        eaves_lf=80.0,
+        rake_lf=40.0,
+        drip_edge_lf=120.0,
+        total_facets=2,
+        flashing_lf=0.0,
+        step_flashing_lf=0.0,
+    )
+
+    generate_and_gate_flags(job_id, ice_barrier_required=False, ev_data=ev_data, carrier_waste_pct=10.0)
+
+    conn = get_connection()
+    try:
+        cursor = conn.execute(
+            """SELECT r.required_child_code 
+            FROM supplement_flags f 
+            JOIN supplement_rules r ON f.rule_id = r.id 
+            WHERE f.job_id = ? AND f.triggered = 1""",
+            (job_id,)
+        )
+        codes = [row["required_child_code"] for row in cursor.fetchall()]
+    finally:
+        conn.close()
+
+    assert "RFG 300S" not in codes
+    assert "RFG STEEP" not in codes
+
+
+def test_shingle_waste_pipeline_high_carrier_waste_no_flag():
+    job_id = str(uuid.uuid4())
+    conn = get_connection()
+    try:
+        conn.execute(
+            """INSERT INTO jobs (id, homeowner_name, address_line1, city, state, postal_code, phone, status, shingle_type, damage_signals) 
+            VALUES (?, 'Generous Carrier', '300 High Waste Way', 'Thomasville', 'GA', '31792', '229-555-0300', 'LEAD_CAPTURED', 'Architectural', '[]')""",
+            (job_id,)
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    seed_supplement_rules()
+
+    ev_data = EagleViewData(
+        total_area_sf=3000.0,
+        predominant_pitch="6/12",
+        ridge_lf=30.0,
+        hip_lf=25.0,
+        valley_lf=40.0,
+        eaves_lf=100.0,
+        rake_lf=50.0,
+        drip_edge_lf=150.0,
+        total_facets=6,
+        flashing_lf=0.0,
+        step_flashing_lf=0.0,
+    )
+
+    # Carrier already gave 15% or higher
+    generate_and_gate_flags(job_id, ice_barrier_required=False, ev_data=ev_data, carrier_waste_pct=15.0)
+
+    conn = get_connection()
+    try:
+        cursor = conn.execute(
+            """SELECT r.required_child_code 
+            FROM supplement_flags f 
+            JOIN supplement_rules r ON f.rule_id = r.id 
+            WHERE f.job_id = ? AND f.triggered = 1""",
+            (job_id,)
+        )
+        codes = [row["required_child_code"] for row in cursor.fetchall()]
+    finally:
+        conn.close()
+
+    assert "RFG 300S" not in codes
+
+
+def test_supplemental_xactimate_pricing_resolution():
+    from app.core.database import get_pricing_ledger, seed_default_pricing
+    seed_default_pricing()
+    pricing = get_pricing_ledger()
+
+    # Confirm all new supplemental codes resolve to non-zero baseline rates
+    assert pricing.get("rfg_steep_per_sq", 0.0) == 35.0
+    assert pricing.get("rfg_ridgc_plus_per_lf", 0.0) == 8.50
+    assert pricing.get("sfg_guta_per_lf", 0.0) == 12.0
+    assert pricing.get("dmo_dump_per_container", 0.0) == 450.0
+    assert pricing.get("rfg_renail_per_sq", 0.0) == 15.0
+    assert pricing.get("rfg_waste_adjustment_per_sq", 0.0) == 105.0
+
+    # Calculate priced line amounts for a sample job with all 5 flags + waste adjustment
+    quantities = {
+        "rfg_steep_per_sq": 32.0,
+        "rfg_ridgc_plus_per_lf": 60.0,
+        "sfg_guta_per_lf": 120.0,
+        "dmo_dump_per_container": 2.0,
+        "rfg_renail_per_sq": 32.0,
+        "rfg_waste_adjustment_per_sq": 1.6,
+    }
+
+    line_amounts = {k: qty * pricing[k] for k, qty in quantities.items()}
+    assert line_amounts["rfg_steep_per_sq"] == 1120.0  # 32 * 35
+    assert line_amounts["rfg_ridgc_plus_per_lf"] == 510.0  # 60 * 8.50
+    assert line_amounts["sfg_guta_per_lf"] == 1440.0  # 120 * 12
+    assert line_amounts["dmo_dump_per_container"] == 900.0  # 2 * 450
+    assert line_amounts["rfg_renail_per_sq"] == 480.0  # 32 * 15
+    assert line_amounts["rfg_waste_adjustment_per_sq"] == 168.0  # 1.6 * 105
+    assert all(amt > 0 for amt in line_amounts.values())
+

@@ -560,10 +560,16 @@ def _fetch_job_context_sync(job_id: str) -> dict:
         conn.close()
 
 
-def generate_and_gate_flags(job_id: str, ice_barrier_required: bool, ev_data: EagleViewData) -> bool:
+def generate_and_gate_flags(
+    job_id: str, 
+    ice_barrier_required: bool, 
+    ev_data: EagleViewData,
+    carrier_waste_pct: float = 10.0,
+    hips_count: int | None = None
+) -> bool:
     """
     Evaluates DB rules and persists them to supplement_flags if the climate gate permits it.
-    Also calculates dynamic quantities for specific rules (e.g. IWS rolls).
+    Also calculates dynamic quantities for specific rules (e.g. IWS rolls, waste factor adjustments).
     Returns True if any flag requires manual review due to bad input data.
     """
     conn = get_connection()
@@ -644,6 +650,24 @@ def generate_and_gate_flags(job_id: str, ice_barrier_required: bool, ev_data: Ea
                     continue
                 quantity_delta = float(ev_data.total_squares)
                 notes = "IRC R905.2.1 roof decking re-nailing on tear-off"
+
+            elif code == "RFG 300S" or rule["trigger_logic_name"] == "eval_shingle_waste":
+                resolved_hips = hips_count
+                if resolved_hips is None:
+                    resolved_hips = max(2, int(round(ev_data.hip_lf / 10.0))) if ev_data.hip_lf >= 10.0 else (1 if ev_data.hip_lf > 0 else 0)
+                is_waste_eligible = SupplementEngine.evaluate_shingle_waste(
+                    carrier_waste_pct=carrier_waste_pct,
+                    valley_length_ft=ev_data.valley_lf,
+                    hips_count=resolved_hips
+                )
+                if not is_waste_eligible:
+                    continue
+                waste_delta_pct = max(0.01, (15.0 - float(carrier_waste_pct)) / 100.0)
+                quantity_delta = round(float(ev_data.total_squares) * waste_delta_pct, 2)
+                notes = (
+                    f"Complex roof geometry waste factor adjustment (15% required vs {carrier_waste_pct:.0f}% carrier allowed; "
+                    f"{ev_data.valley_lf:.1f} LF valleys, {resolved_hips} hips)"
+                )
 
             flags_to_insert.append((
                 str(uuid.uuid4()),
@@ -1005,8 +1029,22 @@ async def run_supplement_pipeline(job_id: str, ev_pdf_path: str, sol_pdf_path: s
             codes = await asyncio.to_thread(get_relevant_codes, report, code_index)
 
             # 4.5. Generate and Gate Supplement Flags
+            carrier_waste_pct = 10.0
+            if sol_data and hasattr(sol_data, "line_items"):
+                for li in sol_data.line_items:
+                    wp = getattr(li, "waste_percent_included", None)
+                    if wp is not None:
+                        carrier_waste_pct = float(wp) * 100.0 if float(wp) <= 1.0 else float(wp)
+                        break
+
             ice_barrier_required = bool(job_dict.get("ice_barrier_required")) if job_dict.get("ice_barrier_required") is not None else False
-            manual_review_required = await asyncio.to_thread(generate_and_gate_flags, job_id, ice_barrier_required, ev_data)
+            manual_review_required = await asyncio.to_thread(
+                generate_and_gate_flags, 
+                job_id, 
+                ice_barrier_required, 
+                ev_data,
+                carrier_waste_pct
+            )
             
             if manual_review_required:
                 await asyncio.to_thread(update_job_status, job_id, JobStatus.PENDING_OPERATOR_REVIEW, note="Manual flag entry required due to malformed extraction.")

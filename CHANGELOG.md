@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.5.6] - 2026-08-28
+### Added & Enhanced (Shingle Waste Pipeline Integration & Supplemental Pricing Resolution)
+
+- **Shingle Waste Factor Evaluator Integration**: Wired `SupplementEngine.evaluate_shingle_waste` into `generate_and_gate_flags` and `run_supplement_pipeline` in `app/core/pipeline.py`. Dynamically extracts carrier waste percentage from Statement of Loss (defaulting to 10%) and checks valley/hip geometry to trigger `RFG 300S` shingle waste factor adjustment flags (15% complex geometry baseline).
+- **Supplemental Pricing Baselines**: Added baseline pricing entries in `seed_default_pricing` (`app/core/database.py`) for `rfg_steep_per_sq` ($35.00/SQ), `rfg_ridgc_plus_per_lf` ($8.50/LF), `sfg_guta_per_lf` ($12.00/LF), `dmo_dump_per_container` ($450.00/container), `rfg_renail_per_sq` ($15.00/SQ), and `rfg_waste_adjustment_per_sq` ($105.00/SQ).
+- **Frontend & Rebuttal Display**: Added `RFG 300S` complex geometry waste mapping to `LABEL_MAP` in `app/api/frontend_routes.py` and seeded baseline `eval_shingle_waste` rule in `supplement_rules`.
+- **Test Suite Expansion (+3 tests, 457 → 460)**: Added tests in `tests/test_xactimate_coverage.py` validating waste factor triggering under complex geometry, absence of waste flags under simple gable geometry and generous carrier allowances, and non-zero unit price resolution across all supplemental codes.
+
 ## [2.5.5] - 2026-08-28
 ### Added & Enhanced (Open Data Canvassing Enrichment: US Census ACS-5 + OpenStreetMap Footprints)
 
