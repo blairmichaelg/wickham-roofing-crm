@@ -573,11 +573,17 @@ def generate_and_gate_flags(job_id: str, ice_barrier_required: bool, ev_data: Ea
         conn.execute("BEGIN IMMEDIATE")
         conn.execute("DELETE FROM supplement_flags WHERE job_id = ?", (job_id,))
         
+        # Fetch job info for conditional rules
+        job_row = conn.execute("SELECT shingle_type, damage_signals FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        shingle_type = job_row["shingle_type"] if job_row and "shingle_type" in job_row.keys() else None
+        damage_signals = job_row["damage_signals"] if job_row and "damage_signals" in job_row.keys() else None
+
         # Fetch all seeded rules
         cursor = conn.execute("SELECT * FROM supplement_rules")
         rules = cursor.fetchall()
         flags_to_insert = []
         for rule in rules:
+            code = rule["required_child_code"]
             # CLIMATE GATE: If rule is climate dependent but job doesn't require it, SKIP.
             if bool(rule["climate_dependent"]) and not ice_barrier_required:
                 continue
@@ -586,12 +592,11 @@ def generate_and_gate_flags(job_id: str, ice_barrier_required: bool, ev_data: Ea
             notes = "Triggered via deterministic pipeline"
             
             # Use deterministic math engine if applicable
-            if rule["required_child_code"] == "RFG IWS":
+            if code == "RFG IWS":
                 try:
                     pitch = float(ev_data.predominant_pitch.split('/')[0])
                 except (ValueError, AttributeError):
                     pitch = 0.0
-                
                 
                 # IWS roll calculation requires pitch, eave LF, and valley LF
                 try:
@@ -604,6 +609,41 @@ def generate_and_gate_flags(job_id: str, ice_barrier_required: bool, ev_data: Ea
                     quantity_delta = 0.0
                     notes = f"MANUAL REVIEW REQUIRED: {e}"
                     manual_review_required = True
+
+            elif code == "RFG STEEP":
+                is_steep, pitch_val = SupplementEngine.evaluate_steep_charge(ev_data.predominant_pitch)
+                if not is_steep:
+                    continue
+                quantity_delta = float(ev_data.total_squares)
+                notes = f"Steep slope safety charge ({pitch_val:.1f}/12 pitch)"
+
+            elif code == "RFG RIDGC+":
+                is_upgrade, _ = SupplementEngine.evaluate_ridge_cap_upgrade(shingle_type)
+                if not is_upgrade:
+                    continue
+                quantity_delta = float(ev_data.ridge_lf + ev_data.hip_lf)
+                notes = f"High-profile ridge cap for {shingle_type or 'architectural'} shingles"
+
+            elif code == "SFG GUTA":
+                is_gutters = SupplementEngine.evaluate_gutter_replacement(damage_signals)
+                if not is_gutters:
+                    continue
+                quantity_delta = float(ev_data.eaves_lf)
+                notes = "Documented gutter storm & hail impact damage"
+
+            elif code == "DMO DUMP":
+                is_dump, count = SupplementEngine.evaluate_dumpster_hauloff(tear_off_required=True, squares=ev_data.total_squares)
+                if not is_dump:
+                    continue
+                quantity_delta = float(count)
+                notes = f"Debris haul-off container ({count} dumpster{'s' if count > 1 else ''})"
+
+            elif code == "RFG RENAIL":
+                is_renail = SupplementEngine.evaluate_decking_renail()
+                if not is_renail:
+                    continue
+                quantity_delta = float(ev_data.total_squares)
+                notes = "IRC R905.2.1 roof decking re-nailing on tear-off"
 
             flags_to_insert.append((
                 str(uuid.uuid4()),

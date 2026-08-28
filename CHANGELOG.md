@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.5.2] - 2026-08-28
+### Added & Enhanced (Xactimate Line-Item Coverage Expansion)
+
+- **Xactimate Code Coverage Audit & Expansion**: Added deterministic evaluation methods in `app/services/supplement_engine.py` and seeded rules in `app/core/database.py` for standard insurance supplement items:
+  - `RFG STEEP`: Steep roof safety/labor charge automatically triggered when pitch is $\ge 7/12$.
+  - `RFG RIDGC+`: High-profile dimensional ridge cap upgrade triggered for architectural/dimensional shingles.
+  - `DMO DUMP`: Debris haul-off container fees on tear-off jobs, scaling dynamically by square count.
+  - `SFG GUTA`: Seamless gutter & downspout replacement triggered strictly on documented gutter storm/hail impact damage.
+  - `RFG RENAIL`: IRC R905.2.1 roof decking re-nailing on tear-off jobs.
+- **Frontend & Reporting Label Mapping**: Extended `LABEL_MAP` in `app/api/frontend_routes.py` with descriptive titles and statutory/OSHA/IRC citations for all expanded line-item codes.
+- **EagleView Ergonomics**: Added `total_squares` computed property to `EagleViewData` model in `app/core/supplement_models.py`.
+- **Test Suite Expansion (+6 tests, 430 → 436)**: Added `tests/test_xactimate_coverage.py` validating pitch gating, architectural ridge cap upgrades, gutter damage gating, dumpster container math, and pipeline flag persistence.
+
 ## [2.5.0] - 2026-08-28
 ### Added & Hardened (Georgia FBPA Compliance, 5-Day Invoicing Lock, AOB Prohibition, Soft Deletes)
 

@@ -413,6 +413,10 @@ async def serve_job_detail(
                 "Roof Tear-Off Debris Pickup & Haul-Off",
                 "Debris Tonnage & Disposal Compliance",
             ),
+            "DMO DUMP": (
+                "Dumpster Haul-Off & Landfill Disposal",
+                "Debris Tonnage & Landfill Regulatory Compliance",
+            ),
             "RFG DRIP": (
                 "Drip Edge Metal Flashing",
                 "IRC R905.2.8.5 Building Code",
@@ -420,6 +424,22 @@ async def serve_job_detail(
             "RFG IWS": (
                 "Ice & Water Shield Membrane",
                 "IRC R905.1.2 Climate Code",
+            ),
+            "RFG STEEP": (
+                "Steep Slope Safety & Labor Charge",
+                "OSHA 1926.501 Steep Roof Safety Protocol",
+            ),
+            "RFG RIDGC+": (
+                "High-Profile Dimensional Ridge Cap",
+                "Manufacturer Architectural Shingle System Spec",
+            ),
+            "SFG GUTA": (
+                "Seamless Aluminum Gutter & Downspout Replacement",
+                "Documented Hail & Storm Impact Damage",
+            ),
+            "RFG RENAIL": (
+                "Roof Decking Sheathing Re-Nailing",
+                "IRC R905.2.1 Deck Fastening Compliance",
             ),
             "MATH": (
                 "Carrier Line-Item Calculation Shortage",

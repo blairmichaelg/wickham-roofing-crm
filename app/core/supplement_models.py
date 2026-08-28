@@ -50,6 +50,10 @@ class EagleViewData(BaseModel):
     total_facets: int
     predominant_pitch: str
 
+    @property
+    def total_squares(self) -> float:
+        return round(self.total_area_sf / 100.0, 2)
+
 
 class LineItem(BaseModel):
     """

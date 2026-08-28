@@ -356,7 +356,12 @@ def seed_supplement_rules() -> None:
             (str(uuid.uuid4()), "RFG 300S", "RFG START", "Manufacturer Shingle High-Wind Installation Specifications", "MFG_SPEC", "eval_rfg_start", False),
             (str(uuid.uuid4()), "RFG 300S", "RFG DRIP", "IRC R905.2.8.5", "IRC", "eval_rfg_drip", False),
             (str(uuid.uuid4()), "RFG 300S", "RFG IWS", "IRC R905.1.2", "IRC", "eval_rfg_iws", True),
-            (str(uuid.uuid4()), "RFG TEAR", "DMO PU", "Debris Haul-off and Tonnage Regulatory Compliance", "INTERNAL_POLICY", "eval_dmo_pu", False)
+            (str(uuid.uuid4()), "RFG TEAR", "DMO PU", "Debris Haul-off and Tonnage Regulatory Compliance", "INTERNAL_POLICY", "eval_dmo_pu", False),
+            (str(uuid.uuid4()), "RFG 300S", "RFG STEEP", "OSHA 1926.501 Steep Roof Safety Protocol", "INTERNAL_POLICY", "eval_rfg_steep", False),
+            (str(uuid.uuid4()), "RFG 300S", "RFG RIDGC+", "Manufacturer Architectural Shingle High-Profile Ridge Spec", "MFG_SPEC", "eval_rfg_ridgc_plus", False),
+            (str(uuid.uuid4()), "RFG TEAR", "DMO DUMP", "Debris Haul-Off & Landfill Disposal Regulations", "INTERNAL_POLICY", "eval_dmo_dump", False),
+            (str(uuid.uuid4()), "RFG 300S", "SFG GUTA", "Documented Hail & Storm Gutter Impact Damage", "INTERNAL_POLICY", "eval_sfg_guta", False),
+            (str(uuid.uuid4()), "RFG 300S", "RFG RENAIL", "IRC R905.2.1 Roof Sheathing Fastening Code", "IRC", "eval_rfg_renail", False),
         ]
         conn.executemany('''
             INSERT OR IGNORE INTO supplement_rules (id, parent_code, required_child_code, citation_text, citation_type, trigger_logic_name, climate_dependent)
