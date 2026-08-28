@@ -290,8 +290,14 @@ def run_migrations() -> None:
             m20.up(conn)
             conn.execute("UPDATE schema_version SET version = 20, applied_at = CURRENT_TIMESTAMP WHERE id = 1")
 
+        if current_version < 21:
+            import importlib
+            m21 = importlib.import_module("app.core.migrations.0021_add_soft_delete_and_retention")
+            m21.up(conn)
+            conn.execute("UPDATE schema_version SET version = 21, applied_at = CURRENT_TIMESTAMP WHERE id = 1")
+
         conn.execute("COMMIT")
-        logger.info("migrations_applied", current_version=current_version, target_version=20)
+        logger.info("migrations_applied", current_version=current_version, target_version=21)
         
         # Since seed logic was removed from up(), do it here outside the transaction
         if current_version < 1:
@@ -850,22 +856,27 @@ def standardize_existing_job_documents(job_id: str | None = None) -> None:
 
 
 def insert_job_document(job_id: str, filename: str, file_type: str, storage_path: str, sha256_hash: str | None = None, visibility: str = "office_only", category: str = "UNSPECIFIED", replace_existing: bool = False) -> str:
-    """Register a generated or uploaded file in the universal document vault."""
+    """Register a generated or uploaded file in the universal document vault.
+    
+    Implements 7-Year Statutory Document Retention standards (O.C.G.A. § 10-1-393.12).
+    Files are never physically deleted from the vault; replace_existing performs a soft-delete.
+    """
     filename = standardize_vault_filename(job_id, filename, category, file_type)
     conn = get_connection()
     try:
         conn.execute("BEGIN IMMEDIATE")
         if replace_existing:
+            # Soft delete existing records to preserve 7-year legal audit trail
             if category and category != "UNSPECIFIED":
-                conn.execute("DELETE FROM job_documents WHERE job_id = ? AND (filename = ? OR category = ?)", (job_id, filename, category))
+                conn.execute("UPDATE job_documents SET deleted_at = CURRENT_TIMESTAMP WHERE job_id = ? AND deleted_at IS NULL AND (filename = ? OR category = ?)", (job_id, filename, category))
             else:
-                conn.execute("DELETE FROM job_documents WHERE job_id = ? AND filename = ?", (job_id, filename))
+                conn.execute("UPDATE job_documents SET deleted_at = CURRENT_TIMESTAMP WHERE job_id = ? AND deleted_at IS NULL AND filename = ?", (job_id, filename))
         else:
             # Exact Deduplication Check:
             # 1. If sha256_hash is provided, match identical content for this job
             if sha256_hash:
                 cursor = conn.execute(
-                    "SELECT id FROM job_documents WHERE job_id = ? AND sha256_hash = ?",
+                    "SELECT id FROM job_documents WHERE job_id = ? AND sha256_hash = ? AND deleted_at IS NULL",
                     (job_id, sha256_hash)
                 )
                 row = cursor.fetchone()
@@ -879,7 +890,7 @@ def insert_job_document(job_id: str, filename: str, file_type: str, storage_path
             else:
                 # 2. If sha256_hash is absent, match by exact job_id, filename, category & storage_path
                 cursor = conn.execute(
-                    "SELECT id FROM job_documents WHERE job_id = ? AND filename = ? AND category = ? AND storage_path = ?",
+                    "SELECT id FROM job_documents WHERE job_id = ? AND filename = ? AND category = ? AND storage_path = ? AND deleted_at IS NULL",
                     (job_id, filename, category, storage_path)
                 )
                 row = cursor.fetchone()
@@ -902,26 +913,28 @@ def insert_job_document(job_id: str, filename: str, file_type: str, storage_path
     finally:
         conn.close()
 
-def get_job_documents(job_id: str, file_type: str | None = None) -> list[dict]:
+def get_job_documents(job_id: str, file_type: str | None = None, include_deleted: bool = False) -> list[dict]:
     """Return all document versions for a job, newest first.
     
     This is the canonical read path. Because documents are append-only,
     the most recent row for a given filename is the authoritative version.
     Pass file_type to filter (e.g., 'SUPPLEMENT_PDF', 'EAGLEVIEW_PDF').
+    Excludes soft-deleted documents by default unless include_deleted is True.
     """
     conn = get_connection()
     try:
+        deleted_filter = "" if include_deleted else " AND deleted_at IS NULL"
         if file_type:
             cursor = conn.execute(
-                """SELECT * FROM job_documents 
-                   WHERE job_id = ? AND file_type = ?
+                f"""SELECT * FROM job_documents 
+                   WHERE job_id = ? AND file_type = ?{deleted_filter}
                    ORDER BY created_at DESC""",
                 (job_id, file_type)
             )
         else:
             cursor = conn.execute(
-                """SELECT * FROM job_documents 
-                   WHERE job_id = ? 
+                f"""SELECT * FROM job_documents 
+                   WHERE job_id = ?{deleted_filter}
                    ORDER BY created_at DESC""",
                 (job_id,)
             )
@@ -930,15 +943,48 @@ def get_job_documents(job_id: str, file_type: str | None = None) -> list[dict]:
         conn.close()
 
 def get_job_document_by_hash(job_id: str, sha256_hash: str) -> dict | None:
-    """Lookup an existing document by its content hash to prevent duplicate processing."""
+    """Lookup an existing active document by its content hash to prevent duplicate processing."""
     conn = get_connection()
     try:
         cursor = conn.execute(
-            "SELECT * FROM job_documents WHERE job_id = ? AND sha256_hash = ?",
+            "SELECT * FROM job_documents WHERE job_id = ? AND sha256_hash = ? AND deleted_at IS NULL",
             (job_id, sha256_hash)
         )
         row = cursor.fetchone()
         return dict(row) if row else None
+    finally:
+        conn.close()
+
+def soft_delete_job_document(doc_id: str) -> bool:
+    """Soft delete a job document record by setting deleted_at (7-year statutory retention)."""
+    conn = get_connection()
+    try:
+        cursor = conn.execute("UPDATE job_documents SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL", (doc_id,))
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+def soft_delete_job(job_id: str) -> bool:
+    """Soft delete a job record and its associated documents/agreements (7-year retention)."""
+    conn = get_connection()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        cursor = conn.execute("UPDATE jobs SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL", (job_id,))
+        conn.execute("UPDATE job_documents SET deleted_at = CURRENT_TIMESTAMP WHERE job_id = ? AND deleted_at IS NULL", (job_id,))
+        conn.execute("UPDATE job_agreements SET deleted_at = CURRENT_TIMESTAMP WHERE job_id = ? AND deleted_at IS NULL", (job_id,))
+        conn.execute("COMMIT")
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+def soft_delete_job_agreement(agreement_id: str) -> bool:
+    """Soft delete a signed job agreement record by setting deleted_at."""
+    conn = get_connection()
+    try:
+        cursor = conn.execute("UPDATE job_agreements SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL", (agreement_id,))
+        conn.commit()
+        return cursor.rowcount > 0
     finally:
         conn.close()
 

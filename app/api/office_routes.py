@@ -1778,15 +1778,25 @@ def commission_override_route(job_id: str, payload: CommissionOverridePayload):
         conn.close()
 
 @router.post("/accounting/jobs/{job_id}/invoice", dependencies=[Depends(verify_accounting)])
-async def create_invoice_route(job_id: str, bg_tasks: BackgroundTasks):
+async def create_invoice_route(job_id: str, bg_tasks: BackgroundTasks, is_emergency: bool = False):
     """
     Transition a job to INVOICED status, generating an invoice number and
     making it visible in the QBO export queue.
+    Enforces Georgia FBPA 5-business-day post-denial invoicing lock (O.C.G.A. § 10-1-393.12).
     """
     try:
         job_id = str(uuid.UUID(job_id))
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid job_id format.")
+
+    from app.services.compliance import is_post_denial_invoicing_locked
+
+    locked, lock_msg, _ = is_post_denial_invoicing_locked(job_id, is_emergency=is_emergency)
+    if locked:
+        raise HTTPException(
+            status_code=400,
+            detail=lock_msg,
+        )
 
     conn = get_connection()
     try:

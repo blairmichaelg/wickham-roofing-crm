@@ -68,13 +68,20 @@ class DocumentsGenerator(PDFEngine):
             )
             story.append(self._box_warning("HB 423 Deductible Compliance Disclosure (O.C.G.A. § 33-24-59.27)", warning_text, colors.darkred))
             story.append(Spacer(1, 10))
+
+            # --- Section 4: Georgia Statutory Cancellation Disclosure (O.C.G.A. § 10-1-393.12) ---
+            cancel_stat_text = (
+                "You may cancel this contract at any time before midnight on the fifth (5th) business day after you have received written "
+                "notification from your insurer that all or any part of the claim or contract is not a covered loss under the insurance policy. "
+                "See attached Notice of Cancellation form for an explanation of this right."
+            )
+            story.append(self._box_warning("GEORGIA STATUTORY RIGHT TO CANCEL (O.C.G.A. § 10-1-393.12)", cancel_stat_text, colors.HexColor("#7f1d1d")))
+            story.append(Spacer(1, 10))
             
-            # --- Section 4: Terms, Representation & Cancellation Rights ---
-            story.append(Paragraph("2. Terms, Representation & Statutory Cancellation Right", self.custom_styles["SectionHeading"]))
+            # --- Section 5: Terms & Representation ---
+            story.append(Paragraph("2. Terms & Representation", self.custom_styles["SectionHeading"]))
             terms_text = (
                 "<b>Public Adjuster Disclosure:</b> Contractor is not acting as a licensed public adjuster and does not represent or negotiate legal claims on behalf of Homeowner.<br/><br/>"
-                "<b>Statutory Right to Cancel (O.C.G.A. § 43-14-14):</b> Homeowner has the statutory right to cancel this contract without penalty at any time before midnight "
-                "on the fifth (5th) business day after receiving written notification from the insurer that all or any part of the claim is not a covered loss under the policy.<br/><br/>"
                 "<b>Default & Liquidated Overhead:</b> If Homeowner breaches this contract after insurance approval without statutory cause, Homeowner agrees to pay liquidated damages "
                 "equal to 15% of the approved claim total to reimburse Contractor for administrative, technical, and pre-construction expenses."
             )
@@ -424,13 +431,20 @@ class DocumentsGenerator(PDFEngine):
             )
             story.append(self._box_warning("HB 423 Deductible Compliance Disclosure (O.C.G.A. § 33-24-59.27)", warning_text, colors.darkred))
             story.append(Spacer(1, 10))
+
+            # --- Section 4: Georgia Statutory Cancellation Disclosure (O.C.G.A. § 10-1-393.12) ---
+            cancel_stat_text = (
+                "You may cancel this contract at any time before midnight on the fifth (5th) business day after you have received written "
+                "notification from your insurer that all or any part of the claim or contract is not a covered loss under the insurance policy. "
+                "See attached Notice of Cancellation form for an explanation of this right."
+            )
+            story.append(self._box_warning("GEORGIA STATUTORY RIGHT TO CANCEL (O.C.G.A. § 10-1-393.12)", cancel_stat_text, colors.HexColor("#7f1d1d")))
+            story.append(Spacer(1, 10))
             
-            # --- Section 4: Terms, Representation & Cancellation Rights ---
-            story.append(Paragraph("2. Terms, Representation & Statutory Cancellation Right", self.custom_styles["SectionHeading"]))
+            # --- Section 5: Terms & Representation ---
+            story.append(Paragraph("2. Terms & Representation", self.custom_styles["SectionHeading"]))
             terms_text = (
                 "<b>Public Adjuster Disclosure:</b> Contractor is not acting as a licensed public adjuster and does not represent or negotiate legal claims on behalf of Homeowner.<br/><br/>"
-                "<b>Statutory Right to Cancel (O.C.G.A. § 43-14-14):</b> Homeowner has the statutory right to cancel this contract without penalty at any time before midnight "
-                "on the fifth (5th) business day after receiving written notification from the insurer that all or any part of the claim is not a covered loss under the policy.<br/><br/>"
                 "<b>Default & Liquidated Overhead:</b> If Homeowner breaches this contract after insurance approval without statutory cause, Homeowner agrees to pay liquidated damages "
                 "equal to 15% of the approved claim total to reimburse Contractor for administrative, technical, and pre-construction expenses."
             )

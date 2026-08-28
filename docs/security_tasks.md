@@ -27,4 +27,10 @@ This document summarizes the authorization boundaries and security enforcements 
 - **Full Access Core** (`{"michael", "scott", "debi"}`): Bypasses all role boundaries on any endpoint with full write/mutate access.
 - **Read-Only Core** (`{"alex wickham"}`): Allowed only `GET`, `HEAD`, and `OPTIONS` operations across all admin/office endpoints. Blocked from any mutating operations (`POST`, `PUT`, `PATCH`, `DELETE`).
 
+## Georgia Statutory & Legal Compliance (O.C.G.A. § 10-1-393.12 & SB 201)
+- **5-Day Post-Denial Invoicing Lock**: Enforced server-side in `create_invoice_route`. Prevents invoice generation on insurance jobs until 5 full business days have elapsed since a `CLAIM_DENIED` status event. Emergency services (tarping) are exempt.
+- **Assignment of Benefits (AOB) Prohibition**: Under Georgia SB 201 (O.C.G.A. § 33-24-59.28), post-disaster residential roofing contracts cannot assign insurance proceeds or rights to contractors. Scanned and rejected deterministically via `app/services/compliance.py`.
+- **Statutory Cancellation Formatting**: Mandatory boldface ≥ 10-point font disclosures on insurance contracts and detachable duplicate Notice of Cancellation forms.
+- **7-Year Statutory Document Retention**: Schema migration 0021 adds `deleted_at` soft deletes to `jobs`, `job_documents`, and `job_agreements` to prevent hard record deletion.
+
 _End of document._

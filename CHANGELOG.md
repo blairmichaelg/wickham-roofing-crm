@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.5.0] - 2026-08-28
+### Added & Hardened (Georgia FBPA Compliance, 5-Day Invoicing Lock, AOB Prohibition, Soft Deletes)
+
+- **Georgia Statutory Cancellation Formatting (O.C.G.A. § 10-1-393.12)**: Updated ReportLab contingency and notice of cancellation generators in `app/services/pdf/documents.py`. Ensured statutory right-to-cancel disclosures are rendered in boldface type at minimum 10-point font size with dedicated high-contrast callout boxes, and guaranteed structurally detachable duplicate Notice of Cancellation forms ("Customer Copy" and "Contractor Copy" separated by page breaks).
+- **5-Business-Day Post-Denial Invoicing Lock**: Added deterministic compliance guard in `app/services/compliance.py` enforcing O.C.G.A. § 10-1-393.12. Prevents invoice generation or non-emergency collection on insurance-contingent jobs until 5 business days have elapsed since a `CLAIM_DENIED` status/timestamp was recorded. Emergency restoration services (e.g. tarping) remain exempt.
+- **Assignment of Benefits (AOB) Prohibition (Georgia SB 201 / O.C.G.A. § 33-24-59.28)**: Added regex pattern detection in `app/services/compliance.py` to intercept and reject AOB language (e.g. assignment of insurance benefits, transfer of policy rights, direct payment authorizations) in contract scopes or descriptions.
+- **Soft-Delete & 7-Year Statutory Document Retention**: Added migration `0021_add_soft_delete_and_retention.py` adding `deleted_at TIMESTAMP DEFAULT NULL` to `jobs`, `job_documents`, and `job_agreements` tables. Updated `insert_job_document` replace logic to set `deleted_at = CURRENT_TIMESTAMP` instead of hard SQL `DELETE`, preserving audit history for statutory retention. Updated document vault queries to exclude soft-deleted items by default.
+- **Test Suite Expansion (+8 tests, 422 → 430)**: Added `tests/test_georgia_compliance.py` covering AOB detection, business day calculations, post-denial invoicing locks, retail exemptions, emergency bypasses, and soft-delete retention.
+
 ## [2.4.3] - 2026-08-28
 ### Fixed & Hardened (Office/Field Circular Import Elimination, Method-Threading Fix, Duplicate Import Cleanup)
 

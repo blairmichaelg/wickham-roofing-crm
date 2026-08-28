@@ -716,6 +716,9 @@ async def sign_retail_contract(job_id: str, payload: RetailContractSignaturePayl
     if not payload.signature_base64.startswith("data:image/png;base64,"):
         raise HTTPException(status_code=400, detail="Invalid signature format. Must be a PNG data URI.")
         
+    from app.services.compliance import validate_no_aob_language
+    validate_no_aob_language(payload.scope_description)
+
     try:
         job_dict = await asyncio.to_thread(_sync_fetch_job_contingency, job_id)
 
