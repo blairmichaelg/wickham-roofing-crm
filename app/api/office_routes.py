@@ -1867,6 +1867,7 @@ async def mark_commission_paid(job_id: str, bg_tasks: BackgroundTasks):
 async def get_storm_canvassing_targets(
     window_hours: int = 72,
     limit: int = 10,
+    enrich: bool = False,
 ):
     """
     Return the top-N canvassing target areas ranked by storm severity.
@@ -1874,12 +1875,16 @@ async def get_storm_canvassing_targets(
     Query params:
       - window_hours (int, default 72): look-back window in hours.
       - limit (int, default 10): maximum number of target areas returned.
+      - enrich (bool, default False): optionally enrich targets with Census demographic and OSM footprint data.
 
     Returns a list of dicts with location, severity, hail/wind stats, and event count.
     Accessible to all authenticated users (field reps and office staff).
     """
     from app.config import get_settings
-    from app.services.canvassing_targets import get_ranked_canvassing_targets
+    from app.services.canvassing_targets import (
+        get_enriched_canvassing_targets,
+        get_ranked_canvassing_targets,
+    )
     
     settings = get_settings()
     conn = get_connection()
@@ -1890,11 +1895,17 @@ async def get_storm_canvassing_targets(
         conn.close()
 
     try:
-        targets = await asyncio.to_thread(
-            get_ranked_canvassing_targets,
-            window_hours=window_hours,
-            limit=limit,
-        )
+        if enrich:
+            targets = await get_enriched_canvassing_targets(
+                window_hours=window_hours,
+                limit=limit,
+            )
+        else:
+            targets = await asyncio.to_thread(
+                get_ranked_canvassing_targets,
+                window_hours=window_hours,
+                limit=limit,
+            )
         return {
             "targets": targets,
             "window_hours": window_hours,

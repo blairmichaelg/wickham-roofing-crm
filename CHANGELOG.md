@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.5.5] - 2026-08-28
+### Added & Enhanced (Open Data Canvassing Enrichment: US Census ACS-5 + OpenStreetMap Footprints)
+
+- **US Census Bureau ACS-5 Demographics Enrichment**: Created `app/services/census_enrichment.py` querying public US Census Geocoder coordinates and ACS-5 APIs (tables B19013_001E median household income and B25035_001E median structure year built / home age) with SQLite spatial grid caching (`census_enrichment_cache`) and strict 3.0s timeout fallbacks.
+- **OpenStreetMap Overpass Building Footprint Sizing**: Created `app/services/osm_footprint.py` querying OSM Overpass API for building polygon geometry within 50m of centroid, calculating footprint polygon area in square feet via Shoelace formula, and estimating baseline roof squares with standard 1.15 pitch multiplier before ordering EagleView reports (`osm_footprint_cache`).
+- **Canvassing Target Integration & API Surface**: Updated `app/services/canvassing_targets.py` with asynchronous enrichment non-destructively attaching demographic badges (`Median Income: $Xk`, `Est. Home Age: Y yrs`) and roof size badges (`Est. Roof: Z SQ (OSM)`) without altering core storm severity score mathematics. Added `enrich: bool = False` query parameter to `GET /api/office/storms/targets` in `app/api/office_routes.py`.
+- **Test Suite Expansion (+11 tests, 446 → 457)**: Added `tests/test_open_data_enrichment.py` validating Census API parsing, OSM Overpass polygon mathematics, SQLite caching layers, network timeout graceful degradation, and API endpoint delivery.
+
 ## [2.5.4] - 2026-08-28
 ### Added & Enhanced (Chain-of-Thought Damage Classification Prompt Refinement)
 

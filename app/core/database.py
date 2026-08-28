@@ -1914,7 +1914,9 @@ def get_storm_target_summaries(
                 MAX(CASE WHEN event_type = 'TORNADO' THEN 1 ELSE 0 END) AS has_tornado,
                 MAX(report_time_utc)                         AS last_event_utc,
                 GROUP_CONCAT(DISTINCT event_type)            AS event_types,
-                AVG(distance_miles_from_office)              AS avg_dist
+                AVG(distance_miles_from_office)              AS avg_dist,
+                AVG(latitude)                                AS latitude,
+                AVG(longitude)                               AS longitude
             FROM storm_events
             WHERE report_time_utc >= ?
               AND distance_miles_from_office <= ?
@@ -1968,6 +1970,8 @@ def get_storm_target_summaries(
                 "latest_event_time_utc": last_event or "",
                 "window_hours": window_hours,
                 "event_types": r["event_types"] or "",
+                "latitude": round(r["latitude"], 5) if r["latitude"] is not None else None,
+                "longitude": round(r["longitude"], 5) if r["longitude"] is not None else None,
             })
             
         return results
