@@ -733,21 +733,39 @@ async def get_storms_summary(
             if time_utc > z["most_recent_event_utc"]:
                 z["most_recent_event_utc"] = time_utc
                 
-    hail_norm = hail_threshold if hail_threshold > 0 else 1.0
-    wind_norm = wind_threshold if wind_threshold > 0 else 50.0
-
     target_zips = list(zips.values())
+    from app.core.utils import compute_severity_score, get_priority_info
     for z in target_zips:
-        hail_score = z["max_hail_inches"] / hail_norm
-        wind_score = z["max_wind_mph"] / wind_norm
-        sev_score = 10.0 if z["has_tornado"] else max(hail_score, wind_score)
-        z["severity_score"] = round(sev_score, 4)
-        if sev_score >= 1.5:
-            z["priority_label"] = "🔥 High"
-        elif sev_score >= 1.0:
-            z["priority_label"] = "⚡ Medium"
-        else:
-            z["priority_label"] = "🟢 Low"
+        last_event = z["most_recent_event_utc"]
+        age_days = 0.0
+        if last_event:
+            try:
+                dt = datetime.fromisoformat(last_event.rstrip("Z"))
+                age_days = (datetime.now(UTC).replace(tzinfo=None) - dt.replace(tzinfo=None)).total_seconds() / 86400.0
+                if age_days < 0:
+                    age_days = 0.0
+            except Exception:
+                pass
+
+        sev_score = compute_severity_score(
+            event_type="TORNADO" if z["has_tornado"] else "HAIL",
+            hail_size=z["max_hail_inches"],
+            wind_speed=z["max_wind_mph"],
+            age_days=age_days,
+            distance_miles=None,
+            min_hail=hail_threshold,
+            min_wind=wind_threshold
+        )
+        z["severity_score"] = sev_score
+        label, reason = get_priority_info(
+            severity_score=sev_score,
+            max_hail=z["max_hail_inches"],
+            max_wind=z["max_wind_mph"],
+            has_tornado=z["has_tornado"],
+            last_event_time_utc=last_event or ""
+        )
+        z["priority_label"] = label
+        z["priority_reason"] = reason
 
     target_zips.sort(
         key=lambda z: (

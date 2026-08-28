@@ -203,13 +203,19 @@
                         <p class="text-gray-500 text-xs text-center py-2 col-span-full">No storms in the last 72 hours.</p>
                     </div>
                 </div>
-                <!-- Canvassing Targets List -->
                 <div class="mt-3 border-t border-gray-800 pt-3">
-                    <div class="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-2 flex items-center justify-between">
-                        <span>📍 Canvassing Targets (ranked by severity)</span>
-                        <div class="text-gray-500 font-normal normal-case text-[9px]">
-                            <span>Storm window: last 72 hours</span>
-                            <span id="targetsRefreshTime"></span>
+                    <div class="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-2 flex flex-col gap-1">
+                        <div class="flex items-center justify-between">
+                            <span>📍 Canvassing Targets (ranked by severity)</span>
+                            <div class="text-gray-500 font-normal normal-case text-[9px] flex gap-2">
+                                <span id="targetsSelectedWindow">Storm window: last 72 hours</span>
+                                <span id="targetsThresholds"></span>
+                                <span id="targetsServerRefreshTime"></span>
+                                <span id="targetsRefreshTime"></span>
+                            </div>
+                        </div>
+                        <div class="text-[9px] text-gray-500 font-normal normal-case italic border-b border-gray-800/50 pb-1.5">
+                            Legend: 🔥 High (Severity ≥ 1.5) · ⚡ Medium (Severity ≥ 1.0) · 🟢 Low (Severity < 1.0)
                         </div>
                     </div>
                     <div id="adminCanvassingTargets" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
@@ -462,10 +468,25 @@
                 if (!resp.ok) { el.innerHTML = '<p class="text-gray-500 text-xs col-span-full">Could not load targets.</p>'; return; }
                 const data = await resp.json();
                 const targets = data.targets || [];
+                
+                const winEl = document.getElementById('targetsSelectedWindow');
+                if (winEl) {
+                    winEl.textContent = `Window: last ${windowHours}h`;
+                }
+                const threshEl = document.getElementById('targetsThresholds');
+                if (threshEl && data.min_hail !== undefined && data.min_wind !== undefined) {
+                    threshEl.textContent = ` · Min: ${data.min_hail.toFixed(2)}" Hail / ${Math.round(data.min_wind)}mph Wind`;
+                }
+                const serverRefEl = document.getElementById('targetsServerRefreshTime');
+                if (serverRefEl && data.last_refreshed_utc) {
+                    const serverTime = StormRadar.formatDateTime(data.last_refreshed_utc);
+                    serverRefEl.textContent = ` · Server Data: ${serverTime}`;
+                }
                 const refreshEl = document.getElementById('targetsRefreshTime');
                 if (refreshEl) {
-                    refreshEl.textContent = ` · Refreshed: ${new Date().toLocaleTimeString()}`;
+                    refreshEl.textContent = ` · Checked: ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
                 }
+                
                 if (targets.length === 0) {
                     el.innerHTML = `<p class="text-gray-500 text-xs col-span-full">No qualifying canvassing targets in the last ${windowHours} hours.</p>`;
                     return;
@@ -487,7 +508,7 @@
                         </div>
                         <div class="font-bold text-white text-[11px] leading-tight">${t.location || 'Unknown'}</div>
                         <div class="text-gray-400 text-[9px] mt-0.5">ZIP ${t.zipcode || '—'} · ${t.event_count} event${t.event_count !== 1 ? 's' : ''}</div>
-                        <div class="text-purple-400 text-[9px] font-bold mt-0.5">Score: ${t.max_severity_score.toFixed(2)}</div>
+                        <div class="text-purple-400 text-[9px] font-bold mt-0.5">${t.priority_reason || 'Score: ' + t.max_severity_score.toFixed(2)}</div>
                     </div>`;
                 }).join('');
             } catch (e) {

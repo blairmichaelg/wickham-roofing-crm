@@ -1862,7 +1862,8 @@ def get_storm_target_summaries(
                 MAX(COALESCE(wind_speed_mph, 0.0))           AS max_wind_mph,
                 MAX(CASE WHEN event_type = 'TORNADO' THEN 1 ELSE 0 END) AS has_tornado,
                 MAX(report_time_utc)                         AS last_event_utc,
-                GROUP_CONCAT(DISTINCT event_type)            AS event_types
+                GROUP_CONCAT(DISTINCT event_type)            AS event_types,
+                AVG(distance_miles_from_office)              AS avg_dist
             FROM storm_events
             WHERE report_time_utc >= ?
               AND distance_miles_from_office <= ?
@@ -1885,15 +1886,22 @@ def get_storm_target_summaries(
         ))
         rows = cursor.fetchall()
         results = []
+        from app.core.utils import get_priority_info
         for r in rows:
+            last_event = r["last_event_utc"]
+            has_tor = bool(r["has_tornado"])
+            hail_val = r["max_hail_inches"] or 0.0
+            wind_val = r["max_wind_mph"] or 0.0
             sev = round(r["max_severity_score"] or 0.0, 3)
-            if sev >= 1.5:
-                label = "🔥 High"
-            elif sev >= 1.0:
-                label = "⚡ Medium"
-            else:
-                label = "🟢 Low"
-                
+
+            label, reason = get_priority_info(
+                severity_score=sev,
+                max_hail=hail_val,
+                max_wind=wind_val,
+                has_tornado=has_tor,
+                last_event_time_utc=last_event or ""
+            )
+
             results.append({
                 "location": r["location"] or "Unknown",
                 "zipcode": r["zipcode"] or "",
@@ -1901,12 +1909,16 @@ def get_storm_target_summaries(
                 "max_severity_score": sev,
                 "severity_score": sev,
                 "priority_label": label,
-                "max_hail_inches": round(r["max_hail_inches"] or 0.0, 2),
-                "max_wind_mph": round(r["max_wind_mph"] or 0.0, 1),
-                "has_tornado": bool(r["has_tornado"]),
-                "last_event_utc": r["last_event_utc"] or "",
+                "priority_reason": reason,
+                "max_hail_inches": round(hail_val, 2),
+                "max_wind_mph": round(wind_val, 1),
+                "has_tornado": has_tor,
+                "last_event_utc": last_event or "",
+                "latest_event_time_utc": last_event or "",
+                "window_hours": window_hours,
                 "event_types": r["event_types"] or "",
             })
+            
         return results
     finally:
         conn.close()
@@ -2066,28 +2078,16 @@ def get_sales_pipeline_summary() -> dict:
             for r in cursor.fetchall()
         ]
 
-        # --- Average speed-to-lead (hours from LEAD_CAPTURED to first advancement) ---
+        # --- Average speed-to-lead (hours from LEAD_CAPTURED to first qualifying event) ---
         cursor = conn.execute(
-            "SELECT status_history FROM jobs WHERE status != 'LEAD_CAPTURED' AND status_history IS NOT NULL"
+            "SELECT status_history FROM jobs WHERE status_history IS NOT NULL"
         )
         durations: list[float] = []
+        from app.core.utils import calculate_speed_to_lead
         for r in cursor.fetchall():
-            try:
-                history = json.loads(r["status_history"] or "[]")
-                if len(history) < 2:
-                    continue
-                t0 = history[0].get("timestamp", "")
-                t1 = history[1].get("timestamp", "")
-                if not t0 or not t1:
-                    continue
-                # Parse ISO timestamps (strip trailing Z if present)
-                dt0 = datetime.fromisoformat(t0.rstrip("Z"))
-                dt1 = datetime.fromisoformat(t1.rstrip("Z"))
-                delta_hours = (dt1 - dt0).total_seconds() / 3600.0
-                if delta_hours >= 0:
-                    durations.append(delta_hours)
-            except Exception:
-                continue
+            h_val = calculate_speed_to_lead(r["status_history"])
+            if h_val is not None:
+                durations.append(h_val)
 
         avg_speed = round(sum(durations) / len(durations), 2) if durations else None
 

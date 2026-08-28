@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.4.0] - 2026-08-28
+### Hardened & Enhanced (Speed-to-Lead, Offline Synchronization, and Storm Prioritization)
+- **Deterministic Speed-to-Lead Calculation**: Extracted business logic to a pure helper `calculate_speed_to_lead` in `app/core/utils.py` to parse JSON status history and evaluate duration from the first `LEAD_CAPTURED` status to the first qualifying sales-action status, handling schema-consistent fallbacks gracefully.
+- **Office Storm Canvassing RBAC Consistency**: Aligned `GET /api/field/pipeline/summary` endpoint to filter jobs based on JWT ownership (`rep_name` and `rep_id`) using the same ownership filter as the main list endpoint, resolving identity mismatch bugs and returning empty results gracefully for no-identity tokens.
+- **Offline Sync Hardening**: Prevented sync spamming via `inProgressRetries` track, implemented exponential backoff cooldowns (30s, 60s, 120s, 240s, capped at 300s) on transient network or 5xx server failures, mapped status validation failures to permanent states with explicit error descriptions, and polished sync error modals with try-again lockouts and user-confirmed dismissals.
+- **Deterministic & Explainable Storm Priority Scoring**: Audited severity calculations, moving scoring logic to `compute_severity_score` and `get_priority_info` in `app/core/utils.py`. Stored severity scores during ingestion in `storm_worker.py`. Extended storm canvassing targets endpoints and frontend displays to include explainable details (`priority_label`, `priority_reason`, `max_hail_inches`, `max_wind_mph`, `has_tornado`, `event_count`, `latest_event_time_utc`, `window_hours`).
+- **Unified Storm Date/Time Formatting**: Implemented `formatDateTime` in `StormRadar` (`app/static/js/storm_radar.js`) for rendering combined short date and time across admin/field apps. Displayed actual server-ingested timestamps instead of client fetch times, and defended against invalid timestamps.
+- **Field UX Filters & Centralized Actions**: Refactored job listing ZIP filter to support persistent display states and clear actions. Centralized action selection in the field app via `getJobNextActionHint` with honest, legally safe, and operational guidance.
+- **Path Traversal & UUID Validation**: Validated download parameters, enforcing UUID checks for job IDs on download endpoints (`download_bom`) and preventing directory traversal using `sanitize_download_filename`.
+
 ## [2.3.9] - 2026-08-28
 ### Added & Enhanced (Configurable Storm Thresholds, Offline Error Transparency, and Rep Widgets)
 - **Configurable Storm Windows & Thresholds**: Plumbed parameters through to `/api/storms/recent`, `/api/storms/summary`, `/api/field/storms/{zipcode}`, and JS fetch logic. Added an admin dashboard select widget to toggle windows and show the value dynamically in the header.

@@ -10,7 +10,9 @@ const StormRadar = {
     formatShortDate(dateStr) {
         if (!dateStr) return '';
         try {
-            return new Date(dateStr).toLocaleDateString([], { month: 'short', day: 'numeric' });
+            const dateObj = new Date(dateStr);
+            if (isNaN(dateObj.getTime())) return dateStr;
+            return dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' });
         } catch (e) {
             return dateStr;
         }
@@ -22,7 +24,25 @@ const StormRadar = {
     formatTime(dateStr) {
         if (!dateStr) return '';
         try {
-            return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const dateObj = new Date(dateStr);
+            if (isNaN(dateObj.getTime())) return dateStr;
+            return dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        } catch (e) {
+            return dateStr;
+        }
+    },
+
+    /**
+     * Formats a date string into a combined date and time format (e.g., "Aug 28, 05:34 PM").
+     */
+    formatDateTime(dateStr) {
+        if (!dateStr) return '';
+        try {
+            const dateObj = new Date(dateStr);
+            if (isNaN(dateObj.getTime())) return dateStr;
+            const d = dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' });
+            const t = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            return `${d}, ${t}`;
         } catch (e) {
             return dateStr;
         }
@@ -88,8 +108,7 @@ const StormRadar = {
      * Renders a storm event card.
      */
     renderAlertItem(alert, isAdmin = false) {
-        const timeStr = this.formatTime(alert.report_time_utc);
-        const dateStr = this.formatShortDate(alert.report_time_utc);
+        const dateTimeStr = this.formatDateTime(alert.report_time_utc);
         
         let detailStr = '';
         let badgeColor = 'bg-red-900/80 text-red-300 border-red-700';
@@ -115,7 +134,7 @@ const StormRadar = {
                 <div class="bg-gray-950/80 border border-gray-800 p-2 rounded text-xs text-left">
                     <div class="flex justify-between items-center mb-1">
                         <span class="font-bold text-purple-400">${alert.county || 'Unknown'}</span>
-                        <span class="text-[9px] text-gray-500">${timeStr}</span>
+                        <span class="text-[9px] text-gray-500">${dateTimeStr}</span>
                     </div>
                     <div class="flex justify-between items-center">
                         <span class="text-white font-medium">${detailStr}</span>
@@ -128,7 +147,7 @@ const StormRadar = {
                 <div class="bg-gray-900/80 border border-gray-800 p-3 rounded-lg shadow-sm hover:border-purple-500/50 transition-colors text-left">
                     <div class="flex justify-between items-start mb-1">
                         <span class="text-xs font-bold font-mono text-purple-400">${alert.county || 'Unknown Location'}</span>
-                        <span class="text-[10px] text-gray-500">${dateStr} ${timeStr}</span>
+                        <span class="text-[10px] text-gray-500">${dateTimeStr}</span>
                     </div>
                     <div class="flex justify-between items-center mt-1">
                         <div class="text-sm font-bold text-white">${detailStr}</div>

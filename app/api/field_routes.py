@@ -869,8 +869,10 @@ async def get_field_pipeline_summary(claims: dict = Depends(get_current_claims))
     Get pipeline metrics for the logged-in field representative.
     """
     rep_name = claims.get("rep_name")
-    if not rep_name:
+    rep_id = claims.get("rep_id")
+    if not rep_name and not rep_id:
         return {
+            "status": "success",
             "stage_counts": {
                 "LEAD_CAPTURED": 0,
                 "CONTINGENCY_SIGNED": 0,
@@ -883,9 +885,6 @@ async def get_field_pipeline_summary(claims: dict = Depends(get_current_claims))
             "avg_speed_to_lead_hours": None
         }
 
-    import json
-    from datetime import datetime
-    
     conn = get_connection()
     try:
         SALES_STAGES = [
@@ -898,8 +897,13 @@ async def get_field_pipeline_summary(claims: dict = Depends(get_current_claims))
         ]
         
         cursor = conn.execute(
-            "SELECT status, COUNT(*) AS cnt FROM jobs WHERE canvasser_name = ? GROUP BY status",
-            (rep_name,)
+            """
+            SELECT status, COUNT(*) AS cnt 
+            FROM jobs 
+            WHERE (canvasser_name = ? OR (canvasser_rep_id IS NOT NULL AND canvasser_rep_id = ?))
+            GROUP BY status
+            """,
+            (rep_name, rep_id)
         )
         stage_counts = {s: 0 for s in SALES_STAGES}
         total_active = 0
@@ -912,26 +916,20 @@ async def get_field_pipeline_summary(claims: dict = Depends(get_current_claims))
 
         # Calculate average speed to lead duration
         cursor = conn.execute(
-            "SELECT status_history FROM jobs WHERE canvasser_name = ? AND status != 'LEAD_CAPTURED' AND status_history IS NOT NULL",
-            (rep_name,)
+            """
+            SELECT status_history 
+            FROM jobs 
+            WHERE (canvasser_name = ? OR (canvasser_rep_id IS NOT NULL AND canvasser_rep_id = ?))
+              AND status_history IS NOT NULL
+            """,
+            (rep_name, rep_id)
         )
         durations = []
+        from app.core.utils import calculate_speed_to_lead
         for r in cursor.fetchall():
-            try:
-                history = json.loads(r["status_history"] or "[]")
-                if len(history) < 2:
-                    continue
-                t0 = history[0].get("timestamp", "")
-                t1 = history[1].get("timestamp", "")
-                if not t0 or not t1:
-                    continue
-                dt0 = datetime.fromisoformat(t0.rstrip("Z"))
-                dt1 = datetime.fromisoformat(t1.rstrip("Z"))
-                delta_hours = (dt1 - dt0).total_seconds() / 3600.0
-                if delta_hours >= 0:
-                    durations.append(delta_hours)
-            except Exception:
-                continue
+            h_val = calculate_speed_to_lead(r["status_history"])
+            if h_val is not None:
+                durations.append(h_val)
 
         avg_speed = round(sum(durations) / len(durations), 2) if durations else None
 

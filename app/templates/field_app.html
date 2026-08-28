@@ -306,7 +306,7 @@
                         <span>🔥 Recent Storm-Target ZIPs</span>
                         <span class="text-gray-500 font-normal normal-case text-[9px]">Tap a ZIP to filter your jobs in this area.</span>
                     </h3>
-                    <div id="targetZipsList" class="flex flex-wrap gap-2">
+                    <div id="targetZipsList" class="flex flex-col gap-2">
                         <p class="text-gray-500 italic text-xs">No storm-target ZIPs in service area.</p>
                     </div>
                     <div id="activeZipFilterContainer" class="hidden flex justify-between items-center bg-purple-950/40 p-2 rounded text-xs border border-purple-800/50 mt-2">
@@ -428,6 +428,7 @@
 
     <script>
         const FIELD_TOKEN = "{{ field_token }}";
+        const inProgressRetries = new Set();
 
         const canvas = document.getElementById('signaturePad');
         const ctx = canvas.getContext('2d');
@@ -550,12 +551,48 @@
             }
         }
 
+        function getJobNextActionHint(status, hasStorm) {
+            status = status || '';
+            if (status === 'LEAD_CAPTURED') {
+                return hasStorm
+                    ? 'Review storm evidence, then ask for a contingency signature.'
+                    : 'Confirm property details and schedule/perform inspection.';
+            }
+            if (status === 'CONTINGENCY_SIGNED') {
+                return 'Collect claim details and schedule inspection.';
+            }
+            if (status === 'CLAIM_FILED') {
+                return 'Confirm adjuster appointment and prepare evidence.';
+            }
+            if (status === 'INSTALL_COMPLETED') {
+                return 'Request review and prepare neighbor letter.';
+            }
+            if (status === 'CLOSED') {
+                return 'No action required.';
+            }
+            
+            // Other statuses fallback/generic
+            if (status === 'RETAIL_CONTRACT_SIGNED') {
+                return 'Coordinate installation schedule with production team.';
+            }
+            if (status === 'INVOICED') {
+                return 'Collect final payment and request review/referral.';
+            }
+            return 'Monitor job progress and update status.';
+        }
+
         function renderJobsList() {
             const listEl = document.getElementById('myJobsList');
             if (!listEl || !window.allJobs) return;
             
             let filteredJobs = window.allJobs;
+            const filterContainer = document.getElementById('activeZipFilterContainer');
+            const filterValEl = document.getElementById('activeZipFilterVal');
+            
             if (activeZipFilter) {
+                if (filterValEl) filterValEl.textContent = activeZipFilter;
+                if (filterContainer) filterContainer.classList.remove('hidden');
+                
                 filteredJobs = window.allJobs.filter(j => (j.postal_code || '').trim() === activeZipFilter);
                 const todayStr = new Date().toDateString();
                 const leadsToday = filteredJobs.filter(j => {
@@ -567,6 +604,8 @@
                 if (leadsLabel) {
                     leadsLabel.textContent = `Storm-verified ZIP leads today: ${leadsToday}`;
                 }
+            } else {
+                if (filterContainer) filterContainer.classList.add('hidden');
             }
             
             if (filteredJobs.length === 0) {
@@ -591,30 +630,9 @@
                 if (job.has_recent_wind && job.recent_wind_max_mph > 0) {
                     stormBadges += `<span class="inline-block text-[10px] bg-blue-950/80 text-blue-300 border border-blue-700/80 px-2 py-0.5 rounded font-bold mr-1">💨 ${Math.round(job.recent_wind_max_mph)} mph wind in last 72h</span>`;
                 }
-
-                let nextActionHint = '';
+ 
                 const hasStorm = job.has_recent_hail || job.has_recent_wind;
-                if (job.status === 'LEAD_CAPTURED') {
-                    nextActionHint = hasStorm 
-                        ? 'Next: present contingency agreement and storm evidence.' 
-                        : 'Next: establish homeowner interest and explain retail options.';
-                } else if (job.status === 'CONTINGENCY_SIGNED') {
-                    nextActionHint = hasStorm
-                        ? 'Next: schedule inspection and generate evidence grid.'
-                        : 'Next: prepare contract for adjuster inspection.';
-                } else if (job.status === 'INSTALL_COMPLETED') {
-                    nextActionHint = 'Next: print/send neighbor letter.';
-                } else if (job.status === 'CLAIM_FILED') {
-                    nextActionHint = 'Next: host adjuster meeting and verify storm damage.';
-                } else if (job.status === 'RETAIL_CONTRACT_SIGNED') {
-                    nextActionHint = 'Next: coordinate installation schedule with production team.';
-                } else if (job.status === 'INVOICED') {
-                    nextActionHint = 'Next: collect final payment and request review/referral.';
-                } else if (job.status === 'CLOSED') {
-                    nextActionHint = 'Next: lead finalized! Ask for referrals.';
-                } else {
-                    nextActionHint = 'Next: monitor job progress and update status.';
-                }
+                const nextActionHint = getJobNextActionHint(job.status, hasStorm);
 
                 const card = document.createElement('div');
                 card.className = `bg-gray-800 border ${isNakedLead ? 'border-amber-600/60' : 'border-gray-700'} p-4 rounded-lg shadow-md space-y-3`;
@@ -1007,13 +1025,43 @@
             }
 
             listEl.innerHTML = failedRecords.map(r => {
-                const lead = r.payload.lead || {};
+                const lead = r.payload ? (r.payload.lead || {}) : {};
                 const name = lead.homeowner_name || 'Unnamed Lead';
                 const addr = lead.address_line1 || 'No address';
                 const zip = lead.postal_code || '';
                 const reason = r.error_reason || 'Unknown error';
                 const attempt = r.last_attempt_utc ? new Date(r.last_attempt_utc).toLocaleString() : 'Never';
-                const status = r.last_http_status ? `(HTTP ${r.last_http_status})` : '';
+                const http_status = r.last_http_status || null;
+                const statusStr = http_status ? `(HTTP ${http_status})` : '';
+                const retryCount = r.retry_count || 0;
+                
+                const isRetryable = !http_status || http_status === 429 || http_status >= 500;
+                const statusLabel = isRetryable ? '<span class="text-amber-400">Needs attention (Retryable)</span>' : '<span class="text-red-400">Needs attention (Permanent error)</span>';
+                
+                const now = new Date();
+                const isCooldown = r.next_retry_utc && now < new Date(r.next_retry_utc);
+                let cooldownSec = 0;
+                if (isCooldown) {
+                    cooldownSec = Math.ceil((new Date(r.next_retry_utc) - now) / 1000);
+                }
+                
+                let actionBtn = '';
+                if (isRetryable) {
+                    const btnDisabled = isCooldown || inProgressRetries.has(r.id) ? 'disabled' : '';
+                    const btnText = inProgressRetries.has(r.id) ? 'Syncing...' : (isCooldown ? `Cooldown (${cooldownSec}s)` : 'Try Again');
+                    const btnClass = isCooldown || inProgressRetries.has(r.id) ? 'bg-gray-700 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700';
+                    actionBtn = `
+                        <button onclick="retrySyncErrorRecord(${r.id}, this)" ${btnDisabled} class="${btnClass} text-white font-bold px-3 py-1 rounded text-xs transition-colors">
+                            ${btnText}
+                        </button>
+                    `;
+                } else {
+                    actionBtn = `
+                        <button onclick="confirmDismissRecord(${r.id})" class="bg-red-600 hover:bg-red-700 text-white font-bold px-3 py-1 rounded text-xs transition-colors">
+                            Dismiss
+                        </button>
+                    `;
+                }
 
                 return `
                     <div class="p-4 bg-gray-900/60 border border-gray-800 rounded-lg space-y-2 text-left">
@@ -1022,15 +1070,17 @@
                                 <h4 class="font-bold text-white text-sm">${name}</h4>
                                 <p class="text-xs text-gray-400">${addr} ${zip}</p>
                             </div>
-                            <button onclick="retrySyncErrorRecord(${r.id}, this)" class="bg-purple-600 hover:bg-purple-700 text-white font-bold px-3 py-1 rounded text-xs transition-colors">
-                                Try Again
-                            </button>
+                            <div class="flex flex-col gap-1 items-end">
+                                ${actionBtn}
+                            </div>
                         </div>
-                        <div class="text-xs border-t border-gray-800 pt-2 text-red-400">
-                            <strong>Reason:</strong> ${reason} ${status}
+                        <div class="text-xs border-t border-gray-800 pt-2 text-gray-300">
+                            <div><strong>Status:</strong> ${statusLabel}</div>
+                            <div class="mt-1 text-red-400"><strong>Reason:</strong> ${reason} ${statusStr}</div>
                         </div>
-                        <div class="text-[10px] text-gray-500 text-right">
-                            Last attempt: ${attempt}
+                        <div class="text-[10px] text-gray-500 flex justify-between">
+                            <span>Retries: ${retryCount}/5</span>
+                            <span>Last attempt: ${attempt}</span>
                         </div>
                     </div>
                 `;
@@ -1038,6 +1088,8 @@
         }
 
         async function retrySyncErrorRecord(id, btn) {
+            if (inProgressRetries.has(id)) return;
+            inProgressRetries.add(id);
             btn.disabled = true;
             btn.textContent = 'Syncing...';
             showToast('Retrying background sync...', 'info');
@@ -1051,10 +1103,14 @@
             });
 
             if (!record) {
+                inProgressRetries.delete(id);
                 showToast('Record not found', 'error');
                 renderSyncErrorList();
                 return;
             }
+
+            // Bypassing cooldown since user triggered manually
+            record.next_retry_utc = null;
 
             try {
                 await replayQueuedRecord(record);
@@ -1064,10 +1120,10 @@
                 await new Promise(r => { delTx.oncomplete = r; });
 
                 showToast('Offline record synced successfully!', 'success');
+                inProgressRetries.delete(id);
                 updatePendingSyncBadge();
                 renderSyncErrorList();
                 
-                // Refresh list of jobs if visible
                 if (typeof loadMyJobs === 'function') {
                     loadMyJobs();
                 }
@@ -1075,15 +1131,75 @@
                     loadRepPipelineSummary();
                 }
             } catch (err) {
-                record.error_reason = err.message || 'Unknown error';
-                record.last_attempt_utc = new Date().toISOString();
-                record.last_http_status = err.status || null;
-                record.status = 'failed_permanent';
-
+                processOfflineError(err, record);
                 await updateQueuedRecord(record);
-                showToast(`Retry failed: ${err.message}`, 'error');
+                showToast(`Retry failed: ${record.error_reason}`, 'error');
+                inProgressRetries.delete(id);
                 updatePendingSyncBadge();
                 renderSyncErrorList();
+            }
+        }
+
+        async function confirmDismissRecord(id) {
+            if (confirm("Are you sure you want to permanently remove this local record from your device? Any unsynced data (lead/photos/signature) for this item will be lost.")) {
+                const delTx = idb.transaction("offline_queue", "readwrite");
+                delTx.objectStore("offline_queue").delete(id);
+                await new Promise(r => { delTx.oncomplete = r; });
+                showToast("Record dismissed from device.", "info");
+                updatePendingSyncBadge();
+                renderSyncErrorList();
+            }
+        }
+
+        function processOfflineError(err, item) {
+            item.retry_count = (item.retry_count || 0) + 1;
+            item.last_attempt_utc = new Date().toISOString();
+            
+            let isPermanent = false;
+            let reason = err.message || 'Unknown error';
+            let status_code = err.status || null;
+            
+            if (err.isHttpError && status_code) {
+                item.last_http_status = status_code;
+                if (status_code === 401 || status_code === 403) {
+                    reason = "Authentication failed. Please sign in again or contact the office.";
+                    isPermanent = true;
+                } else if (status_code === 404) {
+                    reason = "The assigned job record was not found on the server (404).";
+                    isPermanent = true;
+                } else if (status_code === 409 || status_code === 422) {
+                    reason = `Validation / Conflict error (${status_code}): Please check the data fields and contact the office.`;
+                    isPermanent = true;
+                } else if (status_code >= 400 && status_code < 500 && status_code !== 429) {
+                    reason = `Client error (${status_code}): permanent failure.`;
+                    isPermanent = true;
+                } else {
+                    reason = `Temporary server error (${status_code}).`;
+                    isPermanent = false;
+                }
+            } else {
+                item.last_http_status = null;
+                reason = `Network or connection failure: ${err.message || 'please check your connectivity.'}`;
+                isPermanent = false;
+            }
+            
+            item.error_reason = reason;
+            
+            if (isPermanent) {
+                item.status = 'failed_permanent';
+                item.next_retry_utc = null;
+            } else {
+                // Exponential backoff
+                const backoffSeconds = Math.min(30 * Math.pow(2, (item.retry_count || 1) - 1), 300);
+                item.next_retry_utc = new Date(Date.now() + backoffSeconds * 1000).toISOString();
+                
+                if (item.retry_count >= 5) {
+                    item.status = 'failed_permanent';
+                    item.error_reason = `Failed after maximum retry attempts. Last error: ${reason}`;
+                    item.next_retry_utc = null;
+                } else {
+                    item.status = 'pending_sync';
+                }
             }
         }
 
@@ -1108,12 +1224,10 @@
             `;
             container.appendChild(toast);
             
-            // Animate in
             requestAnimationFrame(() => {
                 toast.classList.remove('opacity-0', 'translate-y-[-10px]');
             });
             
-            // Auto remove
             setTimeout(() => {
                 toast.classList.add('opacity-0');
                 setTimeout(() => toast.remove(), 300);
@@ -1144,27 +1258,28 @@
                 const items = req.result;
                 let syncFailed = false;
                 for (const item of items) {
+                    item.status = item.status || 'pending_sync';
+                    if (item.status !== 'pending_sync') continue;
+                    
+                    const now = new Date();
+                    if (item.next_retry_utc && now < new Date(item.next_retry_utc)) {
+                        continue;
+                    }
+                    if (inProgressRetries.has(item.id)) {
+                        continue;
+                    }
+                    
                     try {
                         await replayQueuedRecord(item);
-                        // Remove from DB
                         const delTx = idb.transaction("offline_queue", "readwrite");
                         delTx.objectStore("offline_queue").delete(item.id);
                         await new Promise(r => { delTx.oncomplete = r; });
                         updatePendingSyncBadge();
                     } catch (err) {
-                        item.retry_count = (item.retry_count || 0) + 1;
-                        item.error_reason = err.message || 'Unknown error';
-                        item.last_attempt_utc = new Date().toISOString();
-                        item.last_http_status = err.status || null;
-                        
-                        if (err.isHttpError && err.status && err.status >= 400 && err.status < 500) {
-                            item.status = 'failed_permanent'; // client errors won't fix themselves on retry
-                        } else if (item.retry_count >= 5) {
-                            item.status = 'failed_permanent';
-                        }
+                        processOfflineError(err, item);
                         await updateQueuedRecord(item);
                         updatePendingSyncBadge();
-                        showToast(`Background sync failed: ${err.message}`, "error");
+                        showToast(`Background sync failed: ${item.error_reason}`, "error");
                         syncFailed = true;
                     }
                 }
@@ -1711,9 +1826,11 @@
                         if (tz.max_wind_mph > 0) severityInfo.push(`${Math.round(tz.max_wind_mph)}mph Wind`);
                         const sevText = severityInfo.join(', ');
                         const prio = tz.priority_label || '🟢 Low';
+                        const reason = tz.priority_reason || sevText;
                         return `
-                            <button type="button" onclick="filterJobsByZip('${tz.zip}')" class="bg-purple-900/40 hover:bg-purple-800/60 border border-purple-700/80 text-purple-200 text-[11px] font-bold px-2.5 py-1 rounded transition-colors flex items-center gap-1">
-                                📍 ${tz.zip} <span class="text-purple-400 font-normal">(${prio}: ${sevText})</span>
+                            <button type="button" onclick="filterJobsByZip('${tz.zip}')" class="bg-purple-900/40 hover:bg-purple-800/60 border border-purple-700/80 text-purple-200 text-[11px] font-bold p-2.5 rounded transition-colors text-left flex justify-between items-center w-full gap-2">
+                                <span>📍 ZIP ${tz.zip}</span>
+                                <span class="text-purple-400 font-normal">${prio} — ${reason}</span>
                             </button>
                         `;
                     }).join('');

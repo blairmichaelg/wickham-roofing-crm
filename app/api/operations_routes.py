@@ -224,6 +224,12 @@ from app.services.pdf.documents import DocumentsGenerator
     dependencies=[Depends(verify_office_role)]
 )
 async def download_bom(job_id: str):
+    import uuid
+    try:
+        job_id = str(uuid.UUID(job_id))
+    except ValueError:
+        raise HTTPException(400, "Invalid job_id format.")
+        
     conn = get_connection()
     try:
         cursor = conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,))

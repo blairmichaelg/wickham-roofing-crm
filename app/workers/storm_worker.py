@@ -82,12 +82,23 @@ async def ingest_storm_events(ctx: dict) -> None:
         
         # 3. Insert into SQLite db using INSERT OR IGNORE
         try:
+            from app.core.utils import compute_severity_score
+            sev_score = compute_severity_score(
+                r["event_type"],
+                r["hail_size_inches"],
+                r["wind_speed_mph"],
+                age_days=0.0,
+                distance_miles=dist,
+                min_hail=settings.storm_alert_min_hail_inches,
+                min_wind=settings.storm_alert_min_wind_mph
+            )
+
             cursor = conn.execute('''
                 INSERT OR IGNORE INTO storm_events (
                     id, zipcode, event_type, event_date, hail_size_inches, 
                     wind_speed_mph, source, latitude, longitude, county, report_time_utc,
-                    dedup_key, distance_miles_from_office, ingested_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    dedup_key, distance_miles_from_office, ingested_at, severity_score
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 r["id"],
                 closest_zip,
@@ -102,7 +113,8 @@ async def ingest_storm_events(ctx: dict) -> None:
                 r["report_time_utc"],
                 dedup_key,
                 dist,
-                datetime.now(UTC).isoformat()
+                datetime.now(UTC).isoformat(),
+                sev_score
             ))
             
             # Check rowcount to verify if the row is newly inserted

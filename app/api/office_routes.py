@@ -1875,13 +1875,31 @@ async def get_storm_canvassing_targets(
     Accessible to all authenticated users (field reps and office staff).
     """
     from app.services.canvassing_targets import get_ranked_canvassing_targets
+    from app.config import get_settings
+    from app.core.database import get_connection
+    
+    settings = get_settings()
+    conn = get_connection()
+    try:
+        row = conn.execute("SELECT MAX(ingested_at) FROM storm_events").fetchone()
+        last_refreshed = row[0] if (row and row[0]) else None
+    finally:
+        conn.close()
+
     try:
         targets = await asyncio.to_thread(
             get_ranked_canvassing_targets,
             window_hours=window_hours,
             limit=limit,
         )
-        return {"targets": targets, "window_hours": window_hours, "count": len(targets)}
+        return {
+            "targets": targets,
+            "window_hours": window_hours,
+            "count": len(targets),
+            "min_hail": settings.storm_alert_min_hail_inches,
+            "min_wind": settings.storm_alert_min_wind_mph,
+            "last_refreshed_utc": last_refreshed,
+        }
     except Exception as exc:
         logger.error("storm_targets_fetch_failed", error=str(exc))
         raise HTTPException(status_code=500, detail="Failed to fetch storm canvassing targets.")
