@@ -230,7 +230,7 @@ def create_app() -> FastAPI:
     os.makedirs("app/templates", exist_ok=True)
     application.mount("/static", StaticFiles(directory="app/static"), name="static")
 
-    templates = Jinja2Templates(directory="app/templates")
+    from app.core.templates import templates
     templates.env.filters["status_label"] = lambda s: STATUS_LABELS.get(s, s)
     templates.env.filters["days_since"] = days_since
 

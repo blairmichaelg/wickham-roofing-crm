@@ -172,7 +172,7 @@ def get_priority_info(
     if max_hail > 0:
         reasons.append(f"{max_hail}″ hail")
     if max_wind > 0:
-        reasons.append(f"{Math.round(max_wind) if 'Math' in globals() else int(max_wind)} mph wind")
+        reasons.append(f"{round(max_wind)} mph wind")
         
     # Format date/time context
     date_str = ""

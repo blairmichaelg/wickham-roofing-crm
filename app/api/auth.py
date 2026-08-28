@@ -52,9 +52,10 @@ def decode_token(token: str) -> dict:
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Invalid authentication credentials")
 
-CORE_TEAM_NAMES = {"michael", "scott", "debi", "alex wickham"}
+FULL_ACCESS_CORE_NAMES = {"michael", "scott", "debi"}
+READ_ONLY_CORE_NAMES = {"alex wickham"}
 
-def is_core_user(claims: dict | None) -> bool:
+def is_core_user(claims: dict | None, method: str = "GET") -> bool:
     """
     Returns True if user is Admin/Accounting/Operations OR one of the core team members (Michael, Scott, Debi).
     Core team members always have full permission/view/access to all boards and functions.
@@ -65,39 +66,59 @@ def is_core_user(claims: dict | None) -> bool:
     if role in ["admin", "accounting", "operations"]:
         return True
     rep_name = (claims.get("rep_name") or "").strip().lower()
-    return rep_name in CORE_TEAM_NAMES
+    if rep_name in FULL_ACCESS_CORE_NAMES:
+        return True
+    if rep_name in READ_ONLY_CORE_NAMES:
+        return method in ("GET", "HEAD", "OPTIONS")
+    return False
 
-def is_admin_or_core(claims: dict | None) -> bool:
+def is_admin_or_core(claims: dict | None, method: str = "GET") -> bool:
     if not claims:
         return False
     if claims.get("role") == "admin":
         return True
     rep_name = (claims.get("rep_name") or "").strip().lower()
-    return rep_name in CORE_TEAM_NAMES
+    if rep_name in FULL_ACCESS_CORE_NAMES:
+        return True
+    if rep_name in READ_ONLY_CORE_NAMES:
+        return method in ("GET", "HEAD", "OPTIONS")
+    return False
 
-def is_accounting_or_core(claims: dict | None) -> bool:
+def is_accounting_or_core(claims: dict | None, method: str = "GET") -> bool:
     if not claims:
         return False
     if claims.get("role") in ["admin", "accounting"]:
         return True
     rep_name = (claims.get("rep_name") or "").strip().lower()
-    return rep_name in CORE_TEAM_NAMES
+    if rep_name in FULL_ACCESS_CORE_NAMES:
+        return True
+    if rep_name in READ_ONLY_CORE_NAMES:
+        return method in ("GET", "HEAD", "OPTIONS")
+    return False
 
-def is_operations_or_core(claims: dict | None) -> bool:
+def is_operations_or_core(claims: dict | None, method: str = "GET") -> bool:
     if not claims:
         return False
     if claims.get("role") in ["admin", "operations"]:
         return True
     rep_name = (claims.get("rep_name") or "").strip().lower()
-    return rep_name in CORE_TEAM_NAMES
+    if rep_name in FULL_ACCESS_CORE_NAMES:
+        return True
+    if rep_name in READ_ONLY_CORE_NAMES:
+        return method in ("GET", "HEAD", "OPTIONS")
+    return False
 
-def is_office_or_core(claims: dict | None) -> bool:
+def is_office_or_core(claims: dict | None, method: str = "GET") -> bool:
     if not claims:
         return False
     if claims.get("role") in ["admin", "operations", "accounting"]:
         return True
     rep_name = (claims.get("rep_name") or "").strip().lower()
-    return rep_name in CORE_TEAM_NAMES
+    if rep_name in FULL_ACCESS_CORE_NAMES:
+        return True
+    if rep_name in READ_ONLY_CORE_NAMES:
+        return method in ("GET", "HEAD", "OPTIONS")
+    return False
 
 async def get_current_role(
     auth_token: str | None = Cookie(None),
@@ -130,30 +151,30 @@ async def get_current_claims(
         if request.method not in ("GET", "HEAD", "OPTIONS"):
             raise HTTPException(
                 status_code=403,
-                detail="Alex Wickham has read-only privileges and cannot perform modifications."
+                detail="Alex Wickham has read-only privileges. Read-only access: contact an admin to make this change."
             )
             
     return claims
 
-async def verify_admin(claims: dict = Depends(get_current_claims)):
-    if not is_admin_or_core(claims):
+async def verify_admin(request: Request, claims: dict = Depends(get_current_claims)):
+    if not is_admin_or_core(claims, request.method):
         raise HTTPException(status_code=403, detail="Not authorized for admin access")
     return claims["role"]
 
-async def verify_accounting(claims: dict = Depends(get_current_claims)):
-    if not is_accounting_or_core(claims):
+async def verify_accounting(request: Request, claims: dict = Depends(get_current_claims)):
+    if not is_accounting_or_core(claims, request.method):
         raise HTTPException(status_code=403, detail="Not authorized for accounting access")
     return claims["role"]
 
-async def verify_operations(claims: dict = Depends(get_current_claims)):
-    if not is_operations_or_core(claims):
+async def verify_operations(request: Request, claims: dict = Depends(get_current_claims)):
+    if not is_operations_or_core(claims, request.method):
         raise HTTPException(status_code=403, detail="Not authorized for operations access")
     return claims["role"]
 
 async def verify_field(claims: dict = Depends(get_current_claims)):
     return claims["role"]
 
-async def verify_office_role(claims: dict = Depends(get_current_claims)):
-    if not is_office_or_core(claims):
+async def verify_office_role(request: Request, claims: dict = Depends(get_current_claims)):
+    if not is_office_or_core(claims, request.method):
         raise HTTPException(status_code=403, detail="Not authorized for office access")
     return claims["role"]

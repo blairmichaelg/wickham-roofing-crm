@@ -16,7 +16,6 @@
             {% if role in ['admin', 'accounting', 'operations'] or is_core %}
                 <button onclick="switchTab('admin')" id="tab-btn-admin" class="px-3 py-1.5 rounded text-sm font-semibold transition-all border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500">Admin Guide</button>
                 <button onclick="switchTab('accounting')" id="tab-btn-accounting" class="px-3 py-1.5 rounded text-sm font-semibold transition-all border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500">Accounting Guide</button>
-                <button onclick="switchTab('debi')" id="tab-btn-debi" class="px-3 py-1.5 rounded text-sm font-semibold transition-all border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500">Debi's Onboarding</button>
                 <button onclick="switchTab('operations')" id="tab-btn-operations" class="px-3 py-1.5 rounded text-sm font-semibold transition-all border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500">Operations Guide</button>
             {% endif %}
             <button onclick="switchTab('field')" id="tab-btn-field" class="px-3 py-1.5 rounded text-sm font-semibold transition-all border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500">Field Guide</button>
@@ -420,39 +419,6 @@ No. Once a job is exported, it is automatically removed from future export batch
 Yes! Click the <strong>"View Details →"</strong> link on any job row. You will see the full job profile with all financials, margins, documents, and supplements.</p>
 <p class="mb-4">---</p>
 <em>This guide reflects the latest production features for the Wickham Roofing Wickham Roofing CRM.</em>
-</div>
-<div id="content-debi" class="hidden mb-12 bg-gray-800 p-8 rounded-lg shadow-lg border border-gray-700">
-<h2 class="text-2xl font-black mt-8 mb-4 border-b border-gray-700 pb-2">Wickham Roofing — Debi's Onboarding Guide (Accounting)</h2>
-<p class="mb-4">Welcome to the Wickham Roofing Wickham Roofing CRM v4!</p>
-<p class="mb-4">As the Accounting Lead, you have a critical role in tracking ACV/Supplement checks, managing canvasser commissions, and exporting invoices to QuickBooks Online. This guide contains everything you need to get started immediately.</p>
-<p class="mb-4">---</p>
-<h3 class="text-xl font-bold mt-6 mb-3 text-blue-400">1. Access & Credentials</h3>
-<p class="mb-4"><strong>Your PIN</strong> will be given to you directly by Michael (Tech Admin). Do not share it with anyone.</p>
-<strong>App URL:</strong>
-You can access the CRM system securely from your phone, tablet, or home computer at:
-👉 <strong>[https://app.wickhamroofing.app](https://app.wickhamroofing.app)</strong>
-<h3 class="text-xl font-bold mt-6 mb-3 text-blue-400">2. Your Core Responsibilities & Workflow</h3>
-<p class="mb-4">Once you log in, you will be taken directly to the <strong>Accounting Ledger</strong>. Here is what you'll do on a daily basis:</p>
-<h4 class="text-lg font-bold mt-4 mb-2">Tracking ACV and Supplement Checks</h4>
-Unlike the old system where we just checked a box, you will now enter the <strong>actual dollar amounts</strong> for checks.
-<ol class="list-decimal pl-5 mb-4 space-y-1"><li class="mb-1">Find a job under the ACV or Supplement section that is currently marked <strong>"Pending."</strong></li>
-<li class="mb-1">Click it and enter the exact dollar amount from the physical check you received, along with the date.</li>
-<li class="mb-1">The system acts as a safeguard: it compares the check amount against the expected RCV or Depreciation. If the check is short by 2% or more, the system will flag a warning to you so you can follow up with the insurance carrier!</li></ol>
-<h4 class="text-lg font-bold mt-4 mb-2">Paying Canvasser Commissions</h4>
-The brand new Commission Engine is now live and fully automated! 
-<ul class="list-disc pl-5 mb-4 space-y-1"><li>Every canvasser earns a default <strong>10% of total revenue</strong> on a job. </li>
-<li>You can override this on a per-job basis by clicking <strong>"Adjust %"</strong> (e.g., if you have a special arrangement of 12% for a specific job).</li>
-<li>Need a paper trail? Click <strong>"Download PDF"</strong> next to a rep's name to generate an automated, professional commission statement document for payout records.</li></ul>
-<h4 class="text-lg font-bold mt-4 mb-2">QuickBooks Online (QBO) Exports</h4>
-<ul class="list-disc pl-5 mb-4 space-y-1"><li>Look at the <strong>"QBO Export Queue"</strong> metric card at the top of your dashboard to see how many jobs are waiting to be exported.</li>
-<li>Click <strong>"Export QBO CSV"</strong> to download a ready-to-import file with all the new jobs.</li>
-<li><strong>Safeguard:</strong> Once you export a job, the system marks it exported. You can never accidentally double-export a job to QuickBooks!</li></ul>
-<h3 class="text-xl font-bold mt-6 mb-3 text-blue-400">3. Transparency & Visibility</h3>
-While you don't have access to the Admin controls or Operations scheduling, you <strong>DO</strong> have full access to view any job's complete profile. 
-<ul class="list-disc pl-5 mb-4 space-y-1"><li>Click <strong>"View Details →"</strong> on any job row to see the full financial breakdown, margins, measurements, and all documents (like the Contingency Agreement or generated Invoices).</li></ul>
-<p class="mb-4"><h3 class="text-xl font-bold mt-6 mb-3 text-blue-400">Support</h3>
-If you get a network error during export or see anything strange with the commission calculations, please reach out to Michael or the Tech Admin immediately. The server runs autonomously 24/7 on the Wickham Roofing CRM.</p>
-<p class="mb-4">Welcome aboard!</p>
 </div>
 <div id="content-operations" class="hidden mb-12 bg-gray-800 p-8 rounded-lg shadow-lg border border-gray-700">
 <h2 class="text-2xl font-black mt-8 mb-4 border-b border-gray-700 pb-2">Wickham Roofing — Operations Guide</h2>
@@ -920,7 +886,7 @@ Never manually edit the `data/wickham.db` SQLite file with external viewers (lik
     const isCore = {{ 'true' if is_core else 'false' }};
     function switchTab(tabName) {
         // All potential tabs
-        const allTabs = ['admin', 'accounting', 'debi', 'operations', 'field', 'runbook'];
+        const allTabs = ['admin', 'accounting', 'operations', 'field', 'runbook'];
         
         allTabs.forEach(name => {
             const el = document.getElementById('content-' + name);

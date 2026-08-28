@@ -23,4 +23,8 @@ This document summarizes the authorization boundaries and security enforcements 
 - **Field Rep PINs**: The "No Silent Zeros" mandate is enforced. All field rep PINs are stored securely via `bcrypt` hashing, replacing legacy plaintext configurations.
 - **JWT Verification**: System is pinned exclusively to the `HS256` symmetric algorithm to mitigate algorithm confusion attacks. `None` algorithms are actively rejected.
 
+## Core Team Access
+- **Full Access Core** (`{"michael", "scott", "debi"}`): Bypasses all role boundaries on any endpoint with full write/mutate access.
+- **Read-Only Core** (`{"alex wickham"}`): Allowed only `GET`, `HEAD`, and `OPTIONS` operations across all admin/office endpoints. Blocked from any mutating operations (`POST`, `PUT`, `PATCH`, `DELETE`).
+
 _End of document._

@@ -15,6 +15,11 @@ To log out, click **Logout** in the top-right corner of your dashboard.
 
 **Note:** As the accountant, you have access to financial data across all jobs and all sales reps. You can see everyone's commission data because aggregating and paying commissions is your core responsibility. Please keep your PIN secure.
 
+> [!NOTE]
+> **Core Team Access Levels**:
+> - **Full Access Core (Michael, Scott, Debi)**: Unrestricted full-access across all roles, dashboards, and write operations.
+> - **Read-Only Core (Alex Wickham)**: Read-only visibility into the Accounting Ledger and all job profiles, but blocked from performing any mutating actions (such as recording checks, manually overriding commissions, or triggering QBO exports).
+
 ---
 
 ## 2. Understanding the Ledger
@@ -147,4 +152,4 @@ Yes! Click the **"View Details →"** link on any job row. You will see the full
 
 ---
 
-*This guide reflects the production features for version 2.1.0 of the Wickham Roofing CRM.*
+*This guide reflects the production features for version 2.4.1 of the Wickham Roofing CRM. Includes read-only core role classification for Alex Wickham.*

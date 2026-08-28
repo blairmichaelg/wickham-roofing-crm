@@ -17,6 +17,11 @@ the production pipeline once a supplement has been approved.
 
 To log out, click **Logout** in the top-right corner of the dashboard.
 
+> [!NOTE]
+> **Core Team Access Levels**:
+> - **Full Access Core (Michael, Scott, Debi)**: Unrestricted full-access across all roles, dashboards, and write operations.
+> - **Read-Only Core (Alex Wickham)**: Read-only visibility into the Operations Command board and all job profiles, but blocked from performing mutating actions (such as marking materials ordered/on site, or scheduling installations).
+
 ---
 
 ## 2. Understanding the Operations Board
@@ -179,6 +184,6 @@ already confirmed with a mistake, contact the Tech Admin to correct it.
 
 ---
 
-*This guide reflects the Operations workflow as of version `2.1.1` (2026-08-11).
+*This guide reflects the Operations workflow as of version `2.4.1` (2026-08-28).
 If new panels, buttons, or workflows are added in future updates, this
 guide should be reviewed and updated to match.*

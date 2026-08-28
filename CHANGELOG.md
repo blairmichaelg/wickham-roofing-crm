@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.4.1] - 2026-08-28
+### Hardened & Refactored (Router Coupling, Core Team Access Separation, and Help Panel Consolidation)
+- **Router Import Coupling Refactor**: Extracted Jinja2Templates instantiation to a new shared module `app/core/templates.py` to decouple router loading and prevent circular import dependencies. Kept test client patch points intact by maintaining the necessary module-level imports.
+- **Full-Access vs Read-Only Core Team Bypass Split**: Divided `CORE_TEAM_NAMES` into `FULL_ACCESS_CORE_NAMES` (`{"michael", "scott", "debi"}`) and `READ_ONLY_CORE_NAMES` (`{"alex wickham"}`). Configured auth check helpers to grant Alex read-only visibility on GET/HEAD/OPTIONS operations, but strictly deny mutating operations (`POST`, `PUT`, `PATCH`, `DELETE`) with a 403 Forbidden response.
+- **Help Tab Cleanup & Guides Consolidation**: Removed the redundant "Debi's Onboarding" tab and content pane from `help.html` and consolidated onboarding instructions into the primary "Accounting Guide" template. Left `docs/debi_onboarding_guide.md` intact for direct email usage.
+- **Documentation Accuracy Pass**: Updated version references to `2.4.1` and documented Core Team Access division boundaries within `admin_tech_guide.md`, `accounting_guide.md`, `operations_guide.md`, and `security_tasks.md`.
+- **Test Suite Expansion (+4 tests, 414 → 418)**: Added `tests/test_core_rbac_split.py` to assert read-only core bypass validation, mutating write blocks, full-access bypasses, and Help page rendering contracts.
+
 ## [2.4.0] - 2026-08-28
 ### Hardened & Enhanced (Speed-to-Lead, Offline Synchronization, and Storm Prioritization)
 - **Deterministic Speed-to-Lead Calculation**: Extracted business logic to a pure helper `calculate_speed_to_lead` in `app/core/utils.py` to parse JSON status history and evaluate duration from the first `LEAD_CAPTURED` status to the first qualifying sales-action status, handling schema-consistent fallbacks gracefully.

@@ -20,7 +20,7 @@ def assert_field_rep_owns_job(claims: dict, job_id: str) -> None:
         return
         
     rep_name = (claims.get("rep_name") or claims.get("sub") or "").strip().lower()
-    if rep_name in {"michael", "scott", "debi"}:
+    if rep_name in {"michael", "scott", "debi", "alex wickham"}:
         return
 
     field_rep_id = claims.get("rep_id")

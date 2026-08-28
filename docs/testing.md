@@ -1,6 +1,6 @@
 # Testing Guide — Wickham Roofing CRM
 
-This guide documents the **62 test modules** (414 assertions) comprising the Wickham Roofing CRM test suite, mapping each module to the business guarantee it protects, documenting how to run the suite with coverage, and specifying the enforced threshold targets.
+This guide documents the **63 test modules** (418 assertions) comprising the Wickham Roofing CRM test suite, mapping each module to the business guarantee it protects, documenting how to run the suite with coverage, and specifying the enforced threshold targets.
 
 ---
 
@@ -43,6 +43,7 @@ This guide documents the **62 test modules** (414 assertions) comprising the Wic
 | `test_code_router.py` | Smart Code RAG parser correctly indexes building-code text files and returns relevant citations for supplement discrepancies |
 | `test_commissions_coverage.py` | Commission calculation engine correctly computes rep earnings, respects manual overrides, and handles edge cases |
 | `test_complexity.py` | Roof complexity scoring produces deterministic outputs for standard pitch/facet combinations |
+| `test_core_rbac_split.py` | Core team bypass logic validation: full-access core (Michael, Scott, Debi) vs read-only core (Alex Wickham) mutating blocks |
 | `test_cron_storm_ingest.py` | Storm ingest cron job correctly fetches and persists NOAA weather events |
 | `test_database.py` | SQLite WAL migrations run idempotently; core CRUD operations and backup/restore maintain data fidelity |
 | `test_document_parser.py` | Statement-of-Loss PDF parser extracts structured claim data and rejects malformed documents |

@@ -29,7 +29,6 @@ from fastapi.responses import (
     JSONResponse,
     StreamingResponse,
 )
-from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from app.api.auth import (
@@ -58,12 +57,12 @@ from app.core.database import (
 )
 from app.core.job_costing import compute_job_profitability
 from app.core.pipeline import run_full_office_pipeline, run_supplement_pipeline
+from app.core.templates import templates
 from app.core.upload_utils import stream_upload_safely
 from app.services.hover_extractor import detect_pdf_format
 from app.services.pdf import PDFGenerator
 from app.services.rate_limit import check_rate_limit
 
-templates = Jinja2Templates(directory="app/templates")
 logger = structlog.get_logger("app.api.office_routes")
 router = APIRouter(prefix="/api/office", tags=["office_ux"])
 EXPORT_DIR = Path("generated_exports")
@@ -1874,9 +1873,9 @@ async def get_storm_canvassing_targets(
     Returns a list of dicts with location, severity, hail/wind stats, and event count.
     Accessible to all authenticated users (field reps and office staff).
     """
-    from app.services.canvassing_targets import get_ranked_canvassing_targets
     from app.config import get_settings
     from app.core.database import get_connection
+    from app.services.canvassing_targets import get_ranked_canvassing_targets
     
     settings = get_settings()
     conn = get_connection()

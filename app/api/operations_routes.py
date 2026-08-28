@@ -14,7 +14,6 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
 from app.api.auth import verify_office_role, verify_operations
-from app.api.office_routes import templates
 from app.core.database import (
     JobStatus,
     get_connection,
@@ -22,6 +21,7 @@ from app.core.database import (
     transition_material_flags,
     update_job_status,
 )
+from app.core.templates import templates
 
 logger = structlog.get_logger("app.api.operations_routes")
 router = APIRouter(prefix="/api/operations", tags=["operations"])
