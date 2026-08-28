@@ -95,3 +95,6 @@ mypy_*_output.txt
 scratch/
 appendonlydir/
 logs/
+
+coverage.json
+scripts/dev/env_check_results.txt
