@@ -838,6 +838,22 @@ def _writeback_ev_geometry(conn: sqlite3.Connection, job_id: str, ev_data: Eagle
         updates["ev_eaves_lf"] = float(ev_data.eaves_lf)
     if ev_data.rake_lf:
         updates["ev_rakes_lf"] = float(ev_data.rake_lf)   # NOTE: jobs table uses ev_rakes_lf (plural)
+    if ev_data.drip_edge_lf is not None:
+        updates["ev_drip_edge_lf"] = float(ev_data.drip_edge_lf)
+    if ev_data.flashing_lf is not None:
+        updates["ev_flashing_lf"] = float(ev_data.flashing_lf)
+    if ev_data.step_flashing_lf is not None:
+        updates["ev_step_flashing_lf"] = float(ev_data.step_flashing_lf)
+    if ev_data.total_facets is not None:
+        updates["ev_total_facets"] = int(ev_data.total_facets)
+    if ev_data.pipe_boot_count is not None:
+        updates["ev_pipe_boot_count"] = int(ev_data.pipe_boot_count)
+    if ev_data.vent_count is not None:
+        updates["ev_vent_count"] = int(ev_data.vent_count)
+    if ev_data.starter_strip_lf is not None:
+        updates["ev_starter_strip_lf"] = float(ev_data.starter_strip_lf)
+    if ev_data.flashing_wall_lf is not None:
+        updates["ev_flashing_wall_lf"] = float(ev_data.flashing_wall_lf)
 
     if not updates:
         logger.info("ev_writeback_skipped_no_values", job_id=job_id)

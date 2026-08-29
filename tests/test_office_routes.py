@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
 
+from app.core.database import get_connection
 from app.main import app
 
 client = TestClient(app)
@@ -364,6 +365,169 @@ def test_admin_triage_view_surfaces_review_and_failed_jobs():
         conn.execute("DELETE FROM jobs WHERE id IN (?, ?, ?, ?)", (job_review, job_failed, job_insp_failed, job_normal))
         conn.commit()
         conn.close()
+
+
+def test_manual_measurement_entry_success():
+    from app.api.auth import create_access_token
+    import uuid
+    admin_token = create_access_token("admin")
+    job_id = str(uuid.uuid4())
+    conn = get_connection()
+    conn.execute(
+        "INSERT INTO jobs (id, homeowner_name, address_line1, city, state, postal_code, phone, status) VALUES (?, 'Manual Geometry Homeowner', '100 Geometry Way', 'Valdosta', 'GA', '31601', '555-1000', 'LEAD_CAPTURED')",
+        (job_id,)
+    )
+    conn.commit()
+    conn.close()
+
+    try:
+        payload = {
+            "total_area_sf": 2800.0,
+            "predominant_pitch": "6/12",
+            "ridge_lf": 45.0,
+            "hip_lf": 60.0,
+            "valley_lf": 30.0,
+            "eaves_lf": 150.0,
+            "rake_lf": 80.0,
+            "drip_edge_lf": 230.0,
+            "flashing_lf": 25.0,
+            "step_flashing_lf": 35.0,
+            "flashing_wall_lf": 15.0,
+            "total_facets": 8,
+            "pipe_boot_count": 3,
+            "vent_count": 4,
+            "starter_strip_lf": 230.0
+        }
+        res = client.post(
+            f"/api/office/jobs/{job_id}/measurements/manual",
+            json=payload,
+            cookies={"auth_token": admin_token}
+        )
+        assert res.status_code == 200, res.text
+        data = res.json()
+        assert data["status"] == "success"
+
+        # Verify DB state
+        conn = get_connection()
+        row = conn.execute(
+            "SELECT status, ev_total_area_sf, ev_predominant_pitch, ev_ridge_lf, ev_drip_edge_lf, ev_total_facets, ev_pipe_boot_count, ev_vent_count, ev_starter_strip_lf, ev_flashing_wall_lf FROM jobs WHERE id = ?",
+            (job_id,)
+        ).fetchone()
+        conn.close()
+
+        assert row["status"] == "EV_PARSED"
+        assert row["ev_total_area_sf"] == 2800.0
+        assert row["ev_predominant_pitch"] == "6/12"
+        assert row["ev_ridge_lf"] == 45.0
+        assert row["ev_drip_edge_lf"] == 230.0
+        assert row["ev_total_facets"] == 8
+        assert row["ev_pipe_boot_count"] == 3
+        assert row["ev_vent_count"] == 4
+        assert row["ev_starter_strip_lf"] == 230.0
+        assert row["ev_flashing_wall_lf"] == 15.0
+    finally:
+        conn = get_connection()
+        conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
+        conn.commit()
+        conn.close()
+
+
+def test_manual_measurement_entry_invalid_geometry_rejected():
+    from app.api.auth import create_access_token
+    import uuid
+    admin_token = create_access_token("admin")
+    job_id = str(uuid.uuid4())
+    conn = get_connection()
+    conn.execute(
+        "INSERT INTO jobs (id, homeowner_name, address_line1, city, state, postal_code, phone, status) VALUES (?, 'Bad Geometry Homeowner', '101 Error Way', 'Valdosta', 'GA', '31601', '555-1001', 'LEAD_CAPTURED')",
+        (job_id,)
+    )
+    conn.commit()
+    conn.close()
+
+    try:
+        # Impossible footprint vs perimeter: 10,000 SF on 20 LF perimeter
+        payload = {
+            "total_area_sf": 10000.0,
+            "predominant_pitch": "6/12",
+            "ridge_lf": 0.0,
+            "hip_lf": 0.0,
+            "valley_lf": 0.0,
+            "eaves_lf": 10.0,
+            "rake_lf": 10.0
+        }
+        res = client.post(
+            f"/api/office/jobs/{job_id}/measurements/manual",
+            json=payload,
+            cookies={"auth_token": admin_token}
+        )
+        assert res.status_code == 422
+        assert "Impossible geometry" in res.json()["detail"]
+    finally:
+        conn = get_connection()
+        conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
+        conn.commit()
+        conn.close()
+
+
+def test_admin_triage_resolve_with_geometry_validation():
+    from app.api.auth import create_access_token
+    import uuid
+    admin_token = create_access_token("admin")
+    job_id = str(uuid.uuid4())
+    conn = get_connection()
+    conn.execute(
+        "INSERT INTO jobs (id, homeowner_name, address_line1, city, state, postal_code, phone, status) VALUES (?, 'Triage Resolve Homeowner', '102 Triage Way', 'Valdosta', 'GA', '31601', '555-1002', 'PIPELINE_FAILED')",
+        (job_id,)
+    )
+    conn.commit()
+    conn.close()
+
+    class MockRedis:
+        async def enqueue_job(self, *args, **kwargs):
+            return "job_queued"
+
+    from app.main import app
+    app.state.redis_pool = MockRedis()
+
+    try:
+        # 1. Invalid geometry rejected with 422
+        bad_payload = {
+            "ev_total_area_sf": 5000.0,
+            "ev_predominant_pitch": "30/12",  # invalid pitch
+            "ev_eaves_lf": 100.0,
+            "ev_rakes_lf": 50.0
+        }
+        res = client.post(
+            f"/api/office/admin/triage/{job_id}/resolve",
+            json=bad_payload,
+            cookies={"auth_token": admin_token}
+        )
+        assert res.status_code == 422
+
+        # 2. Valid geometry succeeds and queues ARQ retry
+        good_payload = {
+            "ev_total_area_sf": 2500.0,
+            "ev_predominant_pitch": "6/12",
+            "ev_ridge_lf": 40.0,
+            "ev_eaves_lf": 150.0,
+            "ev_rakes_lf": 80.0,
+            "ev_drip_edge_lf": 230.0,
+            "ev_total_facets": 6
+        }
+        res_ok = client.post(
+            f"/api/office/admin/triage/{job_id}/resolve",
+            json=good_payload,
+            cookies={"auth_token": admin_token}
+        )
+        assert res_ok.status_code == 200
+        assert res_ok.json()["status"] == "queued"
+    finally:
+        conn = get_connection()
+        conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
+        conn.commit()
+        conn.close()
+
 
 
 

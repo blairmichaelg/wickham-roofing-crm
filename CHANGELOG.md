@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.7.0] - 2026-08-29
+### Added & Enhanced (Manual Measurement Entry as a First-Class Workflow & Deterministic Geometry Validation)
+
+- **Database Schema Expansion (Migration 0022)**: Added full geometry columns (`ev_drip_edge_lf`, `ev_flashing_lf`, `ev_step_flashing_lf`, `ev_total_facets`, `ev_pipe_boot_count`, `ev_vent_count`, `ev_starter_strip_lf`, `ev_flashing_wall_lf`) to `jobs` table, closing persistence gaps from automated PDF extraction.
+- **Pydantic Model Alignment**: Extended `EagleViewData` (`app/core/supplement_models.py`) with optional fields for pipe boots, vents, starter strip, and wall flashing. Updated `_writeback_ev_geometry` in `app/core/pipeline.py` to persist these fields to SQLite.
+- **Deterministic Geometry Validation Engine (`app/core/geometry_validation.py`)**: Implemented zero-AI pure mathematical validation including continuous pitch multipliers (1/12 to 24/12), maximum area-to-footprint perimeter bounds proof, edge completeness rules, and unified RFG STEEP threshold ($\ge 7/12$).
+- **First-Class Manual Entry Endpoint (`POST /api/office/jobs/{job_id}/measurements/manual`)**: Created dedicated REST endpoint allowing manual measurement entry at any lifecycle stage, validating geometry, updating database columns, and transitioning status to `EV_PARSED`.
+- **Triage Resolve Shared Validation**: Upgraded `admin_triage_resolve` in `app/api/office_routes.py` with expanded geometry fields and shared deterministic validation.
+- **UI Integration (`app/templates/job_detail.html`)**: Added interactive modal and trigger button for entering/updating roof geometry manually directly from the office job detail card.
+- **Test Suite (+11 tests, 464 → 475)**: Added `tests/test_geometry_validation.py` (8 unit tests) and 3 route integration tests in `tests/test_office_routes.py`.
+
 ## [2.6.0] - 2026-08-28
 ### Fixed & Enhanced (INSPECTION_FAILED Triage Visibility Resolution)
 

@@ -296,8 +296,14 @@ def run_migrations() -> None:
             m21.up(conn)
             conn.execute("UPDATE schema_version SET version = 21, applied_at = CURRENT_TIMESTAMP WHERE id = 1")
 
+        if current_version < 22:
+            import importlib
+            m22 = importlib.import_module("app.core.migrations.0022_add_full_geometry_columns")
+            m22.up(conn)
+            conn.execute("UPDATE schema_version SET version = 22, applied_at = CURRENT_TIMESTAMP WHERE id = 1")
+
         conn.execute("COMMIT")
-        logger.info("migrations_applied", current_version=current_version, target_version=21)
+        logger.info("migrations_applied", current_version=current_version, target_version=22)
         
         # Since seed logic was removed from up(), do it here outside the transaction
         if current_version < 1:

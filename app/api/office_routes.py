@@ -29,7 +29,7 @@ from fastapi.responses import (
     JSONResponse,
     StreamingResponse,
 )
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.api.auth import (
     get_current_claims,
@@ -1280,18 +1280,134 @@ async def admin_triage_view(request: Request):
         {"request": request, "stuck_jobs": stuck_jobs}
     )
 
+class ManualMeasurementPayload(BaseModel):
+    total_area_sf: float = Field(..., ge=0, description="Total roof surface area in sq ft")
+    predominant_pitch: str = Field(..., description="Predominant pitch e.g. 6/12")
+    ridge_lf: float = Field(default=0.0, ge=0)
+    hip_lf: float = Field(default=0.0, ge=0)
+    valley_lf: float = Field(default=0.0, ge=0)
+    eaves_lf: float = Field(default=0.0, ge=0)
+    rake_lf: float = Field(default=0.0, ge=0)
+    drip_edge_lf: float | None = Field(default=None, ge=0)
+    flashing_lf: float | None = Field(default=None, ge=0)
+    step_flashing_lf: float | None = Field(default=None, ge=0)
+    flashing_wall_lf: float | None = Field(default=None, ge=0)
+    total_facets: int | None = Field(default=None, ge=0)
+    pipe_boot_count: int | None = Field(default=None, ge=0)
+    vent_count: int | None = Field(default=None, ge=0)
+    starter_strip_lf: float | None = Field(default=None, ge=0)
+
+
+def validate_geometry_dict(data: dict[str, Any]) -> None:
+    """Validate geometry fields using deterministic mathematical rules."""
+    from app.core.geometry_validation import (
+        get_pitch_multiplier,
+        validate_area_to_footprint,
+        validate_edge_completeness,
+        validate_pitch,
+    )
+    pitch_raw = data.get("predominant_pitch") or data.get("ev_predominant_pitch")
+    if pitch_raw is not None:
+        rise = validate_pitch(str(pitch_raw))
+        multiplier = get_pitch_multiplier(rise)
+    else:
+        multiplier = 1.0
+
+    total_area = float(data.get("total_area_sf") or data.get("ev_total_area_sf") or 0.0)
+    eaves = float(data.get("eaves_lf") or data.get("ev_eaves_lf") or 0.0)
+    rakes = float(data.get("rake_lf") or data.get("rakes_lf") or data.get("ev_rakes_lf") or 0.0)
+    ridge = float(data.get("ridge_lf") or data.get("ev_ridge_lf") or 0.0)
+    drip_edge = float(data.get("drip_edge_lf") or data.get("ev_drip_edge_lf") or 0.0)
+
+    if total_area > 0:
+        validate_edge_completeness(total_area, eaves, rakes, ridge)
+        perimeter = (eaves + rakes) if (eaves + rakes) > 0 else (drip_edge if drip_edge > 0 else (eaves + rakes + ridge))
+        validate_area_to_footprint(total_area, multiplier, perimeter)
+
+
+@router.post(
+    "/jobs/{job_id}/measurements/manual",
+    response_class=JSONResponse,
+    dependencies=[Depends(verify_office_role), Depends(check_rate_limit)]
+)
+async def manual_measurement_entry(
+    request: Request,
+    job_id: str,
+    payload: ManualMeasurementPayload,
+    role: str = Depends(get_current_role)
+):
+    """
+    First-class manual measurement entry endpoint.
+    Validates roof geometry using deterministic mathematical rules and transitions
+    the job to EV_PARSED status without requiring an automated parse failure.
+    """
+    try:
+        job_id = str(uuid.UUID(job_id))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid job_id format.")
+
+    payload_dict = payload.model_dump()
+    try:
+        validate_geometry_dict(payload_dict)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    conn = get_connection()
+    try:
+        cursor = conn.execute("SELECT id, status FROM jobs WHERE id = ?", (job_id,))
+        job_row = cursor.fetchone()
+        if not job_row:
+            raise HTTPException(status_code=404, detail="Job not found.")
+
+        db_updates: dict[str, Any] = {
+            "ev_total_area_sf": payload.total_area_sf,
+            "ev_predominant_pitch": payload.predominant_pitch,
+            "ev_ridge_lf": payload.ridge_lf,
+            "ev_hip_lf": payload.hip_lf,
+            "ev_valley_lf": payload.valley_lf,
+            "ev_eaves_lf": payload.eaves_lf,
+            "ev_rakes_lf": payload.rake_lf,
+            "ev_drip_edge_lf": payload.drip_edge_lf,
+            "ev_flashing_lf": payload.flashing_lf,
+            "ev_step_flashing_lf": payload.step_flashing_lf,
+            "ev_flashing_wall_lf": payload.flashing_wall_lf,
+            "ev_total_facets": payload.total_facets,
+            "ev_pipe_boot_count": payload.pipe_boot_count,
+            "ev_vent_count": payload.vent_count,
+            "ev_starter_strip_lf": payload.starter_strip_lf,
+            "pipeline_error_message": None
+        }
+        set_clause = ", ".join(f"{k} = ?" for k in db_updates)
+        values = list(db_updates.values()) + [job_id]
+        conn.execute(f"UPDATE jobs SET {set_clause} WHERE id = ?", values)
+        conn.commit()
+
+        update_job_status(job_id, JobStatus.EV_PARSED, f"Measurements manually entered by {role}.")
+    finally:
+        conn.close()
+
+    return {
+        "status": "success",
+        "message": "Manual measurements saved and job marked EV_PARSED.",
+        "job_id": job_id
+    }
+
+
 @router.post("/admin/triage/{job_id}/resolve",
              response_class=JSONResponse, dependencies=[Depends(verify_admin), Depends(check_rate_limit)])
 async def admin_triage_resolve(request: Request, job_id: str, payload: dict = Body(...), role: str = Depends(get_current_role)):
     """
-    Accepts a dict of corrected geometry fields, writes them to
+    Accepts a dict of corrected geometry fields, validates them, writes them to
     the jobs table, resets status to EV_PARSED, and enqueues
     the ARQ worker to re-run from the reconcile step.
     """
     allowed_fields = {
         "ev_total_area_sf", "ev_predominant_pitch",
         "ev_ridge_lf", "ev_hip_lf", "ev_valley_lf",
-        "ev_eaves_lf", "ev_rakes_lf"
+        "ev_eaves_lf", "ev_rakes_lf", "ev_drip_edge_lf",
+        "ev_flashing_lf", "ev_step_flashing_lf", "ev_flashing_wall_lf",
+        "ev_total_facets", "ev_pipe_boot_count", "ev_vent_count",
+        "ev_starter_strip_lf"
     }
     updates = {k: v for k, v in payload.items()
                if k in allowed_fields and v is not None}
@@ -1300,6 +1416,12 @@ async def admin_triage_resolve(request: Request, job_id: str, payload: dict = Bo
             status_code=400,
             detail="No valid fields provided."
         )
+
+    try:
+        validate_geometry_dict(updates)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
     conn = get_connection()
     try:
         set_clause = ", ".join(f"{k} = ?" for k in updates)

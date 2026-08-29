@@ -47,6 +47,10 @@ class EagleViewData(BaseModel):
     drip_edge_lf: float
     flashing_lf: float | None = None
     step_flashing_lf: float | None = None
+    flashing_wall_lf: float | None = None
+    pipe_boot_count: int | None = None
+    vent_count: int | None = None
+    starter_strip_lf: float | None = None
     total_facets: int
     predominant_pitch: str
 
