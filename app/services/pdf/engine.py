@@ -156,7 +156,7 @@ class NumberedCanvas(canvas.Canvas):
 
     def showPage(self) -> None:
         self._saved_page_states.append(dict(self.__dict__))
-        self._startPage()
+        self._startPage()  # type: ignore[attr-defined]
 
     def save(self) -> None:
         num_pages = len(self._saved_page_states)
@@ -177,8 +177,9 @@ class NumberedCanvas(canvas.Canvas):
         job_id = getattr(self, "_job_id", "N/A")
         doc_hash = hashlib.sha256(f"{job_id}|{doc_type}".encode()).hexdigest()[:12]
         
+        page_num = getattr(self, "_pageNumber", 1)
         self.drawString(50, 30, f"Wickham Roofing LLC — Document Hash: {doc_hash}")
-        self.drawRightString(560, 30, f"Page {self._pageNumber} of {page_count}")
+        self.drawRightString(560, 30, f"Page {page_num} of {page_count}")
         self.restoreState()
 
 

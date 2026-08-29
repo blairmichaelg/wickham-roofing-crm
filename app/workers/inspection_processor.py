@@ -19,7 +19,8 @@ from pathlib import Path
 
 import structlog
 from arq.worker import Retry
-from PIL import Image as PILImage, ImageOps
+from PIL import Image as PILImage
+from PIL import ImageOps
 
 from app.config import FIELD_DOCS_DIR, get_settings
 from app.core.cache import get_cached_analysis, set_cached_analysis

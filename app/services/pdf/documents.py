@@ -370,8 +370,6 @@ def create_financial_row(
     col_widths: list[float] | None = None,
 ) -> Table:
     """Creates a 2-column key-value financial row with right-aligned amount."""
-    font_bold = get_font_name("bold")
-    font_reg = get_font_name("normal")
     widths = col_widths or [360, 150]
     
     styles = get_audience_styles(sub_brand)
@@ -379,7 +377,7 @@ def create_financial_row(
     amt_p = Paragraph(f"<b>{amount_str}</b>" if is_total else amount_str, styles.get("TableCellRight", styles["BodyText"]))
     
     t = Table([[lbl_p, amt_p]], colWidths=widths)
-    t_style = [
+    t_style: list[Any] = [
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("ALIGN", (1, 0), (1, 0), "RIGHT"),
         ("PADDING", (0, 0), (-1, -1), 4),
@@ -409,7 +407,6 @@ def create_financial_table(
     - Homeowner sub-brand uses alternating background rows and subtle borders.
     """
     font_bold = get_font_name("bold")
-    font_reg = get_font_name("normal")
     curr_cols = set(currency_cols or [])
     cntr_cols = set(center_cols or [])
 

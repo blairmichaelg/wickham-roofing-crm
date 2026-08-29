@@ -1,6 +1,6 @@
 # Testing Guide — Wickham Roofing CRM
 
-This guide documents the **72 test modules** (499 assertions) comprising the Wickham Roofing CRM test suite, mapping each module to the business guarantee it protects, documenting how to run the suite with coverage, and specifying the enforced threshold targets.
+This guide documents the **73 test modules** (507 assertions) comprising the Wickham Roofing CRM test suite, mapping each module to the business guarantee it protects, documenting how to run the suite with coverage, and specifying the enforced threshold targets.
 
 ---
 
@@ -27,7 +27,7 @@ This guide documents the **72 test modules** (499 assertions) comprising the Wic
 | `app/core/` | ≥ 90% |
 | `app/services/` | ≥ 90% |
 | Rest of `app/` | ≥ 75% |
-| Overall | ≥ 75% (enforced via `fail_under = 75` in `pyproject.toml`; current: **76.79%**) |
+| Overall | ≥ 75% (enforced via `fail_under = 75` in `pyproject.toml`; current: **78.15%**) |
 
 ---
 
@@ -35,6 +35,7 @@ This guide documents the **72 test modules** (499 assertions) comprising the Wic
 
 | Module | Business Guarantee Protected |
 |---|---|
+| `test_pdf_engine.py` | Centralized PDF branding engine, typography hierarchies, NumberedCanvas two-pass pagination, EXIF transpose correction, and sub-brand generators |
 | `test_ai_safety_and_math.py` | AI prompts contain mandatory `CRITICAL NO-MATH DIRECTIVE`; Pydantic schema rejects hallucinated arithmetic on claim ASTs |
 | `test_ai_service.py` | Gemini photo analysis service returns validated `PhotoAnalysis` objects; multimodal batching and fallback paths work correctly |
 | `test_cache.py` | SQLite cache layer (`app/core/cache.py`) initialises cleanly, stores, retrieves, and evicts analysis records |

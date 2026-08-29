@@ -487,8 +487,6 @@ class InvoiceGenerator(PDFEngine):
         job_dir.mkdir(parents=True, exist_ok=True)
         filepath = str(job_dir / "Final_Invoice.pdf")
 
-        styles = get_audience_styles("homeowner")
-
         def build_pdf() -> None:
             doc = self._get_doc_template(filepath, job_id=job_id, doc_type="INVOICE")
             story: list[Any] = []

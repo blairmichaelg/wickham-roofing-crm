@@ -1,5 +1,54 @@
 # Changelog
 
+## [2.8.12] - 2026-08-29
+### Changed (Phase 6: Invoice Legal-Text Correctness Pass & Layout Overhaul)
+
+- **Audience-Tiered Invoice Styling (`app/services/pdf/invoice.py`)**: Applied homeowner and internal sub-brand palettes, unified typography hierarchies, and strict right-alignment on all financial currency columns so decimals stack vertically.
+- **Georgia Statutory Compliance Disclosures**:
+  - Enforced 5-business-day post-denial invoicing lock under O.C.G.A. § 10-1-393.12 via `is_post_denial_invoicing_locked`.
+  - Updated statutory deductible-waiver disclosure to cite **O.C.G.A. § 33-24-59.27 (HB 423)**.
+  - Ensured zero references to `"33-1-9"` and zero Assignment of Benefits (AOB) language across all invoices and estimates.
+- **Test Suite (+1 test)**: Added `test_invoice_statutory_compliance_and_post_denial_lock` in `tests/test_georgia_compliance.py`.
+
+## [2.8.11] - 2026-08-29
+### Changed (Phase 5: Neighbor Letter & Commission Statement Styling)
+
+- **Neighbor Sub-Brand (`app/services/pdf/neighbor_letter.py`)**: Applied bold typography, high-energy palette (`BRAND_NAVY`, `BRAND_ACCENT`), structured CTA callout box, and statutory footer.
+- **Internal Dense Treatment (`app/services/pdf/commission.py`)**: Implemented compact data-dense table layout with alternating row backgrounds, highlighted commission earned summary, and aligned numbers.
+- **Test Suite (+1 test)**: Added `test_neighbor_letter_and_commission_generation` in `tests/test_pdf_engine.py`.
+
+## [2.8.10] - 2026-08-29
+### Changed (Phase 4: Supplement Credibility Rendering & Xactimate Layout)
+
+- **Carrier Sub-Brand Visuals (`app/services/pdf/supplement.py`)**: Applied carrier styling (compact 8-9pt typography, thin 0.25pt gridlines, grayscale-dominant) and standard Xactimate column conventions (`Description`, `Code`, `Quantity`, `Unit Rate`, `Total Amount`).
+- **Overhead & Profit (O&P) Itemization**: Distinctly itemized 10% Overhead and 10% Profit line items in the supplement valuation table when warranted.
+- **Building Code Citations Appendix**: Rendered computed IRC and manufacturer specifications in an "Applicable Building Codes & Statutory Justifications" appendix paired via `KeepTogether` blocks.
+
+## [2.8.9] - 2026-08-29
+### Changed (Phase 3: Image Embedding Quality & EXIF Transposition)
+
+- **EXIF Rotation Correction (`app/workers/inspection_processor.py`)**: Applied `PIL.ImageOps.exif_transpose` in both `resize_for_pdf` and `resize_for_ai` to correct smartphone photo orientation before resizing.
+- **Aspect Ratio & Grid Presentation (`app/services/pdf/documents.py`)**: Enforced proportional image scaling and 0.5pt bordered table cells in photo grids.
+- **Test Suite (+1 test)**: Added `test_image_downsample_and_exif_correction` in `tests/test_pdf_engine.py`.
+
+## [2.8.8] - 2026-08-29
+### Changed (Phase 2: Centralized PDF Component Library & Audience-Tiered Styling)
+
+- **Audience Stylesheets (`app/services/pdf/documents.py`)**: Implemented `build_audience_stylesheets()` providing four tailored stylesets (`homeowner`, `carrier`, `neighbor`, `internal`).
+- **Flowable Component Library**: Built reusable `create_header`, `create_section_with_table`, `create_financial_row`, `create_financial_table`, and `create_photo_grid` helper functions.
+- **Refactored Document Generators**: Migrated contingency agreements, notices of cancellation, retail contracts, certificate of completion, and BOM generators to use unified flowables.
+- **Test Suite (+1 test)**: Added `test_pdf_components_and_audience_styles` in `tests/test_pdf_engine.py`.
+
+## [2.8.7] - 2026-08-29
+### Added (Phase 1: Shared PDF Branding Foundation)
+
+- **Centralized Brand Constants (`app/services/pdf/constants.py`)**: Defined brand color hex values, 4 audience-tiered color palettes (`HOMEOWNER_PALETTE`, `CARRIER_PALETTE`, `NEIGHBOR_PALETTE`, `INTERNAL_PALETTE`), standardized margins, and font paths.
+- **PDF Engine Enhancements (`app/services/pdf/engine.py`)**:
+  - `register_brand_fonts()` font bootstrapper with safe Helvetica fallback.
+  - `truncate_text_to_width` canvas string overflow guard.
+  - `NumberedCanvas` dual-pass "Page X of Y" canvas renderer.
+- **Test Suite (+4 tests, 499 → 503)**: Added `tests/test_pdf_engine.py` covering constants, font fallback, string truncation, and two-pass canvas generation.
+
 ## [2.8.6] - 2026-08-29
 ### Added (Negative-Path & Idempotency Tests for Document Intake Endpoints)
 
