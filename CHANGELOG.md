@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.7.1] - 2026-08-29
+### Fixed & Enhanced (Decoupled Document Intake & Case-Insensitive Job Type Normalization)
+
+- **Job Type Normalization**: Added `is_retail_job(job_type)` utility function in `app/core/utils.py` to robustly normalize case variations (`RETAIL`, `retail`, `Retail`, ` retail `). Replaced raw case-sensitive comparisons across backend pipelines, compliance checkers, and Jinja2 templates.
+- **Decoupled Document Intake Endpoints**: Replaced monolithic dual-file intake with independent REST endpoints:
+  - `POST /api/office/jobs/{job_id}/measurement-report`: Uploads Hover or EagleView measurement PDFs independently with SHA-256 idempotency deduplication. For retail jobs, immediately triggers the retail quote pipeline without requiring a Statement of Loss. For insurance jobs, checks for an existing Statement of Loss and triggers supplement processing only when both are present.
+  - `POST /api/office/jobs/{job_id}/statement-of-loss`: Uploads carrier Statement of Loss PDFs independently with SHA-256 idempotency deduplication. If a measurement report is already present, triggers supplement processing.
+- **Retail Quote Route Alignment**: Updated `trigger_supplement_route` (`POST /api/office/jobs/{job_id}/trigger-supplement`) to check `is_retail_job()`, routing retail jobs to `run_retail_quote_pipeline` instead of demanding an unneeded Statement of Loss.
+- **Backward-Compatible Wrapper**: Retained `POST /api/office/jobs/{job_id}/supplement_docs` as a deprecated wrapper for backwards compatibility.
+- **Test Suite (+6 tests, 475 → 481)**: Added `tests/test_document_intake_decoupling.py` testing normalization, independent uploads, sequential intake triggering, idempotency, and retail quote routing.
+
 ## [2.7.0] - 2026-08-29
 ### Added & Enhanced (Manual Measurement Entry as a First-Class Workflow & Deterministic Geometry Validation)
 

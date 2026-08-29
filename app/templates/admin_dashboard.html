@@ -84,7 +84,7 @@
             </div>
             
             <div class="flex-1 overflow-y-auto p-4 space-y-4">
-                {% for job in jobs if job.status == status and (status != 'SCOPE_APPROVED' or job.job_type == 'retail') %}
+                {% for job in jobs if job.status == status and (status != 'SCOPE_APPROVED' or (job.job_type or '')|lower == 'retail') %}
                 <div class="{{ 'bg-red-950/80 border-red-700' if job.status in ['PENDING_OPERATOR_REVIEW', 'INSPECTION_FAILED', 'PIPELINE_FAILED', 'SUPPLEMENT_DENIED', 'CLAIM_DENIED'] else 'bg-gray-800 border-gray-700' }} border p-4 rounded shadow hover:border-blue-500 transition-colors cursor-pointer"
                      onclick="window.location.href='/office/jobs/{{ job.id }}'">
                     <div class="text-xs text-gray-500 mb-1 flex justify-between items-center">

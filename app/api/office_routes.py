@@ -312,6 +312,260 @@ async def upload_eagleview(job_id: str, file: UploadFile = File(...)):
     return {"status": "success", "message": "Master Pipeline complete, QBO CSV generated.", "pipeline_result": result}
 
 
+@router.post("/jobs/{job_id}/measurement-report", dependencies=[Depends(verify_admin), Depends(check_rate_limit)])
+async def upload_measurement_report(
+    request: Request,
+    job_id: str,
+    file: UploadFile = File(...),
+    role: str = Depends(get_current_role)
+):
+    """
+    Upload a measurement report (EagleView or Hover PDF) independently.
+    If the job is retail, triggers retail quote generation immediately.
+    If the job is insurance and a Statement of Loss is already present, triggers supplement generation.
+    """
+    try:
+        job_id = str(uuid.UUID(job_id))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid job_id format.")
+
+    if file.content_type != "application/pdf":
+        raise HTTPException(status_code=400, detail="File must be a PDF.")
+
+    job_dir = FIELD_DOCS_DIR / job_id
+    job_dir.mkdir(parents=True, exist_ok=True)
+    safe_name = file.filename or "measurement_report.pdf"
+    ev_path = job_dir / safe_name
+
+    try:
+        ev_hash = await stream_upload_safely(
+            file, ev_path, max_bytes=25 * 1024 * 1024, allowed_magic_bytes=[b"%PDF-"]
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("measurement_upload_failed", job_id=job_id, error=str(e))
+        raise HTTPException(status_code=500, detail="Failed to save measurement PDF")
+
+    # Format Detection
+    try:
+        fmt = detect_pdf_format(ev_path)
+        if fmt == "UNKNOWN":
+            ev_path.unlink(missing_ok=True)
+            raise HTTPException(status_code=400, detail="Unknown measurement PDF format. Must be EagleView or Hover.")
+    except Exception as e:
+        ev_path.unlink(missing_ok=True)
+        if isinstance(e, HTTPException):
+            raise
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Idempotency check
+    existing_doc = await asyncio.to_thread(get_job_document_by_hash, job_id, ev_hash)
+    if existing_doc:
+        logger.warning("idempotent_measurement_upload_prevented", job_id=job_id, filename=safe_name, sha256=ev_hash)
+        ev_path.unlink(missing_ok=True)
+        return {
+            "status": "success",
+            "message": "Duplicate file detected. Skipped pipeline.",
+            "document_id": existing_doc.get("id"),
+            "filename": safe_name
+        }
+
+    meas_cat = "HOVER_REPORT" if fmt == "HOVER" else ("EAGLEVIEW_REPORT" if fmt == "EAGLEVIEW" else "MEASUREMENT_REPORT")
+    meas_type = "HOVER_PDF" if fmt == "HOVER" else ("EAGLEVIEW_PDF" if fmt == "EAGLEVIEW" else "MEASUREMENT_PDF")
+
+    ev_doc_id = await asyncio.to_thread(
+        insert_job_document, job_id, safe_name, meas_type, str(ev_path), ev_hash, "field_safe", meas_cat, True
+    )
+
+    # Readiness check
+    conn = get_connection()
+    try:
+        job_row = conn.execute("SELECT job_type FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        job_type = job_row["job_type"] if job_row else None
+        sol_row = conn.execute(
+            "SELECT id, storage_path, sha256_hash FROM job_documents WHERE job_id = ? AND category = 'STATEMENT_OF_LOSS'",
+            (job_id,)
+        ).fetchone()
+        sol_doc = dict(sol_row) if sol_row else None
+    finally:
+        conn.close()
+
+    from app.core.utils import is_retail_job
+    redis = getattr(request.app.state, "redis_pool", None)
+
+    if is_retail_job(job_type):
+        from app.core.pipeline import run_retail_quote_pipeline
+        if redis:
+            await redis.enqueue_job("process_retail_quote", job_id=job_id)
+        else:
+            await run_retail_quote_pipeline(job_id=job_id)
+        return {
+            "status": "success",
+            "message": "Measurement report uploaded and retail quote generation enqueued.",
+            "document_id": ev_doc_id
+        }
+
+    if sol_doc and sol_doc.get("storage_path"):
+        sol_path = sol_doc["storage_path"]
+        sol_sha256 = sol_doc.get("sha256_hash") or ""
+        sol_doc_id = sol_doc.get("id") or ""
+        if redis:
+            await redis.enqueue_job(
+                "process_supplement_event",
+                job_id=job_id,
+                ev_pdf_path=str(ev_path),
+                sol_pdf_path=str(sol_path),
+                ev_sha256=ev_hash,
+                ev_doc_id=ev_doc_id,
+                sol_sha256=sol_sha256,
+                sol_doc_id=sol_doc_id,
+                generate_pdf=True,
+                role=role
+            )
+        else:
+            await run_supplement_pipeline(
+                job_id=job_id,
+                ev_pdf_path=str(ev_path),
+                sol_pdf_path=str(sol_path),
+                ev_sha256=ev_hash,
+                ev_doc_id=ev_doc_id,
+                sol_sha256=sol_sha256,
+                sol_doc_id=sol_doc_id,
+                generate_pdf=True,
+                ctx={"role": role},
+            )
+        return {
+            "status": "success",
+            "message": "Measurement report uploaded and supplement generation enqueued.",
+            "document_id": ev_doc_id
+        }
+
+    return {
+        "status": "success",
+        "message": "Measurement report uploaded. Waiting for Statement of Loss to run supplement pipeline.",
+        "document_id": ev_doc_id
+    }
+
+
+@router.post("/jobs/{job_id}/statement-of-loss", dependencies=[Depends(verify_admin), Depends(check_rate_limit)])
+async def upload_statement_of_loss(
+    request: Request,
+    job_id: str,
+    file: UploadFile = File(...),
+    role: str = Depends(get_current_role)
+):
+    """
+    Upload a carrier Statement of Loss PDF independently.
+    If a measurement report is already present, triggers supplement generation.
+    """
+    try:
+        job_id = str(uuid.UUID(job_id))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid job_id format.")
+
+    if file.content_type != "application/pdf":
+        raise HTTPException(status_code=400, detail="File must be a PDF.")
+
+    job_dir = FIELD_DOCS_DIR / job_id
+    job_dir.mkdir(parents=True, exist_ok=True)
+    safe_name = file.filename or "statement_of_loss.pdf"
+    sol_path = job_dir / safe_name
+
+    try:
+        sol_hash = await stream_upload_safely(
+            file, sol_path, max_bytes=25 * 1024 * 1024, allowed_magic_bytes=[b"%PDF-"]
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("sol_upload_failed", job_id=job_id, error=str(e))
+        raise HTTPException(status_code=500, detail="Failed to save Statement of Loss PDF")
+
+    # Idempotency check
+    existing_doc = await asyncio.to_thread(get_job_document_by_hash, job_id, sol_hash)
+    if existing_doc:
+        logger.warning("idempotent_sol_upload_prevented", job_id=job_id, filename=safe_name, sha256=sol_hash)
+        sol_path.unlink(missing_ok=True)
+        return {
+            "status": "success",
+            "message": "Duplicate file detected. Skipped pipeline.",
+            "document_id": existing_doc.get("id"),
+            "filename": safe_name
+        }
+
+    sol_doc_id = await asyncio.to_thread(
+        insert_job_document, job_id, safe_name, "SOL_PDF", str(sol_path), sol_hash, "office_only", "STATEMENT_OF_LOSS", True
+    )
+
+    # Readiness check
+    conn = get_connection()
+    try:
+        job_row = conn.execute("SELECT job_type FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        job_type = job_row["job_type"] if job_row else None
+        ev_row = conn.execute(
+            """SELECT id, storage_path, sha256_hash FROM job_documents 
+               WHERE job_id = ? AND category IN (
+                   'MEASUREMENT_REPORT', 'EAGLEVIEW', 'EAGLEVIEW_REPORT',
+                   'HOVER_REPORT', 'HOVER_PDF', 'EAGLEVIEW_PDF'
+               )""",
+            (job_id,)
+        ).fetchone()
+        ev_doc = dict(ev_row) if ev_row else None
+    finally:
+        conn.close()
+
+    from app.core.utils import is_retail_job
+    if is_retail_job(job_type):
+        return {
+            "status": "success",
+            "message": "Statement of Loss uploaded.",
+            "document_id": sol_doc_id
+        }
+
+    redis = getattr(request.app.state, "redis_pool", None)
+    if ev_doc and ev_doc.get("storage_path"):
+        ev_path = ev_doc["storage_path"]
+        ev_sha256 = ev_doc.get("sha256_hash") or ""
+        ev_doc_id = ev_doc.get("id") or ""
+        if redis:
+            await redis.enqueue_job(
+                "process_supplement_event",
+                job_id=job_id,
+                ev_pdf_path=str(ev_path),
+                sol_pdf_path=str(sol_path),
+                ev_sha256=ev_sha256,
+                ev_doc_id=ev_doc_id,
+                sol_sha256=sol_hash,
+                sol_doc_id=sol_doc_id,
+                generate_pdf=True,
+                role=role
+            )
+        else:
+            await run_supplement_pipeline(
+                job_id=job_id,
+                ev_pdf_path=str(ev_path),
+                sol_pdf_path=str(sol_path),
+                ev_sha256=ev_sha256,
+                ev_doc_id=ev_doc_id,
+                sol_sha256=sol_hash,
+                sol_doc_id=sol_doc_id,
+                generate_pdf=True,
+                ctx={"role": role},
+            )
+        return {
+            "status": "success",
+            "message": "Statement of Loss uploaded and supplement generation enqueued.",
+            "document_id": sol_doc_id
+        }
+
+    return {
+        "status": "success",
+        "message": "Statement of Loss uploaded. Waiting for measurement report to run supplement pipeline.",
+        "document_id": sol_doc_id
+    }
+
+
 @router.post("/jobs/{job_id}/supplement_docs", dependencies=[Depends(verify_admin), Depends(check_rate_limit)])
 async def upload_supplement_docs(
     request: Request,
@@ -321,8 +575,8 @@ async def upload_supplement_docs(
     role: str = Depends(get_current_role)
 ):
     """
-    Upload both EagleView and Statement of Loss PDFs to trigger the Supplement pipeline.
-    Injects the background task directly into the ARQ queue.
+    [DEPRECATED] Upload both EagleView and Statement of Loss PDFs simultaneously to trigger the Supplement pipeline.
+    Deprecated in v2.7.1 in favor of independent /measurement-report and /statement-of-loss endpoints.
     """
     try:
         job_id = str(uuid.UUID(job_id))
@@ -348,8 +602,6 @@ async def upload_supplement_docs(
         logger.error("supplement_docs_upload_failed", job_id=job_id, error=str(e))
         raise HTTPException(status_code=500, detail="Failed to save PDFs")
 
-
-
     try:
         fmt = detect_pdf_format(ev_path)
         if fmt == "UNKNOWN":
@@ -363,14 +615,13 @@ async def upload_supplement_docs(
         raise HTTPException(status_code=400, detail=str(e))
 
     try:
-        ev_sha256 = ev_hash   # Already computed by stream_upload_safely
-        sol_sha256 = sol_hash # Already computed by stream_upload_safely
+        ev_sha256 = ev_hash
+        sol_sha256 = sol_hash
         
         meas_cat = "HOVER_REPORT" if fmt == "HOVER" else ("EAGLEVIEW_REPORT" if fmt == "EAGLEVIEW" else "MEASUREMENT_REPORT")
         meas_type = "HOVER_PDF" if fmt == "HOVER" else ("EAGLEVIEW_PDF" if fmt == "EAGLEVIEW" else "MEASUREMENT_PDF")
         meas_name = ev_file.filename if ev_file.filename else ev_path.name
 
-        # Insert or update documents in vault
         ev_doc_id = await asyncio.to_thread(
             insert_job_document, job_id, meas_name, meas_type, str(ev_path), ev_sha256, "field_safe", meas_cat, True
         )
@@ -1464,6 +1715,8 @@ async def trigger_supplement_route(request: Request, job_id: str, claims: dict =
     # Locate measurement and statement of loss documents for this job
     conn = get_connection()
     try:
+        job_row = conn.execute("SELECT job_type FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        job_type = job_row["job_type"] if job_row else None
         cursor = conn.execute(
             """SELECT filename, storage_path, sha256_hash, id, category 
                FROM job_documents 
@@ -1477,6 +1730,16 @@ async def trigger_supplement_route(request: Request, job_id: str, claims: dict =
         docs = [dict(r) for r in cursor.fetchall()]
     finally:
         conn.close()
+
+    from app.core.utils import is_retail_job
+    if is_retail_job(job_type):
+        from app.core.pipeline import run_retail_quote_pipeline
+        redis = getattr(request.app.state, "redis_pool", None)
+        if redis:
+            await redis.enqueue_job("process_retail_quote", job_id=job_id)
+        else:
+            await run_retail_quote_pipeline(job_id=job_id)
+        return {"status": "accepted", "message": "Retail quote generation triggered."}
 
     ev_doc = next((d for d in docs if d["category"] in (
         "MEASUREMENT_REPORT", "EAGLEVIEW", "EAGLEVIEW_REPORT",

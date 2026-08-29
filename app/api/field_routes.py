@@ -200,11 +200,12 @@ async def create_new_job(
     (FIELD_DOCS_DIR / job_id).mkdir(parents=True, exist_ok=True)
     
     # Fork retail jobs to retail quote worker
-    job_type = payload.job_type
-    if job_type == "RETAIL":
-        await request.app.state.redis_pool.enqueue_job(
-            "process_retail_quote", job_id=job_id
-        )
+    from app.core.utils import is_retail_job
+    if is_retail_job(payload.job_type):
+        if hasattr(request.app.state, "redis_pool") and request.app.state.redis_pool:
+            await request.app.state.redis_pool.enqueue_job(
+                "process_retail_quote", job_id=job_id
+            )
 
     logger.info("new_lead_captured", job_id=job_id, invoice_id=inv_id, homeowner=payload.homeowner_name)
     return {"status": "success", "job_id": job_id}

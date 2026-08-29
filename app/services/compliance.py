@@ -123,8 +123,8 @@ def is_post_denial_invoicing_locked(
         if not row:
             return False, None, None
 
-        job_type = (row["job_type"] or "insurance").lower()
-        if job_type == "retail":
+        from app.core.utils import is_retail_job
+        if is_retail_job(row["job_type"]):
             return False, None, None
 
         # Check status history for the most recent CLAIM_DENIED transition

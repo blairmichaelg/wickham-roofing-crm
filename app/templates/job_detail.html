@@ -65,7 +65,7 @@
                     ⚠️ Ice &amp; Water Shield Requirement Unresolved
                 </span>
                 {% endif %}
-                {% if job.job_type == 'retail' %}
+                {% if (job.job_type or '')|lower == 'retail' %}
                 <span class="px-3 py-1 inline-flex text-xs sm:text-sm font-semibold rounded-full bg-indigo-900 text-indigo-200 border border-indigo-700">
                     🛠️ Retail Job
                 </span>
@@ -789,7 +789,7 @@
                             <div>
                                 <p class="text-xs text-gray-400 uppercase font-semibold">Deductible</p>
                                 <p class="text-lg font-bold text-red-400">${{ "%.2f"|format(job.financials.deductible_cents / 100) if job.financials.deductible_cents is not none else '0.00' }}</p>
-                                {% if job.job_type != 'retail' %}
+                                {% if (job.job_type or '')|lower != 'retail' %}
                                     {% if job.financials.deductible_paid %}
                                         <span class="text-xs text-green-400 font-bold block mt-1">✓ Deductible Paid: ${{ "%.2f"|format(job.financials.deductible_paid_cents / 100) if job.financials.deductible_paid_cents is not none else '0.00' }}</span>
                                     {% else %}

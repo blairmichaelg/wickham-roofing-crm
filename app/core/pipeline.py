@@ -879,8 +879,8 @@ async def run_supplement_pipeline(job_id: str, ev_pdf_path: str, sol_pdf_path: s
     # 0. Fetch Job Context (Threaded)
     job_dict = await asyncio.to_thread(_fetch_job_context_sync, job_id)
     
-    job_type = job_dict.get("job_type", "INSURANCE")
-    if job_type == "RETAIL":
+    from app.core.utils import is_retail_job
+    if is_retail_job(job_dict.get("job_type")):
         logger.warning("supplement_skipped_retail_job",
                        job_id=job_id)
         return {"status": "skipped", "reason": "retail_job"}

@@ -190,3 +190,14 @@ def get_priority_info(
         
     reason_text = " · ".join(reasons) if reasons else "Recent weather activity"
     return label, reason_text
+
+
+def is_retail_job(job_type: str | None) -> bool:
+    """
+    Case-insensitive helper to determine if a job is retail.
+    Normalizes 'RETAIL', 'retail', 'Retail', ' retail ', etc.
+    """
+    if not job_type:
+        return False
+    return job_type.strip().upper() == "RETAIL"
+
