@@ -140,3 +140,47 @@ def test_image_downsample_and_exif_correction(tmp_path):
         assert out_ai.height == 450
 
 
+def test_neighbor_letter_and_commission_generation(tmp_path):
+    import asyncio
+    from app.services.pdf.neighbor_letter import NeighborLetterGenerator
+    from app.services.pdf.commission import CommissionGenerator
+    
+    with patch("app.services.pdf.neighbor_letter.FIELD_DOCS_DIR", tmp_path), \
+         patch("app.services.pdf.commission.FIELD_DOCS_DIR", tmp_path):
+        
+        job = {
+            "id": "job_neighbor_test",
+            "homeowner_name": "Jane Neighbor",
+            "address_line1": "100 Maple St",
+            "city": "Thomasville",
+            "state": "GA",
+            "postal_code": "31792",
+        }
+        storm_events = [
+            {"event_type": "hail", "county": "Thomas County", "max_hail_inches": 1.75, "report_time_utc": "2026-08-20T12:00:00Z"}
+        ]
+        
+        # 1. Neighbor letter
+        n_gen = NeighborLetterGenerator()
+        n_path = asyncio.run(n_gen.generate(job, storm_events=storm_events))
+        assert Path(n_path).exists()
+        assert Path(n_path).stat().st_size > 0
+        
+        # 2. Commission statement
+        c_gen = CommissionGenerator()
+        commission_data = {
+            "canvasser_name": "Austin Rep",
+            "revenue_val": 15000.0,
+            "material_cost_val": 4500.0,
+            "labor_cost_val": 3500.0,
+            "overhead_amount": 1500.0,
+            "gross_profit": 5500.0,
+            "commission_pct": 0.10,
+            "commission_amount": 550.0,
+        }
+        c_path = asyncio.run(c_gen.generate_commission_statement(job, commission_data))
+        assert Path(c_path).exists()
+        assert Path(c_path).stat().st_size > 0
+
+
+

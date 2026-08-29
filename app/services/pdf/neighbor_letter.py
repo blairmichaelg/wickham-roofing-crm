@@ -4,19 +4,42 @@ Neighbor Letter PDF Generator.
 Generates a one-page storm-aware "door-drop" letter for homes adjacent
 to a just-completed job. Triggered when a job reaches INSTALL_COMPLETED.
 
-Follows the existing PDFEngine pattern used by documents.py / invoice.py.
+Follows the centralized PDFEngine and audience-tiered sub-brand system.
 """
 from __future__ import annotations
 
 import asyncio
 import datetime
+from pathlib import Path
+from typing import Any
 
 import structlog
 from reportlab.lib import colors
-from reportlab.lib.units import inch
-from reportlab.platypus import HRFlowable, Paragraph, Spacer
+from reportlab.platypus import (
+    HRFlowable,
+    KeepTogether,
+    Paragraph,
+    Spacer,
+    Table,
+    TableStyle,
+)
 
-from app.services.pdf.constants import COMPANY_EMAIL, COMPANY_NAME, COMPANY_PHONE, FIELD_DOCS_DIR
+from app.services.pdf.constants import (
+    BRAND_ACCENT,
+    BRAND_BLUE,
+    BRAND_BORDER,
+    BRAND_LIGHT_BG,
+    BRAND_NAVY,
+    COMPANY_EMAIL,
+    COMPANY_NAME,
+    COMPANY_PHONE,
+    FIELD_DOCS_DIR,
+    NEIGHBOR_PALETTE,
+    SPACING_MD,
+    SPACING_SM,
+    SPACING_XS,
+)
+from app.services.pdf.documents import create_header, get_audience_styles
 from app.services.pdf.engine import PDFEngine
 
 logger = structlog.get_logger("app.services.pdf.neighbor_letter")
@@ -49,6 +72,7 @@ class NeighborLetterGenerator(PDFEngine):
         filepath = str(job_dir / "Neighbor_Letter.pdf")
 
         storm_events = storm_events or []
+        styles = get_audience_styles("neighbor")
 
         def _build() -> None:
             doc = self._get_doc_template(
@@ -57,11 +81,12 @@ class NeighborLetterGenerator(PDFEngine):
                 job_id=job_id,
                 doc_type="NEIGHBOR_LETTER",
             )
-            story: list = []
+            story: list[Any] = []
 
-            # ── Salutation ──────────────────────────────────────────────────
-            story.append(Paragraph("Dear Neighbor,", self.custom_styles["SectionHeading"]))
-            story.append(Spacer(1, 10))
+            # ── Header & Salutation ─────────────────────────────────────────
+            story.extend(create_header("STORM RESTORATION NOTICE", "neighbor", subtitle="A Message to Our Neighbors"))
+            story.append(Paragraph("Dear Neighbor,", styles.get("SectionHeading", styles["CalloutHeading"])))
+            story.append(Spacer(1, 8))
 
             # ── Opening paragraph: what just happened on this street ─────────
             address = job.get("address_line1", "a property on your street")
@@ -75,7 +100,7 @@ class NeighborLetterGenerator(PDFEngine):
                 "After a thorough inspection, we discovered significant storm damage — "
                 "damage that is commonly found on neighboring homes following the same weather event."
             )
-            story.append(Paragraph(opening, self.custom_styles["BodyText"]))
+            story.append(Paragraph(opening, styles["BodyText"]))
             story.append(Spacer(1, 10))
 
             # ── Storm context block (only if events provided) ────────────────
@@ -101,7 +126,14 @@ class NeighborLetterGenerator(PDFEngine):
                     "that may not be visible from the ground — but can result in costly leaks and interior "
                     "water damage if left unaddressed."
                 )
-                story.append(Paragraph(storm_para, self.custom_styles["BodyText"]))
+                
+                storm_box = Table([[Paragraph(storm_para, styles["BodyText"])]], colWidths=[510])
+                storm_box.setStyle(TableStyle([
+                    ("BACKGROUND", (0, 0), (-1, -1), BRAND_LIGHT_BG),
+                    ("BOX", (0, 0), (-1, -1), 1, BRAND_BORDER),
+                    ("PADDING", (0, 0), (-1, -1), 8),
+                ]))
+                story.append(storm_box)
                 story.append(Spacer(1, 10))
 
             # ── Free inspection offer ────────────────────────────────────────
@@ -112,19 +144,23 @@ class NeighborLetterGenerator(PDFEngine):
                 "to file a claim — so you pay only your deductible. "
                 "There is no obligation, and the inspection takes only 30–45 minutes."
             )
-            story.append(Paragraph(offer, self.custom_styles["BodyText"]))
-            story.append(Spacer(1, 16))
+            story.append(Paragraph(offer, styles["BodyText"]))
+            story.append(Spacer(1, 14))
 
-            # ── Divider + CTA ────────────────────────────────────────────────
-            story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#1e3a8a")))
-            story.append(Spacer(1, 10))
-
-            cta = (
-                f"<b>Call or text us today to schedule your FREE inspection:</b><br/>"
-                f"📞 {COMPANY_PHONE}<br/>"
-                f"✉ {COMPANY_EMAIL}"
+            # ── Divider + CTA Box ────────────────────────────────────────────
+            cta_heading = Paragraph("<b>Call or text us today to schedule your FREE inspection:</b>", styles["CalloutHeading"])
+            cta_body = Paragraph(
+                f"📞 <b>Phone:</b> {COMPANY_PHONE} &nbsp;&nbsp;|&nbsp;&nbsp; ✉ <b>Email:</b> {COMPANY_EMAIL}",
+                styles["CalloutText"]
             )
-            story.append(Paragraph(cta, self.custom_styles["SectionHeading"]))
+            cta_table = Table([[cta_heading], [Spacer(1, 4)], [cta_body]], colWidths=[510])
+            cta_table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), BRAND_LIGHT_BG),
+                ("BOX", (0, 0), (-1, -1), 1.5, BRAND_ACCENT),
+                ("PADDING", (0, 0), (-1, -1), 10),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ]))
+            story.append(KeepTogether([cta_table]))
             story.append(Spacer(1, 12))
 
             # ── Legal footer ─────────────────────────────────────────────────
@@ -134,10 +170,12 @@ class NeighborLetterGenerator(PDFEngine):
                 "Homeowners are responsible for their insurance deductible as required by law. "
                 f"Letter generated {datetime.date.today().isoformat()}."
             )
-            story.append(Paragraph(footer, self.custom_styles["FinePrint"]))
+            fine_print_style = self.custom_styles.get("FinePrint", styles["BodyText"])
+            story.append(Paragraph(footer, fine_print_style))
 
             doc.build(story)
 
         await asyncio.to_thread(_build)
         log.info("neighbor_letter_generation_complete", path=filepath)
         return filepath
+
