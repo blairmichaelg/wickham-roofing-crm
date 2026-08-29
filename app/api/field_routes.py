@@ -1370,3 +1370,37 @@ async def get_sales_tools(job_id: str, request: Request, claims: dict = Depends(
 
     return result
 
+
+class PushSubscriptionKeys(BaseModel):
+    p256dh: str
+    auth: str
+
+
+class PushSubscriptionPayload(BaseModel):
+    endpoint: str
+    keys: PushSubscriptionKeys
+    role: str = "field"
+
+
+@router.post("/push/subscribe", dependencies=[Depends(verify_field)])
+async def subscribe_push_notifications(
+    payload: PushSubscriptionPayload,
+    claims: dict = Depends(get_current_claims)
+):
+    """
+    Register a browser Web Push subscription for field reps and installation crews.
+    """
+    from app.core.notifications import save_push_subscription
+    user_id = claims.get("sub")
+    role = payload.role or claims.get("role", "field")
+
+    sub_id = save_push_subscription(
+        user_id=user_id,
+        role=role,
+        endpoint=payload.endpoint,
+        p256dh=payload.keys.p256dh,
+        auth=payload.keys.auth
+    )
+    return {"status": "success", "subscription_id": sub_id}
+
+

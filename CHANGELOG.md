@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.8.0] - 2026-08-29
+### Added & Enhanced (Crew Job-Alert Push Notifications via Web Push / VAPID)
+
+- **Flagged Decision (Crew Subscription Architecture)**: Implemented decoupled `push_subscriptions` schema (Migration 0023) associating browser subscription endpoints with `user_id` and `role` (`crew` or `field`), avoiding artificial coupling between sales canvassers (`field_reps`) and installation subcontractor crews.
+- **Zero-Cost Web Push Engine**: Integrated `pywebpush` with standard VAPID authentication (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_CLAIM_EMAIL` documented in `.env.example`).
+- **Subscription API (`POST /api/field/push/subscribe`)**: Added endpoint for field reps and installation crews to register browser push subscriptions with cryptographic keys (`p256dh`, `auth`).
+- **Automated Lifecycle Dispatching**: Added automated Web Push dispatch in `update_job_status` when jobs transition to `INSTALL_SCHEDULED`, alerting crews with homeowner name, street address, and direct link to job details.
+- **Self-Healing Subscription Pruning**: Built automated pruning of expired or unsubscribed browser endpoints upon receiving HTTP 404/410 responses from push services.
+- **PWA Service Worker Enhancement (`app/static/service-worker.js`)**: Added `push` and `notificationclick` event handlers to display native OS notifications with vibration and route directly to the relevant job card on tap.
+- **Test Suite (+5 tests, 481 → 486)**: Added `tests/test_push_notifications.py` testing subscription lifecycle, VAPID dispatching, 410 error pruning, and state machine transition triggers.
+
 ## [2.7.1] - 2026-08-29
 ### Fixed & Enhanced (Decoupled Document Intake & Case-Insensitive Job Type Normalization)
 

@@ -135,3 +135,48 @@ self.addEventListener('fetch', (event) => {
         })
     );
 });
+
+// ── Web Push Event ──────────────────────────────────────────────────────
+self.addEventListener('push', (event) => {
+    let data = { title: 'Wickham CRM Alert', body: 'New update received.' };
+    if (event.data) {
+        try {
+            data = event.data.json();
+        } catch (e) {
+            data.body = event.data.text();
+        }
+    }
+
+    const options = {
+        body: data.body || 'New notification',
+        icon: '/static/icons/icon-192.png',
+        badge: '/static/icons/icon-192.png',
+        data: data.data || {},
+        vibrate: [100, 50, 100],
+        requireInteraction: true
+    };
+
+    event.waitUntil(
+        self.registration.showNotification(data.title || 'Wickham Roofing CRM', options)
+    );
+});
+
+// ── Notification Click Event ────────────────────────────────────────────
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+    const targetUrl = (event.notification.data && event.notification.data.url) || '/field';
+
+    event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+            for (const client of windowClients) {
+                if (client.url.includes(targetUrl) && 'focus' in client) {
+                    return client.focus();
+                }
+            }
+            if (clients.openWindow) {
+                return clients.openWindow(targetUrl);
+            }
+        })
+    );
+});
+

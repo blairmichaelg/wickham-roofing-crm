@@ -302,8 +302,14 @@ def run_migrations() -> None:
             m22.up(conn)
             conn.execute("UPDATE schema_version SET version = 22, applied_at = CURRENT_TIMESTAMP WHERE id = 1")
 
+        if current_version < 23:
+            import importlib
+            m23 = importlib.import_module("app.core.migrations.0023_add_push_subscriptions")
+            m23.up(conn)
+            conn.execute("UPDATE schema_version SET version = 23, applied_at = CURRENT_TIMESTAMP WHERE id = 1")
+
         conn.execute("COMMIT")
-        logger.info("migrations_applied", current_version=current_version, target_version=22)
+        logger.info("migrations_applied", current_version=current_version, target_version=23)
         
         # Since seed logic was removed from up(), do it here outside the transaction
         if current_version < 1:
@@ -564,6 +570,21 @@ def _update_job_status_internal(conn: sqlite3.Connection, job_id: str, new_statu
         
     if cursor.rowcount == 0:
         raise ValueError(f"Job {job_id} not found during update")
+
+    if new_status == JobStatus.INSTALL_SCHEDULED:
+        try:
+            from app.core.notifications import dispatch_web_push
+            job_row = conn.execute("SELECT homeowner_name, address_line1 FROM jobs WHERE id = ?", (job_id,)).fetchone()
+            name = job_row["homeowner_name"] if job_row else "Job"
+            addr = job_row["address_line1"] if job_row else ""
+            dispatch_web_push(
+                title=f"Build Scheduled: {name}",
+                body=f"Installation scheduled for {addr}. View job details in field app.",
+                data={"job_id": job_id, "url": f"/field/jobs/{job_id}"},
+                role=None
+            )
+        except Exception as push_err:
+            logger.warning("push_dispatch_on_status_failed", job_id=job_id, error=str(push_err))
 
 def force_override_status(job_id: str, new_status: str, note: str = "") -> None:
     """

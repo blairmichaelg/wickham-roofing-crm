@@ -107,3 +107,125 @@ class RobustConnectionManager:
 
 # Global singleton
 notifier = RobustConnectionManager()
+
+
+def save_push_subscription(user_id: str | None, role: str, endpoint: str, p256dh: str, auth: str) -> str:
+    """Save or update a Web Push subscription in SQLite."""
+    import uuid
+
+    from app.core.database import get_connection
+
+    conn = get_connection()
+    try:
+        sub_id = str(uuid.uuid4())
+        conn.execute(
+            """
+            INSERT INTO push_subscriptions (id, user_id, role, endpoint, p256dh_key, auth_key, created_at, last_used_at)
+            VALUES (?, ?, ?, ?, ?, ?, datetime('now', 'utc'), datetime('now', 'utc'))
+            ON CONFLICT(endpoint) DO UPDATE SET
+                user_id = excluded.user_id,
+                role = excluded.role,
+                p256dh_key = excluded.p256dh_key,
+                auth_key = excluded.auth_key,
+                last_used_at = datetime('now', 'utc')
+            """,
+            (sub_id, user_id, role, endpoint, p256dh, auth)
+        )
+        conn.commit()
+        return sub_id
+    finally:
+        conn.close()
+
+
+def prune_dead_subscription(endpoint: str) -> None:
+    """Remove an expired or invalid push subscription (HTTP 404 / 410)."""
+    from app.core.database import get_connection
+
+    conn = get_connection()
+    try:
+        conn.execute("DELETE FROM push_subscriptions WHERE endpoint = ?", (endpoint,))
+        conn.commit()
+        logger.info("push_subscription_pruned", endpoint=endpoint)
+    finally:
+        conn.close()
+
+
+def dispatch_web_push(title: str, body: str, data: dict[str, Any] | None = None, role: str | None = None) -> dict[str, int]:
+    """
+    Dispatch Web Push notification to active push subscriptions matching role (or all if role is None).
+    Prunes expired subscriptions (HTTP 404/410).
+    """
+    import json
+    import os
+
+    from app.core.database import get_connection
+
+    vapid_private_key = os.getenv("VAPID_PRIVATE_KEY")
+    vapid_claim_email = os.getenv("VAPID_CLAIM_EMAIL", "mailto:admin@wickhamroofing.com")
+
+    if not vapid_private_key:
+        logger.warning("webpush_skipped_no_vapid_key")
+        return {"sent": 0, "failed": 0, "pruned": 0}
+
+    conn = get_connection()
+    try:
+        if role:
+            cursor = conn.execute(
+                "SELECT endpoint, p256dh_key, auth_key FROM push_subscriptions WHERE role = ?",
+                (role,)
+            )
+        else:
+            cursor = conn.execute(
+                "SELECT endpoint, p256dh_key, auth_key FROM push_subscriptions"
+            )
+        subs = [dict(r) for r in cursor.fetchall()]
+    finally:
+        conn.close()
+
+    if not subs:
+        return {"sent": 0, "failed": 0, "pruned": 0}
+
+    payload = json.dumps({
+        "title": title,
+        "body": body,
+        "data": data or {}
+    })
+
+    from pywebpush import WebPushException, webpush  # type: ignore[import-untyped]
+
+    sent = 0
+    failed = 0
+    pruned = 0
+
+    for sub in subs:
+        endpoint = sub["endpoint"]
+        sub_info = {
+            "endpoint": endpoint,
+            "keys": {
+                "p256dh": sub["p256dh_key"],
+                "auth": sub["auth_key"]
+            }
+        }
+        try:
+            webpush(
+                subscription_info=sub_info,
+                data=payload,
+                vapid_private_key=vapid_private_key,
+                vapid_claims={"sub": vapid_claim_email}
+            )
+            sent += 1
+        except WebPushException as ex:
+            response = getattr(ex, "response", None)
+            status_code = getattr(response, "status_code", None)
+            if status_code in (404, 410):
+                prune_dead_subscription(endpoint)
+                pruned += 1
+            else:
+                logger.error("webpush_send_error", endpoint=endpoint, error=str(ex))
+                failed += 1
+        except Exception as e:
+            logger.error("webpush_send_unexpected_error", endpoint=endpoint, error=str(e))
+            failed += 1
+
+    return {"sent": sent, "failed": failed, "pruned": pruned}
+
