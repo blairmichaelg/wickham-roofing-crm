@@ -154,6 +154,7 @@ def test_install_scheduled_triggers_push(monkeypatch):
         dispatch_called = True
         assert "Push Homeowner" in title
         assert "500 Scheduled St" in body
+        assert role == "crew"
         return {"sent": 1, "failed": 0, "pruned": 0}
 
     monkeypatch.setattr("app.core.notifications.dispatch_web_push", mock_dispatch)
@@ -166,3 +167,35 @@ def test_install_scheduled_triggers_push(monkeypatch):
         conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
         conn.commit()
         conn.close()
+
+
+def test_dispatch_web_push_role_filtering_excludes_field_subscribers(monkeypatch):
+    crew_endpoint = f"https://push.example.com/crew/{uuid.uuid4()}"
+    field_endpoint = f"https://push.example.com/field/{uuid.uuid4()}"
+
+    save_push_subscription("user-crew", "crew", crew_endpoint, "key_crew", "auth_crew")
+    save_push_subscription("user-field", "field", field_endpoint, "key_field", "auth_field")
+
+    monkeypatch.setenv("VAPID_PRIVATE_KEY", "dummy_private_key")
+
+    called_endpoints = []
+
+    def mock_webpush(subscription_info, *args, **kwargs):
+        called_endpoints.append(subscription_info["endpoint"])
+
+    monkeypatch.setattr("pywebpush.webpush", mock_webpush)
+
+    try:
+        # When dispatching to role="crew", only crew subscriber receives notification
+        res = dispatch_web_push(
+            title="Crew Alert",
+            body="New crew schedule",
+            role="crew"
+        )
+        assert res["sent"] == 1
+        assert crew_endpoint in called_endpoints
+        assert field_endpoint not in called_endpoints
+    finally:
+        prune_dead_subscription(crew_endpoint)
+        prune_dead_subscription(field_endpoint)
+

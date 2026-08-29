@@ -581,10 +581,10 @@ def _update_job_status_internal(conn: sqlite3.Connection, job_id: str, new_statu
                 title=f"Build Scheduled: {name}",
                 body=f"Installation scheduled for {addr}. View job details in field app.",
                 data={"job_id": job_id, "url": f"/field/jobs/{job_id}"},
-                role=None
+                role="crew"
             )
         except Exception as push_err:
-            logger.warning("push_dispatch_on_status_failed", job_id=job_id, error=str(push_err))
+            logger.error("push_dispatch_on_status_failed", job_id=job_id, error=str(push_err))
 
 def force_override_status(job_id: str, new_status: str, note: str = "") -> None:
     """

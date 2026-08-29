@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.8.2] - 2026-08-29
+### Fixed (Push Notification Role Targeting & Scoping)
+
+- **Role Scoping Fix (`INSTALL_SCHEDULED`)**: Fixed bug in `update_job_status` (`app/core/database.py`) where `dispatch_web_push` was called with `role=None`, causing global broadcast to all subscribers. Scoped push notifications specifically to `role="crew"`, preventing unwanted alerts to sales canvassers and field reps.
+- **Improved Error Logging**: Replaced silent warning logger on dispatch failure with explicit `logger.error` to improve operational triage visibility.
+- **Per-Assignment Limitation Note**: As confirmed in Phase A.0, `schedule.crew_name` currently stores unstructured free text without a relational foreign key to `push_subscriptions.user_id`. The current interim fix scopes notifications strictly to all registered `crew` subscribers. True single-crew assignment targeting will be implemented in a future schema enhancement linking `schedule` to structured crew entities.
+- **Test Suite (+1 test, 489 → 490)**: Extended `tests/test_push_notifications.py` to assert `role="crew"` on `INSTALL_SCHEDULED` and added `test_dispatch_web_push_role_filtering_excludes_field_subscribers` verifying `field`-role subscribers are filtered out.
+
 ## [2.8.1] - 2026-08-29
 ### Fixed & Enhanced (Documentation Drift Regression Testing & Role Guide Refresh)
 
