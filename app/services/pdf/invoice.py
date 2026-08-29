@@ -7,18 +7,34 @@ import structlog
 from reportlab.lib import colors
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.platypus import (
+    HRFlowable,
+    KeepTogether,
     Paragraph,
     Spacer,
     Table,
     TableStyle,
 )
-from reportlab.platypus.flowables import HRFlowable
 
 from app.core.supplement_models import MaterialBOM
-
-logger = structlog.get_logger("app.services.pdf")
-from app.services.pdf.constants import FIELD_DOCS_DIR
+from app.services.compliance import is_post_denial_invoicing_locked
+from app.services.pdf.constants import (
+    BRAND_BORDER,
+    BRAND_LIGHT_BG,
+    BRAND_MUTED_BG,
+    BRAND_NAVY,
+    BRAND_SLATE,
+    FIELD_DOCS_DIR,
+    HOMEOWNER_PALETTE,
+    INTERNAL_PALETTE,
+)
+from app.services.pdf.documents import (
+    create_financial_table,
+    create_header,
+    get_audience_styles,
+)
 from app.services.pdf.engine import PDFEngine
+
+logger = structlog.get_logger("app.services.pdf.invoice")
 
 
 class InvoiceGenerator(PDFEngine):
@@ -37,77 +53,69 @@ class InvoiceGenerator(PDFEngine):
         job_dir.mkdir(parents=True, exist_ok=True)
         filepath = str(job_dir / "Retail_Quote.pdf")
 
+        styles = get_audience_styles("homeowner")
+
         def build_pdf() -> None:
-            """
-            Build Pdf functionality.
-            
-            Returns:
-                Any: The resulting output.
-            """
-            import datetime as _dt
-            doc = self._get_doc_template(filepath,
-                                         job_id=job_id)
+            doc = self._get_doc_template(filepath, job_id=job_id, doc_type="RETAIL_QUOTE")
             story: list[Any] = []
 
-            story.append(Paragraph(
-                "ROOFING REPLACEMENT QUOTE",
-                self.custom_styles["Title"]
-            ))
-            story.append(Spacer(1, 12))
+            story.extend(create_header("ROOFING REPLACEMENT QUOTE", "homeowner", subtitle="Professional Tiered Valuation & Specification"))
             story.append(self._build_metadata_table(job))
-            story.append(Spacer(1, 6))
+            story.append(Spacer(1, 10))
 
             # Measured area summary
-            story.append(Paragraph(
-                f"<b>Measured Roof Area:</b> "
-                f"{billable_squares:.2f} squares "
-                f"(includes 10% waste factor)",
-                self.custom_styles["BodyText"]
-            ))
-            story.append(Spacer(1, 16))
+            area_text = (
+                f"<b>Measured Roof Area:</b> {billable_squares:.2f} squares "
+                f"(includes standard geometry waste factor)"
+            )
+            story.append(Paragraph(area_text, styles["BodyText"]))
+            story.append(Spacer(1, 12))
 
             # 3-Tier options table
-            story.append(Paragraph(
-                "Select Your Roofing System:",
-                self.custom_styles["SectionHeading"]
-            ))
+            story.append(Paragraph("Select Your Roofing System Option:", styles["SectionHeading"]))
+            story.append(Spacer(1, 4))
 
-            header = ["Option", "System", "Description",
-                      "Total Price"]
-            rows = [header]
+            table_cell_style = ParagraphStyle(
+                "QuoteTableCell",
+                parent=styles["BodyText"],
+                fontSize=8.5,
+                leading=11,
+                textColor=colors.HexColor("#1e293b")
+            )
+
+            header = ["Option", "System", "Description", "Total Price"]
+            rows: list[list[Any]] = [header]
             labels = ["A", "B", "C"]
             for i, tier in enumerate(tiers):
                 rows.append([
-                    labels[i],
-                    tier["name"],
-                    tier["description"],
+                    labels[i] if i < len(labels) else str(i + 1),
+                    Paragraph(f"<b>{tier['name']}</b>", table_cell_style),
+                    Paragraph(tier["description"], table_cell_style),
                     f"${tier['total_price']:,.2f}"
                 ])
 
-            t = Table(rows, colWidths=[30, 130, 220, 90])
+            t = Table(rows, colWidths=[45, 125, 230, 110])
             t.setStyle(TableStyle([
-                ('BACKGROUND', (0,0), (-1,0), colors.darkblue),
-                ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-                ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0,0), (-1,0), 10),
-                ('ROWBACKGROUNDS', (0,1), (-1,-1),
-                 [colors.lightblue, colors.white,
-                  colors.lightgrey]),
-                ('GRID', (0,0), (-1,-1), 0.5, colors.black),
-                ('VALIGN', (0,0), (-1,-1), 'TOP'),
-                ('PADDING', (0,0), (-1,-1), 8),
-                ('FONTNAME', (0,1), (0,-1), 'Helvetica-Bold'),
-                ('FONTSIZE', (3,1), (3,-1), 11),
-                ('ALIGN', (3,0), (3,-1), 'RIGHT'),
+                ('BACKGROUND', (0, 0), (-1, 0), BRAND_NAVY),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 9.5),
+                ('ALIGN', (0, 0), (0, -1), 'CENTER'),
+                ('ALIGN', (1, 0), (2, -1), 'LEFT'),
+                ('ALIGN', (3, 0), (3, -1), 'RIGHT'),  # strict right-align currency
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [BRAND_LIGHT_BG, BRAND_MUTED_BG]),
+                ('GRID', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('PADDING', (0, 0), (-1, -1), 6),
+                ('FONTNAME', (0, 1), (0, -1), 'Helvetica-Bold'),
+                ('FONTSIZE', (3, 1), (3, -1), 10),
             ]))
             story.append(t)
-            story.append(Spacer(1, 20))
+            story.append(Spacer(1, 14))
 
             # What's included block
-            story.append(Paragraph(
-                "All Options Include:",
-                self.custom_styles["SectionHeading"]
-            ))
+            story.append(Paragraph("All Options Include:", styles["SectionHeading"]))
+            story.append(Spacer(1, 4))
             included = [
                 "Complete tear-off and disposal of existing roofing materials",
                 "New synthetic underlayment and heavy-duty drip edge installation",
@@ -116,34 +124,22 @@ class InvoiceGenerator(PDFEngine):
                 "Complete haul-away and magnet sweep job site cleanup",
             ]
             for item in included:
-                story.append(Paragraph(
-                    f"✓  {item}",
-                    self.custom_styles["BodyText"]
-                ))
-            story.append(Spacer(1, 16))
+                story.append(Paragraph(f"✓ &nbsp;{item}", styles["BodyText"]))
+                story.append(Spacer(1, 2))
+            story.append(Spacer(1, 12))
 
             # Quote validity disclaimer
-            story.append(self._box_warning(
-                "Quote Validity",
-                f"This quote is valid for 30 days from "
-                f"{_dt.date.today().isoformat()}. "
-                f"Prices subject to material cost changes. "
-                f"Does not include permit fees or code-required "
-                f"decking replacement.",
-                colors.darkgrey
-            ))
-            story.append(Spacer(1, 24))
+            validity_text = (
+                f"This quote is valid for 30 days from {datetime.date.today().isoformat()}. "
+                "Prices subject to material supplier adjustments. Does not include permit fees or code-required decking replacement."
+            )
+            story.append(self._box_warning("Quote Validity & Scope Terms", validity_text, BRAND_SLATE))
+            story.append(Spacer(1, 14))
 
             # Acceptance signature
-            story.append(Paragraph(
-                "To Accept This Quote:",
-                self.custom_styles["SectionHeading"]
-            ))
-            story.append(Paragraph(
-                "Circle your selected option (A / B / C) "
-                "and sign below.",
-                self.custom_styles["BodyText"]
-            ))
+            story.append(Paragraph("To Accept This Quote:", styles["SectionHeading"]))
+            story.append(Paragraph("Select your option (A / B / C) and sign below:", styles["BodyText"]))
+            story.append(Spacer(1, 4))
             story.append(self._build_signature_block(
                 title1="Homeowner Signature & Option Selection",
                 title2="Date"
@@ -153,7 +149,6 @@ class InvoiceGenerator(PDFEngine):
 
         await asyncio.to_thread(build_pdf)
         return filepath
-
 
     async def generate_monthly_financial_summary(self, month: int, year: int) -> str:
         """Generate a professional PDF summary for the specified month."""
@@ -165,23 +160,18 @@ class InvoiceGenerator(PDFEngine):
         filepath = str(FIELD_DOCS_DIR / f"Monthly_Financial_Summary_{year}_{month:02d}.pdf")
         Path(filepath).parent.mkdir(parents=True, exist_ok=True)
         
+        styles = get_audience_styles("internal")
+
         def build_pdf() -> None:
-            """
-            Build Pdf functionality.
-            
-            Returns:
-                Any: The resulting output.
-            """
             doc = self._get_doc_template(filepath, top_margin=120, job_id="MONTHLY", doc_type="MONTHLY_SUMMARY")
             story: list[Any] = []
             
-            story.append(Paragraph(f"Monthly Financial Summary - {year}-{month:02d}", self.custom_styles["Title"]))
-            story.append(Spacer(1, 20))
+            story.extend(create_header(f"Monthly Financial Summary — {year}-{month:02d}", "internal"))
             
             jobs = get_monthly_financials(month, year)
             
             if not jobs:
-                story.append(Paragraph("No INVOICED or CLOSED jobs found for this period.", self.custom_styles["BodyText"]))
+                story.append(Paragraph("No INVOICED or CLOSED jobs found for this period.", styles["BodyText"]))
                 doc.build(story)
                 return
             
@@ -190,7 +180,7 @@ class InvoiceGenerator(PDFEngine):
             total_comm = 0.0
             
             # Details Table
-            table_data = [["Job ID", "Homeowner", "Revenue", "Costs", "Margin"]]
+            table_data = [["Job ID", "Homeowner", "Revenue", "COGS", "Gross Margin"]]
             
             for j in jobs:
                 rev = j.get("revenue_cents")
@@ -214,7 +204,7 @@ class InvoiceGenerator(PDFEngine):
                 oh_val = oh_pct if oh_pct < 1 else (oh_pct / 100.0)
                 comm_val = comm_pct if comm_pct < 1 else (comm_pct / 100.0)
                 
-                cogs = mat + lab + ((mat+lab)*oh_val)
+                cogs = mat + lab + ((mat + lab) * oh_val)
                 comm = rev * comm_val
                 margin = rev - cogs - comm
                 
@@ -242,29 +232,32 @@ class InvoiceGenerator(PDFEngine):
             
             st = Table(summary_data, colWidths=[150, 150], hAlign='LEFT')
             st.setStyle(TableStyle([
-                ('BACKGROUND', (0,0), (0,-1), colors.lightgrey),
-                ('FONTNAME', (0,0), (-1,-1), 'Helvetica-Bold'),
-                ('GRID', (0,0), (-1,-1), 0.5, colors.black),
-                ('PADDING', (0,0), (-1,-1), 6)
+                ('BACKGROUND', (0, 0), (0, -1), BRAND_LIGHT_BG),
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
+                ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+                ('GRID', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
+                ('PADDING', (0, 0), (-1, -1), 6)
             ]))
             
-            story.append(Paragraph("Executive Summary", self.custom_styles["SectionHeading"]))
+            story.append(Paragraph("Executive Summary", styles["SectionHeading"]))
             story.append(st)
-            story.append(Spacer(1, 20))
+            story.append(Spacer(1, 16))
             
             # Details Block
-            story.append(Paragraph("Job Details", self.custom_styles["SectionHeading"]))
+            story.append(Paragraph("Job Details Breakdown", styles["SectionHeading"]))
+            story.append(Spacer(1, 4))
             
-            dt = Table(table_data, colWidths=[80, 150, 80, 80, 80])
+            dt = Table(table_data, colWidths=[80, 150, 90, 90, 100])
             dt.setStyle(TableStyle([
-                ('BACKGROUND', (0,0), (-1,0), colors.grey),
-                ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
-                ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-                ('ALIGN', (0,0), (1,-1), 'LEFT'),
-                ('ALIGN', (2,0), (-1,-1), 'RIGHT'), # explicit right-align Revenue, Costs, Margin
-                ('GRID', (0,0), (-1,-1), 0.5, colors.lightgrey),
-                ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.whitesmoke, colors.white]),
-                ('PADDING', (0,0), (-1,-1), 6)
+                ('BACKGROUND', (0, 0), (-1, 0), BRAND_SLATE),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 9),
+                ('ALIGN', (0, 0), (1, -1), 'LEFT'),
+                ('ALIGN', (2, 0), (-1, -1), 'RIGHT'),  # strict right-align Revenue, Costs, Margin
+                ('GRID', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [BRAND_LIGHT_BG, BRAND_MUTED_BG]),
+                ('PADDING', (0, 0), (-1, -1), 6)
             ]))
             story.append(dt)
             
@@ -273,7 +266,6 @@ class InvoiceGenerator(PDFEngine):
         await asyncio.to_thread(build_pdf)
         log.info("monthly_summary_generation_complete", filepath=filepath)
         return filepath
-
 
     async def generate_material_po(self, job: dict, bom: MaterialBOM, supplier_name: str, delivery_date: str) -> str:
         """
@@ -286,33 +278,37 @@ class InvoiceGenerator(PDFEngine):
         filepath = str(FIELD_DOCS_DIR / job["id"] / f"PO_{supplier_name.replace(' ', '_')}.pdf")
         Path(filepath).parent.mkdir(parents=True, exist_ok=True)
 
+        styles = get_audience_styles("internal")
+
         def build_pdf() -> None:
-            """
-            Build Pdf functionality.
-            
-            Returns:
-                Any: The resulting output.
-            """
             doc = self._get_doc_template(filepath, job_id=job["id"], doc_type="MATERIAL_PO")
             story: list[Any] = []
             
+            story.extend(create_header("MATERIAL PURCHASE ORDER", "internal", subtitle=f"Supplier: {supplier_name}"))
+            
             # --- 1. Order Details ---
             po_number = f"PO-{job['id'][:8].upper()}-{datetime.date.today().isoformat()}"
-            story.append(Paragraph(f"<b>PO Number:</b> {po_number}", self.custom_styles["BodyText"]))
-            story.append(Paragraph(f"<b>Supplier:</b> {supplier_name}", self.custom_styles["BodyText"]))
-            story.append(Paragraph("<b>Supplier Account #:</b> Wickham Roofing Commercial Account", self.custom_styles["BodyText"]))
-            story.append(Paragraph(f"<b>Order Date:</b> {datetime.date.today().isoformat()}", self.custom_styles["BodyText"]))
-            story.append(Paragraph(f"<b>Requested Delivery Date:</b> {delivery_date}", self.custom_styles["BodyText"]))
-            story.append(Spacer(1, 12))
-            
-            story.append(Paragraph("Delivery Information:", self.custom_styles["SectionHeading"]))
-            story.append(Paragraph(f"<b>Homeowner:</b> {job['homeowner_name']}", self.custom_styles["BodyText"]))
-            story.append(Paragraph(f"<b>Address:</b> {job['address_line1']}, {job['city']}, {job['state']} {job['postal_code']}", self.custom_styles["BodyText"]))
-            story.append(Paragraph(f"<b>Claim #:</b> {job.get('claim_number', 'N/A')}", self.custom_styles["BodyText"]))
-            story.append(Spacer(1, 18))
+            po_meta = [
+                ["PO Number:", po_number, "Order Date:", datetime.date.today().isoformat()],
+                ["Supplier:", supplier_name, "Delivery Date:", delivery_date],
+                ["Property:", f"{job['address_line1']}, {job['city']}, {job['state']}", "Claim #:", job.get("claim_number", "N/A")],
+            ]
+            t_meta = Table(po_meta, colWidths=[90, 170, 90, 160])
+            t_meta.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (0, -1), BRAND_LIGHT_BG),
+                ('BACKGROUND', (2, 0), (2, -1), BRAND_LIGHT_BG),
+                ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                ('FONTNAME', (2, 0), (2, -1), 'Helvetica-Bold'),
+                ('GRID', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
+                ('PADDING', (0, 0), (-1, -1), 5),
+                ('FONTSIZE', (0, 0), (-1, -1), 8.5),
+            ]))
+            story.append(t_meta)
+            story.append(Spacer(1, 14))
             
             # --- 2. BOM Table ---
-            story.append(Paragraph("Material Bill of Quantities:", self.custom_styles["SectionHeading"]))
+            story.append(Paragraph("Material Bill of Quantities:", styles["SectionHeading"]))
+            story.append(Spacer(1, 4))
             
             table_data = [["Material Type", "Quantity", "Unit"]]
             
@@ -328,36 +324,35 @@ class InvoiceGenerator(PDFEngine):
             table_data.append(["Metal & Trim", "", ""])
             table_data.append(["  Drip Edge (10ft)", str(bom.drip_edge_pieces), "Pieces"])
             
-            # Build alternating backgrounds, but explicitly style subheaders
-            row_colors = [('BACKGROUND', (0, i), (-1, i), colors.whitesmoke if i % 2 == 1 else colors.white) for i in range(1, len(table_data))]
-            
-            t = Table(table_data, colWidths=[200, 100, 100])
-            base_style = [
-                ('BACKGROUND', (0,0), (-1,0), colors.grey),
-                ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
-                ('ALIGN', (0,0), (0,-1), 'LEFT'),
-                ('ALIGN', (1,0), (-1,-1), 'RIGHT'), # right align numeric columns
-                ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-                ('BOTTOMPADDING', (0,0), (-1,0), 8),
-                ('GRID', (0,0), (-1,-1), 0.5, colors.lightgrey),
+            t = Table(table_data, colWidths=[270, 120, 120])
+            t.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), BRAND_SLATE),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+                ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),  # right-align numeric columns
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 9),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+                ('GRID', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [BRAND_LIGHT_BG, BRAND_MUTED_BG]),
                 
                 # Subheaders
-                ('BACKGROUND', (0,1), (-1,1), colors.lightgrey),
-                ('FONTNAME', (0,1), (-1,1), 'Helvetica-Bold'),
-                ('BACKGROUND', (0,5), (-1,5), colors.lightgrey),
-                ('FONTNAME', (0,5), (-1,5), 'Helvetica-Bold'),
-                ('BACKGROUND', (0,8), (-1,8), colors.lightgrey),
-                ('FONTNAME', (0,8), (-1,8), 'Helvetica-Bold'),
-            ]
-            t.setStyle(TableStyle(cast(list[Any], base_style + row_colors)))
+                ('BACKGROUND', (0, 1), (-1, 1), colors.HexColor("#e2e8f0")),
+                ('FONTNAME', (0, 1), (-1, 1), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, 5), (-1, 5), colors.HexColor("#e2e8f0")),
+                ('FONTNAME', (0, 5), (-1, 5), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, 8), (-1, 8), colors.HexColor("#e2e8f0")),
+                ('FONTNAME', (0, 8), (-1, 8), 'Helvetica-Bold'),
+                ('PADDING', (0, 0), (-1, -1), 5),
+            ]))
             story.append(t)
-            story.append(Spacer(1, 20))
+            story.append(Spacer(1, 14))
             
             # --- 3. Special Instructions ---
-            story.append(Paragraph("Special Instructions:", self.custom_styles["SectionHeading"]))
-            story.append(Paragraph("Deliver to driveway; no yard entry with loaded truck.", self.custom_styles["BodyText"]))
-            story.append(Spacer(1, 20))
-            story.append(Paragraph("<b>Total Estimated Cost:</b> $___________", self.custom_styles["SectionHeading"]))
+            story.append(Paragraph("Delivery Instructions:", styles["SectionHeading"]))
+            story.append(Paragraph("Deliver materials to driveway; no heavy yard entry without prior contractor clearance.", styles["BodyText"]))
+            story.append(Spacer(1, 14))
+            story.append(Paragraph("<b>Supplier Verification & Signature:</b> ___________________________ &nbsp;&nbsp; <b>Date:</b> _________", styles["BodyText"]))
             
             doc.build(story)
 
@@ -377,41 +372,22 @@ class InvoiceGenerator(PDFEngine):
         log = logger.bind(job_id=job_id)
         log.info("pdf_generation_started")
 
-        # Create a secure temporary file that persists until manually deleted
         job_dir = FIELD_DOCS_DIR / job_id
         job_dir.mkdir(parents=True, exist_ok=True)
-        filepath = str(job_dir / "estimate.pdf")  # Close so ReportLab can write to it
+        filepath = str(job_dir / "estimate.pdf")
+
+        styles = get_audience_styles("homeowner")
 
         def build_pdf() -> None:
-            """
-            Build Pdf functionality.
-            
-            Returns:
-                Any: The resulting output.
-            """
             doc = self._get_doc_template(filepath, job_id=job_id, doc_type="ESTIMATE")
             story: list[Any] = []
             
-            # Styles
-            normal_style = self.styles["Normal"]
+            story.extend(create_header("ROOFING ESTIMATE & SCOPE SPECIFICATION", "homeowner", subtitle=f"Job Identifier: {job_id}"))
+            story.append(Spacer(1, 8))
             
-            # Custom Legal Style
-            legal_style = ParagraphStyle(
-                name="LegalDisclaimer",
-                parent=self.styles["Normal"],
-                fontSize=8,
-                leading=10,
-                textColor=colors.dimgrey,
-            )
-            
-            # --- 1. Metadata ---
-            story.append(Paragraph("<b>Roofing Estimate</b>", self.styles["Heading2"]))
-            story.append(Paragraph(f"<b>Job ID:</b> {job_id}", normal_style))
-            story.append(Spacer(1, 12))
-            
-            # --- 3. Materials ---
-            story.append(Paragraph("<b>Scope of Work / Materials:</b>", normal_style))
-            story.append(Spacer(1, 6))
+            # --- Scope of Work / Materials ---
+            story.append(Paragraph("Scope of Work & Material Specifications:", styles["SectionHeading"]))
+            story.append(Spacer(1, 4))
             materials = data.get("materials", [])
             
             mat_map = {
@@ -437,55 +413,146 @@ class InvoiceGenerator(PDFEngine):
                     else:
                         clean_materials.append([m_str, "1"])
                         
-                t_data = [["Material", "Quantity"]] + clean_materials
-                t = Table(t_data, colWidths=[350, 100])
+                t_data = [["Material Specification", "Quantity / Unit"]] + clean_materials
+                t = Table(t_data, colWidths=[380, 130])
                 t.setStyle(TableStyle([
-                    ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
-                    ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-                    ('GRID', (0,0), (-1,-1), 0.5, colors.lightgrey),
-                    ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.whitesmoke, colors.white]),
-                    ('PADDING', (0,0), (-1,-1), 6)
+                    ('BACKGROUND', (0, 0), (-1, 0), BRAND_NAVY),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 9),
+                    ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+                    ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+                    ('GRID', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
+                    ('ROWBACKGROUNDS', (0, 1), (-1, -1), [BRAND_LIGHT_BG, BRAND_MUTED_BG]),
+                    ('PADDING', (0, 0), (-1, -1), 6)
                 ]))
                 story.append(t)
             else:
-                story.append(Paragraph("No materials specified.", normal_style))
-            story.append(Spacer(1, 12))
+                story.append(Paragraph("No materials specified.", styles["BodyText"]))
+            story.append(Spacer(1, 14))
             
-            # --- 4. Total Cost ---
+            # --- Total Cost ---
             total_cost = data.get("total_cost", 0.0)
             total_style = ParagraphStyle(
                 name="TotalCost",
-                parent=normal_style,
-                fontSize=14,
+                parent=styles["BodyText"],
+                fontSize=13,
+                leading=16,
                 fontName="Helvetica-Bold",
-                alignment=2 # 2=TA_RIGHT
+                textColor=BRAND_NAVY,
+                alignment=2  # 2=TA_RIGHT
             )
-            story.append(Paragraph(f"Total Cost: ${total_cost:,.2f}", total_style))
-            story.append(Paragraph("(Includes Labor, Material Waste, and Applicable Taxes)", self.custom_styles["FinePrint"]))
-            story.append(Spacer(1, 40))
+            story.append(Paragraph(f"Estimated Valuation Total: ${total_cost:,.2f}", total_style))
+            story.append(Paragraph("(Includes Labor, Material Waste, and Applicable Sales Taxes)", styles["FinePrint"]))
+            story.append(Spacer(1, 20))
             
-            # --- 5. Legal Terms & Disclaimers Boilerplate ---
-            story.append(HRFlowable(width="100%", thickness=0.5, color=colors.lightgrey, spaceBefore=0, spaceAfter=12))
-            legal_text = (
-                "<b>Scope of Work:</b> This estimate covers explicitly listed materials and applications. "
-                "Any hidden structural rot, decking damage, or code upgrades discovered during tear-off "
-                "will be handled via a supplemental change order.<br/><br/>"
+            # --- Statutory Deductible & Legal Terms ---
+            deductible_disclosure = (
+                "<b>GEORGIA STATUTORY DEDUCTIBLE DISCLOSURE (O.C.G.A. § 33-24-59.27 / HB 423):</b> "
+                "It is unlawful under Georgia law for a contractor to pay, rebate, waive, or promise to waive all or any part of an insurance deductible. "
+                "The property owner is legally obligated to pay the deductible amount specified in their insurance policy directly to the contractor upon project completion.<br/><br/>"
+                "<b>Scope of Work & Change Orders:</b> This estimate covers explicitly listed materials and applications. "
+                "Any hidden structural rot, decking damage, or code upgrades discovered during tear-off will be handled via a supplemental change order.<br/><br/>"
                 "<b>Workmanship Warranty:</b> Wickham Roofing LLC provides an explicit <b>1-Year Workmanship Warranty</b> "
                 "on all labor and installation from project completion. Material warranties are provided directly by the manufacturer.<br/><br/>"
-                "<b>Payment Terms:</b> All balances are due upon job completion. Unpaid invoices past 30 days "
-                "are subject to standard financing interest rates as specified by corporate policy."
+                "<b>Payment Terms:</b> All balances are due upon job completion. Unpaid invoices past 30 days are subject to standard financing interest rates."
             )
-            story.append(Paragraph(legal_text, legal_style))
+            story.append(self._box_warning("STATUTORY DISCLOSURES & TERMS OF ESTIMATE", deductible_disclosure, BRAND_NAVY))
             
             doc.build(story)
 
         try:
-            # Run the synchronous ReportLab generation in a thread
             await asyncio.to_thread(build_pdf)
             log.info("pdf_generation_complete", filepath=filepath)
             return filepath
         except Exception as exc:
             log.error("pdf_generation_failed", error=str(exc))
             raise
+
+    async def generate_final_invoice(self, job: dict, invoice_data: dict) -> str:
+        """
+        Generate a professional final invoice PDF.
+        Enforces Georgia statutory post-denial invoicing lock (O.C.G.A. § 10-1-393.12).
+        """
+        job_id = job.get("id", "UNKNOWN")
+        
+        # Check post-denial lock
+        locked, reason, deadline = is_post_denial_invoicing_locked(job_id)
+        if locked:
+            raise ValueError(
+                f"Cannot generate final invoice: Job {job_id} is subject to a 5-business-day post-denial invoicing lock under O.C.G.A. § 10-1-393.12 ({reason})."
+            )
+
+        job_dir = FIELD_DOCS_DIR / job_id
+        job_dir.mkdir(parents=True, exist_ok=True)
+        filepath = str(job_dir / "Final_Invoice.pdf")
+
+        styles = get_audience_styles("homeowner")
+
+        def build_pdf() -> None:
+            doc = self._get_doc_template(filepath, job_id=job_id, doc_type="INVOICE")
+            story: list[Any] = []
+
+            inv_number = invoice_data.get("invoice_number", f"INV-{job_id[:8].upper()}")
+            story.extend(create_header("FINAL RESTORATION INVOICE", "homeowner", subtitle=f"Invoice #{inv_number}"))
+            story.append(self._build_metadata_table(job))
+            story.append(Spacer(1, 10))
+
+            items = invoice_data.get("items", [
+                {"description": "Roof Replacement per Insurance Scope", "amount": invoice_data.get("total_amount", 0.0)}
+            ])
+            
+            rows = [["Line Item Description", "Amount"]]
+            subtotal = 0.0
+            for item in items:
+                amt = float(item.get("amount", 0.0))
+                subtotal += amt
+                rows.append([item.get("description", "Roofing Service"), f"${amt:,.2f}"])
+            
+            deductible = float(invoice_data.get("deductible_amount", 0.0))
+            payments_applied = float(invoice_data.get("payments_applied", 0.0))
+            balance_due = subtotal - payments_applied
+
+            if deductible > 0:
+                rows.append(["Homeowner Deductible Responsibility (O.C.G.A. § 33-24-59.27)", f"${deductible:,.2f}"])
+            if payments_applied > 0:
+                rows.append(["Less: Insurance & Prior Payments Applied", f"(${payments_applied:,.2f})"])
+            rows.append(["TOTAL BALANCE DUE UPON RECEIPT", f"${balance_due:,.2f}"])
+
+            t = Table(rows, colWidths=[380, 130])
+            t.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), BRAND_NAVY),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 9.5),
+                ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+                ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -2), [BRAND_LIGHT_BG, BRAND_MUTED_BG]),
+                ('BACKGROUND', (0, -1), (-1, -1), BRAND_NAVY),
+                ('TEXTCOLOR', (0, -1), (-1, -1), colors.white),
+                ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, -1), (-1, -1), 10.5),
+                ('GRID', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
+                ('PADDING', (0, 0), (-1, -1), 6),
+            ]))
+            story.append(t)
+            story.append(Spacer(1, 14))
+
+            # Statutory Deductible Notice
+            deductible_disclosure = (
+                "<b>GEORGIA STATUTORY DEDUCTIBLE DISCLOSURE (O.C.G.A. § 33-24-59.27 / HB 423):</b> "
+                "It is unlawful under Georgia law for a contractor to pay, rebate, waive, or promise to waive all or any part of an insurance deductible. "
+                "The property owner is legally obligated to pay the deductible amount specified in their insurance policy directly to the contractor upon project completion.<br/><br/>"
+                "<b>Workmanship Warranty:</b> All restoration work completed by Wickham Roofing LLC is backed by our explicit <b>1-Year Workmanship Warranty</b>."
+            )
+            story.append(self._box_warning("STATUTORY NOTICE & PAYMENT TERMS", deductible_disclosure, BRAND_NAVY))
+            story.append(Spacer(1, 14))
+
+            story.append(self._build_signature_block(title1="Authorized Contractor Signature", title2="Date"))
+            doc.build(story)
+
+        await asyncio.to_thread(build_pdf)
+        return filepath
+
 
 

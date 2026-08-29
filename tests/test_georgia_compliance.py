@@ -260,3 +260,82 @@ async def test_contingency_and_notice_of_cancellation_pdf_generation(tmp_path):
     contingency_path = await generator.generate_contingency_agreement(job)
     assert Path(contingency_path).exists()
     assert Path(contingency_path).stat().st_size > 0
+
+
+@pytest.mark.asyncio
+async def test_invoice_statutory_compliance_and_post_denial_lock(tmp_path, monkeypatch):
+    import pdfplumber
+    from app.services.pdf.invoice import InvoiceGenerator
+    
+    monkeypatch.setattr("app.services.pdf.invoice.FIELD_DOCS_DIR", tmp_path)
+    
+    job_id = str(uuid.uuid4())
+    job = {
+        "id": job_id,
+        "homeowner_name": "Valdosta Homeowner",
+        "address_line1": "100 Peacock Way",
+        "city": "Valdosta",
+        "state": "GA",
+        "postal_code": "31602",
+        "claim_number": "CLM-INV-7711",
+    }
+    
+    generator = InvoiceGenerator()
+    
+    # 1. Generate estimate PDF
+    est_data = {
+        "materials": ["field_shingle_bundles: 30", "drip_edge_pieces: 10"],
+        "total_cost": 8500.0,
+    }
+    est_path = await generator.generate_estimate_pdf(est_data, job_id)
+    assert Path(est_path).exists()
+    
+    with pdfplumber.open(est_path) as pdf:
+        est_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+        assert "33-24-59.27" in est_text
+        assert "HB 423" in est_text
+        assert "33-1-9" not in est_text
+        assert len(detect_aob_language(est_text)) == 0
+
+    # 2. Generate final invoice PDF (unlocked)
+    inv_data = {
+        "invoice_number": "INV-7711",
+        "items": [{"description": "Full Roof Replacement per Approved Scope", "amount": 8500.0}],
+        "deductible_amount": 1000.0,
+        "payments_applied": 7500.0,
+    }
+    inv_path = await generator.generate_final_invoice(job, inv_data)
+    assert Path(inv_path).exists()
+    
+    with pdfplumber.open(inv_path) as pdf:
+        inv_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+        assert "33-24-59.27" in inv_text
+        assert "HB 423" in inv_text
+        assert "33-1-9" not in inv_text
+        assert len(detect_aob_language(inv_text)) == 0
+
+    # 3. Test post-denial invoicing lock enforcement
+    denial_job_id = str(uuid.uuid4())
+    conn = get_connection()
+    try:
+        denial_time = datetime.datetime.now(timezone.utc)
+        history = [
+            {"status": "LEAD_CAPTURED", "timestamp": "2026-08-20T10:00:00Z", "note": "New lead"},
+            {"status": "CLAIM_DENIED", "timestamp": denial_time.isoformat(), "note": "Carrier denied"},
+        ]
+        conn.execute(
+            """INSERT INTO jobs (id, homeowner_name, address_line1, city, state, postal_code, phone, status, job_type, status_history)
+               VALUES (?, 'Locked Lead', '100 Peacock Way', 'Valdosta', 'GA', '31602', '229-555-0199', 'CLAIM_DENIED', 'insurance', ?)""",
+            (denial_job_id, json.dumps(history))
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    denial_job = dict(job)
+    denial_job["id"] = denial_job_id
+    with pytest.raises(ValueError) as exc_info:
+        await generator.generate_final_invoice(denial_job, inv_data)
+    assert "post-denial invoicing lock" in str(exc_info.value)
+    assert "10-1-393.12" in str(exc_info.value)
+
