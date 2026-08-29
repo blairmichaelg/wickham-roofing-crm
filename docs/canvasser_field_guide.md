@@ -377,8 +377,28 @@ To help close deals faster and streamline nearby jobsite canvassing, the Field A
 - **Storm-Grounded Pitch**: Generates a professionally designed, single-page PDF letter featuring our corporate letterhead. The letter references the exact completed job address and highlights NWS storm events that occurred nearby.
 - **Call-to-Action**: Invites neighbors to book a free roofing inspection. You can download and print these to drop at adjacent houses, maximizing lead gen around completed installs.
 
+## 14. Spoken Field Voice Notes (Voice-to-Text)
+
+To speed up intake without typing long notes on a phone keyboard, the Field App includes an integrated **Voice Note Recorder**:
+
+- **Recording Spoken Notes**: On the New Lead form, scroll to the **Voice Notes** section and tap **🎙️ Record Voice Note**. Speak clearly into your device microphone to document observations (e.g. attic moisture, interior ceiling stains, special homeowner instructions).
+- **Review & Playback**: Tap **⏹️ Stop Recording** when finished. An audio player widget appears so you can preview the recorded audio memo before submitting.
+- **Automated AI Transcription**: When you submit the lead, the `.webm` audio memo is uploaded to `/api/field/jobs/{job_id}/voice-note`. The system automatically transcribes your spoken memo using the local AI speech engine (`faster-whisper`) and attaches the text directly to the job record.
+- **Offline Durability**: If you record a voice note while offline, the audio memo is safely stored in local browser storage (IndexedDB) as part of the offline queue package and will replay/transcribe automatically once connectivity returns.
+
 ---
 
-*This guide reflects the field app as of version `2.4.1`. If the app's
+## 15. Offline Sync Error Modal & Manual Retry Flow
+
+If an offline item fails during automatic replay (for example, if network connectivity drops mid-stream or a server error occurs):
+
+- **Sync Error Notification**: The pending sync badge indicates any replay failure.
+- **Opening the Sync Error Modal**: Tapping the sync alert opens the **Sync Error Modal** (`#syncErrorModal`), showing the exact reason for the failure (such as a temporary network timeout or server validation error).
+- **Manual Retry Action**: Tap the **🔄 Retry Sync** button inside the modal to immediately re-attempt synchronization without losing your recorded notes, photos, or e-signatures.
+- **Escalation to Office**: If the error persists after multiple retries, note the job address shown in the modal and contact the office team.
+
+---
+
+*This guide reflects the field app as of version `2.5.8`. If the app's
 screens, buttons, or error messages change in a future update, this
 guide should be reviewed and updated to match.*

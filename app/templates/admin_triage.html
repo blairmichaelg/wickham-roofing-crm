@@ -48,7 +48,7 @@
                 </div>
                 <span class="px-3 py-1 bg-red-900 text-red-300
                              rounded text-xs font-bold uppercase">
-                    PENDING REVIEW
+                    {{ 'PIPELINE FAILED' if job.status == 'PIPELINE_FAILED' else 'PENDING REVIEW' }}
                 </span>
             </div>
 

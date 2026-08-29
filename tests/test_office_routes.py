@@ -312,3 +312,48 @@ def test_mark_commission_paid(monkeypatch):
     row = conn.execute("SELECT commission_ready FROM jobs WHERE id = ?", (job_id,)).fetchone()
     assert row["commission_ready"] == 0
     conn.close()
+
+
+def test_admin_triage_view_surfaces_review_and_failed_jobs():
+    """Verify that /api/office/admin/triage surfaces both PENDING_OPERATOR_REVIEW and PIPELINE_FAILED jobs, and excludes normal jobs."""
+    from app.api.auth import create_access_token
+    from app.core.database import get_connection
+    import uuid
+
+    admin_token = create_access_token("admin")
+    job_review = f"job-rev-{uuid.uuid4().hex[:8]}"
+    job_failed = f"job-fail-{uuid.uuid4().hex[:8]}"
+    job_normal = f"job-norm-{uuid.uuid4().hex[:8]}"
+
+    conn = get_connection()
+    conn.execute(
+        "INSERT INTO jobs (id, homeowner_name, address_line1, city, state, postal_code, phone, status) VALUES (?, 'Review Homeowner', '123 Review Rd', 'Valdosta', 'GA', '31601', '555-1111', 'PENDING_OPERATOR_REVIEW')",
+        (job_review,)
+    )
+    conn.execute(
+        "INSERT INTO jobs (id, homeowner_name, address_line1, city, state, postal_code, phone, status) VALUES (?, 'Failed Homeowner', '456 Failed Rd', 'Valdosta', 'GA', '31601', '555-2222', 'PIPELINE_FAILED')",
+        (job_failed,)
+    )
+    conn.execute(
+        "INSERT INTO jobs (id, homeowner_name, address_line1, city, state, postal_code, phone, status) VALUES (?, 'Normal Lead Homeowner', '789 Normal Rd', 'Valdosta', 'GA', '31601', '555-3333', 'LEAD_CAPTURED')",
+        (job_normal,)
+    )
+    conn.commit()
+    conn.close()
+
+    try:
+        response = client.get("/api/office/admin/triage", cookies={"auth_token": admin_token})
+        assert response.status_code == 200
+        # (a) Pre-existing PENDING_OPERATOR_REVIEW status surfaces
+        assert "Review Homeowner" in response.text
+        # (b) Newly-included PIPELINE_FAILED status surfaces
+        assert "Failed Homeowner" in response.text
+        # (c) Normal/unrelated status does NOT surface in triage
+        assert "Normal Lead Homeowner" not in response.text
+    finally:
+        conn = get_connection()
+        conn.execute("DELETE FROM jobs WHERE id IN (?, ?, ?)", (job_review, job_failed, job_normal))
+        conn.commit()
+        conn.close()
+
+

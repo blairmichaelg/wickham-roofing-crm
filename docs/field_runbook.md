@@ -1,6 +1,8 @@
-# Wickham Roofing V4 "Wickham Roofing CRM" - Field Runbook
+# Wickham Roofing CRM — Field & Offline Runbook
 
-This runbook provides emergency operational procedures for Scott during the first live dry run. If the V4 CRM behaves unexpectedly, execute the diagnostics below before escalating.
+**Wickham Roofing CRM v2.5.8 · Operational Runbook**
+
+This runbook provides emergency operational procedures for Scott and field reps. If the CRM behaves unexpectedly in the field or office, execute the diagnostics below before escalating.
 
 ## 1. If the Upload Hangs (Mobile Field App)
 
@@ -71,3 +73,23 @@ This runbook provides emergency operational procedures for Scott during the firs
 - **Symptom**: The `mailto:` link fires but the To: address is empty.
 - **Diagnosis**: No email address was captured during initial lead intake.
 - **Action**: Open the job detail view, use the **Edit Claim Info** modal to add the homeowner's email, save, then retry the Email Client button.
+
+## 6. Voice Note Recording & Upload Diagnostics
+
+- **Symptom**: Tapping **🎙️ Record Voice Note** shows "Microphone access denied or unavailable."
+- **Diagnosis**: Mobile browser microphone permissions are blocked or insecure HTTP context is being used.
+- **Action**:
+  1. Check browser settings (iOS Safari / Chrome) and ensure microphone permission is granted for the domain.
+  2. Ensure the app is accessed over HTTPS (Cloudflare tunnel or localhost).
+  3. If a voice upload fails during lead submission, the `.webm` audio is preserved in the offline IndexedDB queue and will retry automatically.
+
+## 7. Offline Queue Sync Replay & Error Modal
+
+- **Symptom**: The sync badge displays a red alert or fails during automatic replay.
+- **Diagnosis**: Replay payload failed due to network timeout or client validation rejection.
+- **Action**:
+  1. Tap the sync badge to open the **Sync Error Modal** (`#syncErrorModal`).
+  2. Inspect the detailed error message displayed in the dialog.
+  3. Tap **🔄 Retry Sync** to re-attempt queue processing immediately.
+  4. If the error is a permanent 400 validation issue, note the job address and report to the office admin.
+

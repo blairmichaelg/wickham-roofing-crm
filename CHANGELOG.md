@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.5.9] - 2026-08-28
+### Fixed & Enhanced (Admin Triage View Completeness, Field Guides & Offline Runbook Alignment)
+
+- **Admin Triage View Completeness**: Fixed query filter in `admin_triage_view` (`app/api/office_routes.py`) from `WHERE j.status = 'PENDING_OPERATOR_REVIEW'` to `WHERE j.status IN ('PENDING_OPERATOR_REVIEW', 'PIPELINE_FAILED')`, ensuring all background pipeline failures are surfaced to operators for triage and resolution. Updated `app/templates/admin_triage.html` with dynamic card status badges.
+- **Regression Test Coverage (+1 test, 463 → 464)**: Added comprehensive triage route test `test_admin_triage_view_surfaces_review_and_failed_jobs` in `tests/test_office_routes.py` asserting that `PENDING_OPERATOR_REVIEW` and `PIPELINE_FAILED` jobs surface correctly in the triage UI while normal lifecycle jobs (`LEAD_CAPTURED`) are strictly excluded.
+- **Canvasser Field Guide Updates (`docs/canvasser_field_guide.md`)**: Documented spoken voice note recording workflow (`#voiceNoteSection`), preview player, automated backend faster-whisper transcription, and offline queue error modal (`#syncErrorModal`) manual retry flow. Updated release version stamp to `v2.5.8` / `v2.5.9`.
+- **Field & Offline Runbook Updates (`docs/field_runbook.md`)**: Added Section 6 for Voice Note Recording & Upload Diagnostics and Section 7 for Offline Queue Sync Replay & Error Modal handling. Updated version stamp to `v2.5.9`.
+
 ## [2.5.8] - 2026-08-28
 ### Added & Enhanced (Supplemental Pricing Unit Verification & DMO PU Key Disambiguation)
 

@@ -1268,7 +1268,7 @@ async def admin_triage_view(request: Request):
                    j.ev_ridge_lf, j.ev_hip_lf,
                    j.ev_valley_lf, j.ev_eaves_lf, j.ev_rakes_lf
             FROM jobs j
-            WHERE j.status = 'PENDING_OPERATOR_REVIEW'
+            WHERE j.status IN ('PENDING_OPERATOR_REVIEW', 'PIPELINE_FAILED')
             ORDER BY j.created_at ASC
         """)
         stuck_jobs = [dict(r) for r in cursor.fetchall()]
