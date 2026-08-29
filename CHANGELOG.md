@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.5.8] - 2026-08-28
+### Added & Enhanced (Supplemental Pricing Unit Verification & DMO PU Key Disambiguation)
+
+- **Pricing Key Unit Verification (RFG START, RFG DRIP, RFG IWS)**: Audited codebase to verify that `starter_bundles` ($45.00/BDL), `drip_edge_pieces_10ft` ($15.00/PC), and `ice_and_water_rolls` ($90.00/RL) are pre-existing, genuine dollar rates per unit in the `pricing` table (matching `MaterialBOM` unit counts). Updated `generate_and_gate_flags` in `app/core/pipeline.py` with deterministic geometry formulas for starter strip bundles (`math.ceil((eaves_lf + rake_lf) / 100.0)`) and drip edge pieces (`math.ceil(drip_lf / 10.0)`).
+- **DMO PU vs DMO DUMP Disambiguation**: Established dedicated baseline pricing key `dmo_pu_per_load` ($250.00/EA) in `seed_default_pricing` (`app/core/database.py`) and re-pointed `DMO PU` in `CODE_PRICING_MAP` (`app/services/pdf/supplement.py`), eliminating key reuse collision with `DMO DUMP` dumpster container fee ($450.00/EA).
+- **End-to-End PDF Validation (+1 test, 462 → 463)**: Added `test_supplement_pdf_additional_codes_pricing_resolution_end_to_end` in `tests/test_xactimate_coverage.py` using `pdfplumber` to verify non-zero, correctly calculated dollar amounts for `RFG START` ($90.00), `RFG DRIP` ($210.00), `RFG IWS` ($630.00), and `DMO PU` ($250.00).
+
 ## [2.5.7] - 2026-08-28
 ### Added & Enhanced (Supplement PDF Pricing Valuation Schedule & Rule Self-Reference Safety Verification)
 

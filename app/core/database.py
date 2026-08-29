@@ -342,6 +342,7 @@ def seed_default_pricing() -> None:
             ("rfg_ridgc_plus_per_lf", 8.50),
             ("sfg_guta_per_lf", 12.0),
             ("dmo_dump_per_container", 450.0),
+            ("dmo_pu_per_load", 250.0),
             ("rfg_renail_per_sq", 15.0),
             ("rfg_waste_adjustment_per_sq", 105.0),
         ]

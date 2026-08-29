@@ -287,6 +287,7 @@ def test_supplemental_xactimate_pricing_resolution():
     assert pricing.get("rfg_ridgc_plus_per_lf", 0.0) == 8.50
     assert pricing.get("sfg_guta_per_lf", 0.0) == 12.0
     assert pricing.get("dmo_dump_per_container", 0.0) == 450.0
+    assert pricing.get("dmo_pu_per_load", 0.0) == 250.0
     assert pricing.get("rfg_renail_per_sq", 0.0) == 15.0
     assert pricing.get("rfg_waste_adjustment_per_sq", 0.0) == 105.0
 
@@ -493,5 +494,127 @@ def test_rebuttal_and_frontend_rules_consumption():
     waste_citation = next(c for c in citations if c["required_child_code"] == "RFG 300S")
     assert waste_citation["quantity_delta"] == 1.5  # 30 SQ * 0.05
     assert "Complex Geometry" in waste_citation["citation_text"]
+
+
+@pytest.mark.asyncio
+async def test_supplement_pdf_additional_codes_pricing_resolution_end_to_end():
+    import os
+    import pdfplumber
+    from app.services.pdf.supplement import SupplementGenerator
+    from app.core.supplement_models import DiscrepancyReport, MaterialBOM
+    from app.core.database import seed_default_pricing
+
+    job_id = str(uuid.uuid4())
+    conn = get_connection()
+    try:
+        conn.execute(
+            """INSERT INTO jobs (id, homeowner_name, address_line1, city, state, postal_code, phone, status, shingle_type, damage_signals, ice_barrier_required) 
+            VALUES (?, 'Climate Additional Verify', '700 Highland Dr', 'Thomasville', 'GA', '31792', '229-555-0700', 'LEAD_CAPTURED', 'Architectural', '[]', 1)""",
+            (job_id,)
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    seed_supplement_rules()
+    seed_default_pricing()
+
+    ev_data = EagleViewData(
+        total_area_sf=3000.0,
+        predominant_pitch="4/12",
+        ridge_lf=30.0,
+        hip_lf=20.0,
+        valley_lf=20.0,
+        eaves_lf=100.0,
+        rake_lf=40.0,
+        drip_edge_lf=140.0,
+        total_facets=4,
+        flashing_lf=0.0,
+        step_flashing_lf=0.0,
+    )
+
+    # 1. Trigger flags with ice_barrier_required=True
+    manual_review = generate_and_gate_flags(
+        job_id=job_id,
+        ice_barrier_required=True,
+        ev_data=ev_data,
+        carrier_waste_pct=15.0
+    )
+    assert manual_review is False
+
+    # 2. Build db_context
+    conn = get_connection()
+    try:
+        cursor = conn.execute('''
+            SELECT r.citation_text, r.citation_type, r.required_child_code, r.climate_dependent, f.quantity_delta, f.notes
+            FROM supplement_flags f
+            JOIN supplement_rules r ON f.rule_id = r.id
+            WHERE f.job_id = ? AND f.triggered = 1
+        ''', (job_id,))
+        rules = [dict(r) for r in cursor.fetchall()]
+    finally:
+        conn.close()
+
+    db_context = {
+        "ice_barrier_required": True,
+        "jurisdiction_code_version": "2021_IRC",
+        "rules": rules,
+        "weather": None
+    }
+
+    report = DiscrepancyReport(
+        job_id=job_id,
+        ev_normalized_squares=30.0,
+        sol_total_rfg_squares=30.0,
+        square_variance=0.0,
+        waste_explanation="Standard waste",
+        material_bom=MaterialBOM(
+            field_shingle_bundles=90,
+            starter_bundles=2,
+            ridge_cap_bundles=3,
+            ice_water_rolls=7,
+            underlayment_rolls=3,
+            drip_edge_pieces=14
+        ),
+        discrepancies=[]
+    )
+
+    job_dict = {
+        "id": job_id,
+        "homeowner_name": "Climate Additional Verify",
+        "address_line1": "700 Highland Dr",
+        "city": "Thomasville",
+        "state": "GA",
+        "postal_code": "31792",
+        "claim_number": "CLM-ADD-202",
+        "insurance_company": "Travelers",
+    }
+
+    # 3. Generate supplement PDF
+    pdf_gen = SupplementGenerator()
+    pdf_path = await pdf_gen.generate_supplement_pdf(report, "Technical narrative justification.", job=job_dict, db_context=db_context)
+
+    try:
+        assert os.path.exists(pdf_path)
+
+        with pdfplumber.open(pdf_path) as pdf:
+            full_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+
+            # Assert all 4 additional codes appear with their calculated dollar totals
+            assert "RFG START" in full_text
+            assert "$90.00" in full_text    # 2.00 BDL * $45.00
+
+            assert "RFG DRIP" in full_text
+            assert "$210.00" in full_text   # 14.00 PC * $15.00
+
+            assert "RFG IWS" in full_text
+            assert "$630.00" in full_text   # 7.00 RL * $90.00
+
+            assert "DMO PU" in full_text
+            assert "$250.00" in full_text   # 1.00 EA * $250.00
+    finally:
+        if os.path.exists(pdf_path):
+            os.remove(pdf_path)
+
 
 

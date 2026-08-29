@@ -791,7 +791,7 @@ class SupplementGenerator(PDFEngine):
                     "RFG START": ("starter_bundles", "BDL", "Starter Strip Shingles"),
                     "RFG DRIP": ("drip_edge_pieces_10ft", "PC", "Drip Edge Metal Flashing"),
                     "RFG IWS": ("ice_and_water_rolls", "RL", "Ice & Water Shield Membrane"),
-                    "DMO PU": ("dmo_dump_per_container", "EA", "Debris Pickup & Haul-Off"),
+                    "DMO PU": ("dmo_pu_per_load", "EA", "Debris Pickup & Haul-Off Labor"),
                 }
                 
                 table_cell_style = ParagraphStyle(

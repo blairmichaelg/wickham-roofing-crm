@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json as _json
+import math
 import sqlite3
 import uuid
 from pathlib import Path
@@ -598,7 +599,22 @@ def generate_and_gate_flags(
             notes = "Triggered via deterministic pipeline"
             
             # Use deterministic math engine if applicable
-            if code == "RFG IWS":
+            if code == "RFG START":
+                total_perimeter_lf = float(ev_data.eaves_lf + ev_data.rake_lf)
+                quantity_delta = float(math.ceil(total_perimeter_lf / 100.0)) if total_perimeter_lf > 0 else 1.0
+                notes = f"Manufacturer starter strip requirement ({total_perimeter_lf:.0f} LF perimeter)"
+
+            elif code == "RFG DRIP":
+                drip_lf = float(ev_data.drip_edge_lf) if (ev_data.drip_edge_lf and ev_data.drip_edge_lf > 0) else float(ev_data.eaves_lf + ev_data.rake_lf)
+                quantity_delta = float(math.ceil(drip_lf / 10.0)) if drip_lf > 0 else 1.0
+                notes = f"IRC R905.2.8.5 perimeter drip edge metal flashing ({drip_lf:.0f} LF)"
+
+            elif code == "DMO PU":
+                haul_loads = max(1, math.ceil(ev_data.total_squares / 30.0)) if ev_data.total_squares > 0 else 1
+                quantity_delta = float(haul_loads)
+                notes = f"Debris haul-off & light transport labor ({haul_loads} load{'s' if haul_loads > 1 else ''})"
+
+            elif code == "RFG IWS":
                 try:
                     pitch = float(ev_data.predominant_pitch.split('/')[0])
                 except (ValueError, AttributeError):
