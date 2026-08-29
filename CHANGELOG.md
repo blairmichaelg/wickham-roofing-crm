@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.8.4] - 2026-08-29
+### Fixed (Purged Fake-ID Filesystem Fallback & Fixed Root-Cause Test Mock)
+
+- **Removed Fake-ID Filesystem Fallback**: Completely removed the fallback in `upload_measurement_report` and `upload_statement_of_loss` (`app/api/office_routes.py`) that checked disk existence and generated fake `"ev_doc_id"` / `"sol_doc_id"` records with empty hashes.
+- **Closed Orphaned-File Pipeline Exposure**: Readiness checks now strictly evaluate active `job_documents` records (`deleted_at IS NULL`), preventing orphaned or soft-deleted PDF files on disk from prematurely triggering the supplement pipeline.
+- **Simplified `/supplement_docs` Wrapper**: Removed manual fallback re-enqueue logic from `upload_supplement_docs`. The legacy wrapper now cleanly delegates to `upload_measurement_report` and `upload_statement_of_loss`, letting the pipeline trigger naturally from real database state.
+- **Fixed Root-Cause Test Mock**: Rewrote `TestSupplementUploadRoute` in `tests/test_office_routes.py` to use real SQLite transactions instead of mocking `insert_job_document` with literal placeholder strings.
+- **Test Suite (+3 tests, 491 → 494)**: Added regression tests in `tests/test_document_intake_decoupling.py` asserting real UUIDs/hashes reach pipeline tasks, verifying orphaned disk files do not trigger pipelines, and confirming soft-deleted documents are excluded from readiness checks.
+
 ## [2.8.3] - 2026-08-29
 ### Refactored (Collapsed /supplement_docs into Canonical Split Endpoints)
 

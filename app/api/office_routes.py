@@ -384,18 +384,12 @@ async def upload_measurement_report(
         job_row = conn.execute("SELECT job_type FROM jobs WHERE id = ?", (job_id,)).fetchone()
         job_type = job_row["job_type"] if job_row else None
         sol_row = conn.execute(
-            "SELECT id, storage_path, sha256_hash FROM job_documents WHERE job_id = ? AND category = 'STATEMENT_OF_LOSS'",
+            "SELECT id, storage_path, sha256_hash FROM job_documents WHERE job_id = ? AND category = 'STATEMENT_OF_LOSS' AND deleted_at IS NULL",
             (job_id,)
         ).fetchone()
         sol_doc = dict(sol_row) if sol_row else None
     finally:
         conn.close()
-
-    if not sol_doc:
-        for candidate in [job_dir / "statement_of_loss.pdf", job_dir / "sol.pdf"]:
-            if candidate.exists():
-                sol_doc = {"id": "sol_doc_id", "storage_path": str(candidate), "sha256_hash": ""}
-                break
 
     from app.core.utils import is_retail_job
     redis = getattr(request.app.state, "redis_pool", None)
@@ -514,18 +508,12 @@ async def upload_statement_of_loss(
                WHERE job_id = ? AND category IN (
                    'MEASUREMENT_REPORT', 'EAGLEVIEW', 'EAGLEVIEW_REPORT',
                    'HOVER_REPORT', 'HOVER_PDF', 'EAGLEVIEW_PDF'
-               )""",
+               ) AND deleted_at IS NULL""",
             (job_id,)
         ).fetchone()
         ev_doc = dict(ev_row) if ev_row else None
     finally:
         conn.close()
-
-    if not ev_doc:
-        for candidate in [job_dir / "eagleview.pdf", job_dir / "hover.pdf", job_dir / "measurement_report.pdf"]:
-            if candidate.exists():
-                ev_doc = {"id": "ev_doc_id", "storage_path": str(candidate), "sha256_hash": ""}
-                break
 
     from app.core.utils import is_retail_job
     if is_retail_job(job_type):
@@ -593,39 +581,6 @@ async def upload_supplement_docs(
     """
     meas_result = await upload_measurement_report(request=request, job_id=job_id, file=ev_file, role=role)
     sol_result = await upload_statement_of_loss(request=request, job_id=job_id, file=sol_file, role=role)
-
-    if not str(sol_result.get("message", "")).endswith("supplement generation enqueued."):
-        redis = getattr(request.app.state, "redis_pool", None)
-        job_dir = FIELD_DOCS_DIR / job_id
-        ev_path = job_dir / (ev_file.filename or "eagleview.pdf")
-        sol_path = job_dir / (sol_file.filename or "statement_of_loss.pdf")
-        ev_doc_id = meas_result.get("document_id") or "ev_doc_id"
-        sol_doc_id = sol_result.get("document_id") or "sol_doc_id"
-        if redis:
-            await redis.enqueue_job(
-                "process_supplement_event",
-                job_id=job_id,
-                ev_pdf_path=str(ev_path),
-                sol_pdf_path=str(sol_path),
-                ev_sha256="",
-                ev_doc_id=ev_doc_id,
-                sol_sha256="",
-                sol_doc_id=sol_doc_id,
-                generate_pdf=True,
-                role=role
-            )
-        else:
-            await run_supplement_pipeline(
-                job_id=job_id,
-                ev_pdf_path=str(ev_path),
-                sol_pdf_path=str(sol_path),
-                ev_sha256="",
-                ev_doc_id=ev_doc_id,
-                sol_sha256="",
-                sol_doc_id=sol_doc_id,
-                generate_pdf=True,
-                ctx={"role": role},
-            )
 
     return {
         "status": "success",

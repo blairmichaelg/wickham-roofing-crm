@@ -159,46 +159,81 @@ class TestUploadIdempotency:
 
 
 class TestSupplementUploadRoute:
-    @patch("app.api.office_routes.insert_job_document")
-    @patch("app.api.office_routes.stream_upload_safely")
-    def test_supplement_upload_enqueues_full_generation(self, mock_stream, mock_insert):
-        mock_stream.side_effect = ["ev_hash", "sol_hash"]
-        mock_insert.side_effect = ["ev_doc_id", "sol_doc_id"]
+    def test_supplement_upload_enqueues_full_generation(self):
+        import uuid
+        job_id = str(uuid.uuid4())
+        conn = get_connection()
+        conn.execute(
+            "INSERT INTO jobs (id, homeowner_name, address_line1, city, state, postal_code, phone, status, job_type) VALUES (?, 'Hover Homeowner', '101 Hover St', 'Valdosta', 'GA', '31601', '555-0101', 'LEAD_CAPTURED', 'INSURANCE')",
+            (job_id,)
+        )
+        conn.commit()
+        conn.close()
+
         app.state.redis_pool = AsyncMock()
 
-        response = client.post(
-            "/api/office/jobs/99999999-9999-9999-9999-999999999904/supplement_docs",
-            files={
-                "ev_file": ("hover.pdf", b"%PDF-1.4 hover", "application/pdf"),
-                "sol_file": ("sol.pdf", b"%PDF-1.4 sol", "application/pdf"),
-            },
-        )
+        try:
+            response = client.post(
+                f"/api/office/jobs/{job_id}/supplement_docs",
+                files={
+                    "ev_file": ("hover.pdf", b"%PDF-1.4 hover mock content", "application/pdf"),
+                    "sol_file": ("sol.pdf", b"%PDF-1.4 sol mock content", "application/pdf"),
+                },
+            )
 
-        assert response.status_code == 200
-        app.state.redis_pool.enqueue_job.assert_awaited_once()
-        _, kwargs = app.state.redis_pool.enqueue_job.await_args
-        assert kwargs["generate_pdf"] is True
+            assert response.status_code == 200
+            app.state.redis_pool.enqueue_job.assert_awaited_once()
+            _, kwargs = app.state.redis_pool.enqueue_job.await_args
+            assert kwargs["generate_pdf"] is True
+            assert uuid.UUID(kwargs["ev_doc_id"])
+            assert uuid.UUID(kwargs["sol_doc_id"])
+            assert len(kwargs["ev_sha256"]) == 64
+            assert len(kwargs["sol_sha256"]) == 64
+        finally:
+            conn = get_connection()
+            conn.execute("DELETE FROM job_documents WHERE job_id = ?", (job_id,))
+            conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
+            conn.commit()
+            conn.close()
 
     @patch("app.api.office_routes.run_supplement_pipeline", new_callable=AsyncMock)
-    @patch("app.api.office_routes.insert_job_document")
-    @patch("app.api.office_routes.stream_upload_safely")
-    def test_supplement_upload_runs_inline_without_redis(self, mock_stream, mock_insert, mock_pipeline):
-        mock_stream.side_effect = ["ev_hash", "sol_hash"]
-        mock_insert.side_effect = ["ev_doc_id", "sol_doc_id"]
+    def test_supplement_upload_runs_inline_without_redis(self, mock_pipeline):
+        import uuid
+        job_id = str(uuid.uuid4())
+        conn = get_connection()
+        conn.execute(
+            "INSERT INTO jobs (id, homeowner_name, address_line1, city, state, postal_code, phone, status, job_type) VALUES (?, 'EV Homeowner', '102 EV St', 'Valdosta', 'GA', '31601', '555-0102', 'LEAD_CAPTURED', 'INSURANCE')",
+            (job_id,)
+        )
+        conn.commit()
+        conn.close()
+
         if hasattr(app.state, "redis_pool"):
             app.state.redis_pool = None
 
-        response = client.post(
-            "/api/office/jobs/99999999-9999-9999-9999-999999999905/supplement_docs",
-            files={
-                "ev_file": ("eagleview.pdf", b"%PDF-1.4 ev", "application/pdf"),
-                "sol_file": ("sol.pdf", b"%PDF-1.4 sol", "application/pdf"),
-            },
-        )
+        try:
+            response = client.post(
+                f"/api/office/jobs/{job_id}/supplement_docs",
+                files={
+                    "ev_file": ("eagleview.pdf", b"%PDF-1.4 ev mock content", "application/pdf"),
+                    "sol_file": ("sol.pdf", b"%PDF-1.4 sol mock content", "application/pdf"),
+                },
+            )
 
-        assert response.status_code == 200
-        mock_pipeline.assert_awaited_once()
-        assert mock_pipeline.await_args.kwargs["generate_pdf"] is True
+            assert response.status_code == 200
+            mock_pipeline.assert_awaited_once()
+            kwargs = mock_pipeline.await_args.kwargs
+            assert kwargs["generate_pdf"] is True
+            assert uuid.UUID(kwargs["ev_doc_id"])
+            assert uuid.UUID(kwargs["sol_doc_id"])
+            assert len(kwargs["ev_sha256"]) == 64
+            assert len(kwargs["sol_sha256"]) == 64
+        finally:
+            conn = get_connection()
+            conn.execute("DELETE FROM job_documents WHERE job_id = ?", (job_id,))
+            conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
+            conn.commit()
+            conn.close()
 
 
 class TestEvidenceGridRoute:

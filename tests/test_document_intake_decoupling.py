@@ -296,3 +296,166 @@ def test_upload_supplement_docs_delegates_to_split_endpoints(monkeypatch):
         conn.commit()
         conn.close()
 
+
+def test_sequential_upload_passes_real_uuids_and_hashes_to_pipeline(monkeypatch):
+    client = TestClient(app)
+    admin_token = create_access_token("admin")
+    job_id = str(uuid.uuid4())
+
+    conn = get_connection()
+    conn.execute(
+        "INSERT INTO jobs (id, homeowner_name, address_line1, city, state, postal_code, phone, status, job_type) VALUES (?, 'Real UUID Homeowner', '106 Real St', 'Valdosta', 'GA', '31601', '555-0107', 'LEAD_CAPTURED', 'INSURANCE')",
+        (job_id,)
+    )
+    conn.commit()
+    conn.close()
+
+    monkeypatch.setattr("app.api.office_routes.detect_pdf_format", lambda p: "EAGLEVIEW")
+    pipeline_kwargs = {}
+
+    async def mock_supplement_pipeline(*args, **kwargs):
+        nonlocal pipeline_kwargs
+        pipeline_kwargs = kwargs
+        return {"status": "success"}
+
+    monkeypatch.setattr("app.api.office_routes.run_supplement_pipeline", mock_supplement_pipeline)
+    app.state.redis_pool = None
+
+    try:
+        dummy_ev = io.BytesIO(b"%PDF-1.4 real uuid eagleview content")
+        dummy_sol = io.BytesIO(b"%PDF-1.4 real uuid statement of loss content")
+
+        res1 = client.post(
+            f"/api/office/jobs/{job_id}/measurement-report",
+            files={"file": ("eagleview.pdf", dummy_ev, "application/pdf")},
+            cookies={"auth_token": admin_token}
+        )
+        assert res1.status_code == 200
+
+        res2 = client.post(
+            f"/api/office/jobs/{job_id}/statement-of-loss",
+            files={"file": ("statement_of_loss.pdf", dummy_sol, "application/pdf")},
+            cookies={"auth_token": admin_token}
+        )
+        assert res2.status_code == 200
+
+        # Assert on the actual arguments passed to run_supplement_pipeline
+        assert "ev_doc_id" in pipeline_kwargs
+        assert "sol_doc_id" in pipeline_kwargs
+        assert uuid.UUID(pipeline_kwargs["ev_doc_id"])
+        assert uuid.UUID(pipeline_kwargs["sol_doc_id"])
+        assert pipeline_kwargs["ev_doc_id"] != "ev_doc_id"
+        assert pipeline_kwargs["sol_doc_id"] != "sol_doc_id"
+        assert len(pipeline_kwargs["ev_sha256"]) == 64
+        assert len(pipeline_kwargs["sol_sha256"]) == 64
+    finally:
+        conn = get_connection()
+        conn.execute("DELETE FROM job_documents WHERE job_id = ?", (job_id,))
+        conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
+        conn.commit()
+        conn.close()
+
+
+def test_orphaned_file_on_disk_without_db_row_does_not_trigger_pipeline(monkeypatch):
+    client = TestClient(app)
+    admin_token = create_access_token("admin")
+    job_id = str(uuid.uuid4())
+
+    conn = get_connection()
+    conn.execute(
+        "INSERT INTO jobs (id, homeowner_name, address_line1, city, state, postal_code, phone, status, job_type) VALUES (?, 'Orphan Test Homeowner', '107 Orphan Way', 'Valdosta', 'GA', '31601', '555-0108', 'LEAD_CAPTURED', 'INSURANCE')",
+        (job_id,)
+    )
+    conn.commit()
+    conn.close()
+
+    # Create an orphaned file on disk without registering it in job_documents
+    from pathlib import Path
+    orphan_dir = Path("data/field_docs") / job_id
+    orphan_dir.mkdir(parents=True, exist_ok=True)
+    orphan_sol = orphan_dir / "statement_of_loss.pdf"
+    orphan_sol.write_bytes(b"%PDF-1.4 orphaned sol content without db entry")
+
+    pipeline_called = False
+
+    async def mock_supplement_pipeline(*args, **kwargs):
+        nonlocal pipeline_called
+        pipeline_called = True
+        return {"status": "success"}
+
+    monkeypatch.setattr("app.api.office_routes.run_supplement_pipeline", mock_supplement_pipeline)
+    monkeypatch.setattr("app.api.office_routes.detect_pdf_format", lambda p: "EAGLEVIEW")
+    app.state.redis_pool = None
+
+    try:
+        dummy_ev = io.BytesIO(b"%PDF-1.4 new eagleview content")
+        res = client.post(
+            f"/api/office/jobs/{job_id}/measurement-report",
+            files={"file": ("eagleview.pdf", dummy_ev, "application/pdf")},
+            cookies={"auth_token": admin_token}
+        )
+        assert res.status_code == 200
+        data = res.json()
+        # Must wait for Statement of Loss and NOT trigger pipeline via orphaned file
+        assert "Waiting for Statement of Loss" in data["message"]
+        assert pipeline_called is False
+    finally:
+        if orphan_sol.exists():
+            orphan_sol.unlink(missing_ok=True)
+        conn = get_connection()
+        conn.execute("DELETE FROM job_documents WHERE job_id = ?", (job_id,))
+        conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
+        conn.commit()
+        conn.close()
+
+
+def test_soft_deleted_document_excluded_from_readiness_check(monkeypatch):
+    client = TestClient(app)
+    admin_token = create_access_token("admin")
+    job_id = str(uuid.uuid4())
+
+    conn = get_connection()
+    conn.execute(
+        "INSERT INTO jobs (id, homeowner_name, address_line1, city, state, postal_code, phone, status, job_type) VALUES (?, 'Soft Delete Homeowner', '108 Soft St', 'Valdosta', 'GA', '31601', '555-0109', 'LEAD_CAPTURED', 'INSURANCE')",
+        (job_id,)
+    )
+    # Insert a soft-deleted Statement of Loss
+    conn.execute(
+        """INSERT INTO job_documents (id, job_id, filename, file_type, storage_path, sha256_hash, visibility, category, deleted_at)
+           VALUES (?, ?, 'old_sol.pdf', 'SOL_PDF', 'data/field_docs/dummy.pdf', 'dummy_hash', 'office_only', 'STATEMENT_OF_LOSS', CURRENT_TIMESTAMP)""",
+        (str(uuid.uuid4()), job_id)
+    )
+    conn.commit()
+    conn.close()
+
+    pipeline_called = False
+
+    async def mock_supplement_pipeline(*args, **kwargs):
+        nonlocal pipeline_called
+        pipeline_called = True
+        return {"status": "success"}
+
+    monkeypatch.setattr("app.api.office_routes.run_supplement_pipeline", mock_supplement_pipeline)
+    monkeypatch.setattr("app.api.office_routes.detect_pdf_format", lambda p: "EAGLEVIEW")
+    app.state.redis_pool = None
+
+    try:
+        dummy_ev = io.BytesIO(b"%PDF-1.4 new eagleview content")
+        res = client.post(
+            f"/api/office/jobs/{job_id}/measurement-report",
+            files={"file": ("eagleview.pdf", dummy_ev, "application/pdf")},
+            cookies={"auth_token": admin_token}
+        )
+        assert res.status_code == 200
+        data = res.json()
+        # Soft-deleted document must be excluded, so it waits for active Statement of Loss
+        assert "Waiting for Statement of Loss" in data["message"]
+        assert pipeline_called is False
+    finally:
+        conn = get_connection()
+        conn.execute("DELETE FROM job_documents WHERE job_id = ?", (job_id,))
+        conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
+        conn.commit()
+        conn.close()
+
+
