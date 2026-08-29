@@ -69,3 +69,49 @@ def test_numbered_canvas_two_pass_generation():
     pdf_bytes = buf.getvalue()
     assert len(pdf_bytes) > 0
     assert b"%PDF-" in pdf_bytes
+
+
+def test_pdf_components_and_audience_styles():
+    from app.services.pdf.documents import (
+        build_audience_stylesheets,
+        create_financial_row,
+        create_financial_table,
+        create_header,
+        create_photo_grid,
+        create_section_with_table,
+        get_audience_styles,
+    )
+    
+    styles_dict = build_audience_stylesheets()
+    assert "homeowner" in styles_dict
+    assert "carrier" in styles_dict
+    assert "neighbor" in styles_dict
+    assert "internal" in styles_dict
+
+    # Test create_header
+    hdr = create_header("Test Title", "homeowner", subtitle="Sub")
+    assert len(hdr) >= 2
+
+    # Test create_financial_row
+    row_t = create_financial_row("Total Amount", "$12,345.67", is_total=True, sub_brand="homeowner")
+    assert row_t is not None
+
+    # Test create_financial_table (carrier sub-brand with right-aligned currency)
+    data = [
+        ["Line Item", "Qty", "Unit Price", "Total RCV"],
+        ["Shingles", "30", "$100.00", "$3,000.00"],
+    ]
+    table = create_financial_table(data, [150, 50, 100, 100], sub_brand="carrier", currency_cols=[2, 3], has_header=True)
+    assert table is not None
+
+    # Test create_section_with_table
+    sect = create_section_with_table("Section 1", table, sub_brand="carrier")
+    assert sect is not None
+
+    # Test create_photo_grid
+    photos = [
+        {"path": "nonexistent.jpg", "caption": "Test Damage Signal"},
+    ]
+    grid = create_photo_grid(photos, cols=2, sub_brand="homeowner")
+    assert grid is not None
+
