@@ -459,3 +459,61 @@ def test_soft_deleted_document_excluded_from_readiness_check(monkeypatch):
         conn.close()
 
 
+def test_upload_supplement_docs_retail_job_message_accuracy(monkeypatch):
+    client = TestClient(app)
+    admin_token = create_access_token("admin")
+    job_id = str(uuid.uuid4())
+
+    conn = get_connection()
+    conn.execute(
+        "INSERT INTO jobs (id, homeowner_name, address_line1, city, state, postal_code, phone, status, job_type) VALUES (?, 'Retail Wrapper Homeowner', '109 Retail Way', 'Valdosta', 'GA', '31601', '555-0110', 'LEAD_CAPTURED', 'retail')",
+        (job_id,)
+    )
+    conn.commit()
+    conn.close()
+
+    monkeypatch.setattr("app.api.office_routes.detect_pdf_format", lambda p: "EAGLEVIEW")
+    retail_quote_called = False
+    supplement_pipeline_called = False
+
+    async def mock_retail_quote(job_id=None, *args, **kwargs):
+        nonlocal retail_quote_called
+        retail_quote_called = True
+        return {"status": "success"}
+
+    async def mock_supplement_pipeline(*args, **kwargs):
+        nonlocal supplement_pipeline_called
+        supplement_pipeline_called = True
+        return {"status": "success"}
+
+    monkeypatch.setattr("app.core.pipeline.run_retail_quote_pipeline", mock_retail_quote)
+    monkeypatch.setattr("app.api.office_routes.run_supplement_pipeline", mock_supplement_pipeline)
+    app.state.redis_pool = None
+
+    try:
+        dummy_ev = io.BytesIO(b"%PDF-1.4 dummy eagleview content")
+        dummy_sol = io.BytesIO(b"%PDF-1.4 dummy statement of loss content")
+
+        res = client.post(
+            f"/api/office/jobs/{job_id}/supplement_docs",
+            files={
+                "ev_file": ("eagleview.pdf", dummy_ev, "application/pdf"),
+                "sol_file": ("statement_of_loss.pdf", dummy_sol, "application/pdf")
+            },
+            cookies={"auth_token": admin_token}
+        )
+        assert res.status_code == 200, res.text
+        data = res.json()
+        assert data["status"] == "success"
+        assert "supplement generation skipped" in data["message"]
+        assert "Supplement generation enqueued" not in data["message"]
+        assert retail_quote_called is True
+        assert supplement_pipeline_called is False
+    finally:
+        conn = get_connection()
+        conn.execute("DELETE FROM job_documents WHERE job_id = ?", (job_id,))
+        conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
+        conn.commit()
+        conn.close()
+
+

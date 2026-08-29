@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.8.5] - 2026-08-29
+### Fixed (Message Accuracy on Deprecated Legacy Upload Wrapper)
+
+- **Legacy Endpoint Message Accuracy**: Updated `upload_supplement_docs` in `app/api/office_routes.py` to evaluate the downstream return from `upload_statement_of_loss`. When executed against a retail job (where supplement pipeline generation is intentionally skipped in favor of quote generation), the wrapper now accurately reports `"Documents uploaded (retail job; supplement generation skipped)."` instead of claiming supplement generation was enqueued.
+- **Regression Test (+1 test, 494 → 495)**: Added `test_upload_supplement_docs_retail_job_message_accuracy` in `tests/test_document_intake_decoupling.py` verifying response messaging on retail job types.
+
 ## [2.8.4] - 2026-08-29
 ### Fixed (Purged Fake-ID Filesystem Fallback & Fixed Root-Cause Test Mock)
 

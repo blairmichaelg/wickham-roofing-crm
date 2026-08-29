@@ -582,9 +582,16 @@ async def upload_supplement_docs(
     meas_result = await upload_measurement_report(request=request, job_id=job_id, file=ev_file, role=role)
     sol_result = await upload_statement_of_loss(request=request, job_id=job_id, file=sol_file, role=role)
 
+    if sol_result.get("message") == "Statement of Loss uploaded.":
+        msg = "Documents uploaded (retail job; supplement generation skipped)."
+    elif "supplement generation enqueued" in sol_result.get("message", ""):
+        msg = "Supplement generation enqueued (via legacy wrapper)."
+    else:
+        msg = f"Documents uploaded (via legacy wrapper): {sol_result.get('message', '')}"
+
     return {
         "status": "success",
-        "message": "Supplement generation enqueued (via legacy wrapper).",
+        "message": msg,
         "measurement": meas_result,
         "sol": sol_result
     }
