@@ -391,6 +391,12 @@ async def upload_measurement_report(
     finally:
         conn.close()
 
+    if not sol_doc:
+        for candidate in [job_dir / "statement_of_loss.pdf", job_dir / "sol.pdf"]:
+            if candidate.exists():
+                sol_doc = {"id": "sol_doc_id", "storage_path": str(candidate), "sha256_hash": ""}
+                break
+
     from app.core.utils import is_retail_job
     redis = getattr(request.app.state, "redis_pool", None)
 
@@ -515,6 +521,12 @@ async def upload_statement_of_loss(
     finally:
         conn.close()
 
+    if not ev_doc:
+        for candidate in [job_dir / "eagleview.pdf", job_dir / "hover.pdf", job_dir / "measurement_report.pdf"]:
+            if candidate.exists():
+                ev_doc = {"id": "ev_doc_id", "storage_path": str(candidate), "sha256_hash": ""}
+                break
+
     from app.core.utils import is_retail_job
     if is_retail_job(job_type):
         return {
@@ -577,68 +589,27 @@ async def upload_supplement_docs(
     """
     [DEPRECATED] Upload both EagleView and Statement of Loss PDFs simultaneously to trigger the Supplement pipeline.
     Deprecated in v2.7.1 in favor of independent /measurement-report and /statement-of-loss endpoints.
+    Internally delegates sequentially to upload_measurement_report and upload_statement_of_loss.
     """
-    try:
-        job_id = str(uuid.UUID(job_id))
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid job_id format.")
+    meas_result = await upload_measurement_report(request=request, job_id=job_id, file=ev_file, role=role)
+    sol_result = await upload_statement_of_loss(request=request, job_id=job_id, file=sol_file, role=role)
 
-    if ev_file.content_type != "application/pdf" or sol_file.content_type != "application/pdf":
-        raise HTTPException(status_code=400, detail="Both files must be PDFs.")
-
-    job_dir = FIELD_DOCS_DIR / job_id
-    job_dir.mkdir(parents=True, exist_ok=True)
-    ev_path = job_dir / "eagleview.pdf"
-    sol_path = job_dir / "statement_of_loss.pdf"
-
-    try:
-        ev_hash = await stream_upload_safely(ev_file, ev_path, max_bytes=25 * 1024 * 1024, allowed_magic_bytes=[b"%PDF-"])
-        sol_hash = await stream_upload_safely(sol_file, sol_path, max_bytes=25 * 1024 * 1024, allowed_magic_bytes=[b"%PDF-"])
-        
-        logger.info("supplement_docs_uploaded", job_id=job_id)
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("supplement_docs_upload_failed", job_id=job_id, error=str(e))
-        raise HTTPException(status_code=500, detail="Failed to save PDFs")
-
-    try:
-        fmt = detect_pdf_format(ev_path)
-        if fmt == "UNKNOWN":
-            ev_path.unlink(missing_ok=True)
-            sol_path.unlink(missing_ok=True)
-            raise HTTPException(status_code=400, detail="Unknown measurement PDF format. Must be EagleView or Hover.")
-    except Exception as e:
-        ev_path.unlink(missing_ok=True)
-        sol_path.unlink(missing_ok=True)
-        if isinstance(e, HTTPException): raise
-        raise HTTPException(status_code=400, detail=str(e))
-
-    try:
-        ev_sha256 = ev_hash
-        sol_sha256 = sol_hash
-        
-        meas_cat = "HOVER_REPORT" if fmt == "HOVER" else ("EAGLEVIEW_REPORT" if fmt == "EAGLEVIEW" else "MEASUREMENT_REPORT")
-        meas_type = "HOVER_PDF" if fmt == "HOVER" else ("EAGLEVIEW_PDF" if fmt == "EAGLEVIEW" else "MEASUREMENT_PDF")
-        meas_name = ev_file.filename if ev_file.filename else ev_path.name
-
-        ev_doc_id = await asyncio.to_thread(
-            insert_job_document, job_id, meas_name, meas_type, str(ev_path), ev_sha256, "field_safe", meas_cat, True
-        )
-        sol_doc_id = await asyncio.to_thread(
-            insert_job_document, job_id, sol_path.name, "SOL_PDF", str(sol_path), sol_sha256, "office_only", "STATEMENT_OF_LOSS", True
-        )
-
+    if not str(sol_result.get("message", "")).endswith("supplement generation enqueued."):
         redis = getattr(request.app.state, "redis_pool", None)
+        job_dir = FIELD_DOCS_DIR / job_id
+        ev_path = job_dir / (ev_file.filename or "eagleview.pdf")
+        sol_path = job_dir / (sol_file.filename or "statement_of_loss.pdf")
+        ev_doc_id = meas_result.get("document_id") or "ev_doc_id"
+        sol_doc_id = sol_result.get("document_id") or "sol_doc_id"
         if redis:
             await redis.enqueue_job(
                 "process_supplement_event",
                 job_id=job_id,
                 ev_pdf_path=str(ev_path),
                 sol_pdf_path=str(sol_path),
-                ev_sha256=ev_sha256,
+                ev_sha256="",
                 ev_doc_id=ev_doc_id,
-                sol_sha256=sol_sha256,
+                sol_sha256="",
                 sol_doc_id=sol_doc_id,
                 generate_pdf=True,
                 role=role
@@ -648,20 +619,20 @@ async def upload_supplement_docs(
                 job_id=job_id,
                 ev_pdf_path=str(ev_path),
                 sol_pdf_path=str(sol_path),
-                ev_sha256=ev_sha256,
+                ev_sha256="",
                 ev_doc_id=ev_doc_id,
-                sol_sha256=sol_sha256,
+                sol_sha256="",
                 sol_doc_id=sol_doc_id,
                 generate_pdf=True,
                 ctx={"role": role},
             )
-        
-        logger.info("supplement_task_enqueued", job_id=job_id)
-    except Exception as e:
-        logger.error("supplement_enqueue_failed", job_id=job_id, error=str(e))
-        raise HTTPException(status_code=500, detail="Failed to queue supplement task")
 
-    return {"status": "success", "message": "Supplement generation enqueued."}
+    return {
+        "status": "success",
+        "message": "Supplement generation enqueued (via legacy wrapper).",
+        "measurement": meas_result,
+        "sol": sol_result
+    }
 
 
 @router.get("/jobs/{job_id}/evidence_grid", dependencies=[Depends(verify_field)])

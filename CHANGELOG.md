@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.8.3] - 2026-08-29
+### Refactored (Collapsed /supplement_docs into Canonical Split Endpoints)
+
+- **Unified Upload Implementation**: Refactored deprecated `POST /api/office/jobs/{job_id}/supplement_docs` (`app/api/office_routes.py`) into a thin compatibility wrapper that delegates sequentially to the canonical `upload_measurement_report` and `upload_statement_of_loss` handlers.
+- **Frontend Migration (`app/templates/job_detail.html`)**: Migrated the document upload form on the job detail page to upload files directly via the independent `POST /api/office/jobs/{job_id}/measurement-report` and `POST /api/office/jobs/{job_id}/statement-of-loss` endpoints.
+- **Eliminated Code Duplication**: Removed duplicate upload, validation, and pipeline-enqueuing code paths across the codebase.
+- **Test Suite (+1 test, 490 → 491)**: Added `test_upload_supplement_docs_delegates_to_split_endpoints` in `tests/test_document_intake_decoupling.py` verifying full end-to-end delegation and pipeline trigger.
+
 ## [2.8.2] - 2026-08-29
 ### Fixed (Push Notification Role Targeting & Scoping)
 

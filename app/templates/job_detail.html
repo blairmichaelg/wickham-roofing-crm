@@ -1003,24 +1003,41 @@
                     throw new Error('Authentication token missing from context.');
                 }
 
-                const formData = new FormData();
-                formData.append('ev_file', evFile);
-                formData.append('sol_file', solFile);
-
-                pipelineStepText.innerText = 'Enqueuing Documents...';
+                pipelineStepText.innerText = 'Uploading Measurement Report...';
                 pipelineProgressBar.style.width = '10%';
 
-                const response = await fetch(`/api/office/jobs/{{ job.id }}/supplement_docs`, {
-                    method: 'POST',
-                    headers: {
-                        'x-internal-token': OFFICE_TOKEN
-                    },
-                    body: formData
-                });
+                if (evFile) {
+                    const fdEV = new FormData();
+                    fdEV.append('file', evFile);
+                    const resEV = await fetch(`/api/office/jobs/{{ job.id }}/measurement-report`, {
+                        method: 'POST',
+                        headers: { 'x-internal-token': OFFICE_TOKEN },
+                        body: fdEV
+                    });
+                    if (!resEV.ok) {
+                        const err = await resEV.json().catch(() => ({ detail: 'Failed to upload measurement report' }));
+                        throw new Error(err.detail || 'Measurement report upload failed');
+                    }
+                }
 
-                if (response.ok) {
-                    pipelineStepText.innerText = 'AI Workers Processing...';
-                    pipelineProgressBar.style.width = '30%';
+                if (solFile) {
+                    pipelineStepText.innerText = 'Uploading Statement of Loss...';
+                    pipelineProgressBar.style.width = '20%';
+                    const fdSOL = new FormData();
+                    fdSOL.append('file', solFile);
+                    const resSOL = await fetch(`/api/office/jobs/{{ job.id }}/statement-of-loss`, {
+                        method: 'POST',
+                        headers: { 'x-internal-token': OFFICE_TOKEN },
+                        body: fdSOL
+                    });
+                    if (!resSOL.ok) {
+                        const err = await resSOL.json().catch(() => ({ detail: 'Failed to upload Statement of Loss' }));
+                        throw new Error(err.detail || 'Statement of Loss upload failed');
+                    }
+                }
+
+                pipelineStepText.innerText = 'AI Workers Processing...';
+                pipelineProgressBar.style.width = '30%';
                     
                     let attempts = 0;
                     const maxAttempts = 24; // 2 minutes

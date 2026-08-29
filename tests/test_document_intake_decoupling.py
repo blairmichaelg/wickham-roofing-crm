@@ -244,3 +244,55 @@ def test_trigger_supplement_route_routes_retail_job(monkeypatch):
         conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
         conn.commit()
         conn.close()
+
+
+def test_upload_supplement_docs_delegates_to_split_endpoints(monkeypatch):
+    client = TestClient(app)
+    admin_token = create_access_token("admin")
+    job_id = str(uuid.uuid4())
+
+    conn = get_connection()
+    conn.execute(
+        "INSERT INTO jobs (id, homeowner_name, address_line1, city, state, postal_code, phone, status, job_type) VALUES (?, 'Wrapper Homeowner', '105 Wrapper Way', 'Valdosta', 'GA', '31601', '555-0106', 'LEAD_CAPTURED', 'INSURANCE')",
+        (job_id,)
+    )
+    conn.commit()
+    conn.close()
+
+    monkeypatch.setattr("app.api.office_routes.detect_pdf_format", lambda p: "EAGLEVIEW")
+    supplement_pipeline_called = False
+
+    async def mock_supplement_pipeline(*args, **kwargs):
+        nonlocal supplement_pipeline_called
+        supplement_pipeline_called = True
+        return {"status": "success"}
+
+    monkeypatch.setattr("app.api.office_routes.run_supplement_pipeline", mock_supplement_pipeline)
+    app.state.redis_pool = None
+
+    try:
+        dummy_ev = io.BytesIO(b"%PDF-1.4 dummy eagleview content")
+        dummy_sol = io.BytesIO(b"%PDF-1.4 dummy statement of loss content")
+
+        res = client.post(
+            f"/api/office/jobs/{job_id}/supplement_docs",
+            files={
+                "ev_file": ("eagleview.pdf", dummy_ev, "application/pdf"),
+                "sol_file": ("statement_of_loss.pdf", dummy_sol, "application/pdf")
+            },
+            cookies={"auth_token": admin_token}
+        )
+        assert res.status_code == 200, res.text
+        data = res.json()
+        assert data["status"] == "success"
+        assert "via legacy wrapper" in data["message"]
+        assert "measurement" in data
+        assert "sol" in data
+        assert supplement_pipeline_called is True
+    finally:
+        conn = get_connection()
+        conn.execute("DELETE FROM job_documents WHERE job_id = ?", (job_id,))
+        conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
+        conn.commit()
+        conn.close()
+
