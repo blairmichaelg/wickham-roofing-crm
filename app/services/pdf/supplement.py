@@ -9,6 +9,7 @@ from reportlab.lib import colors
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.platypus import (
     Image,
+    KeepTogether,
     PageBreak,
     Paragraph,
     Spacer,
@@ -804,7 +805,7 @@ class SupplementGenerator(PDFEngine):
                 
                 rules = db_context.get("rules", [])
                 supp_table_data: list[list[Any]] = [["Item Description", "Code", "Quantity", "Unit Rate", "Total Amount"]]
-                total_supp_val = 0.0
+                subtotal_supp_val = 0.0
                 
                 for r in rules:
                     code = r.get("required_child_code", "")
@@ -813,7 +814,7 @@ class SupplementGenerator(PDFEngine):
                         unit_rate = pricing_ledger.get(pkey, 0.0)
                         qty = float(r.get("quantity_delta") or 1.0)
                         line_amt = qty * unit_rate
-                        total_supp_val += line_amt
+                        subtotal_supp_val += line_amt
                         supp_table_data.append([
                             Paragraph(default_desc, table_cell_style),
                             code,
@@ -822,8 +823,24 @@ class SupplementGenerator(PDFEngine):
                             f"${line_amt:,.2f}"
                         ])
                 
+                # Check for O&P itemization
+                has_op_discrepancy = any(d.category == "Missing O&P" for d in report.discrepancies)
+                include_op = db_context.get("include_overhead_and_profit", has_op_discrepancy)
+
                 if len(supp_table_data) > 1:
-                    supp_table_data.append(["Total Supplemental Valuation", "", "", "", f"${total_supp_val:,.2f}"])
+                    if include_op and subtotal_supp_val > 0:
+                        overhead_amt = subtotal_supp_val * 0.10
+                        profit_amt = subtotal_supp_val * 0.10
+                        total_supp_val = subtotal_supp_val + overhead_amt + profit_amt
+
+                        supp_table_data.append([Paragraph("<b>Subtotal (Supplemental Scope)</b>", table_cell_style), "", "", "", f"${subtotal_supp_val:,.2f}"])
+                        supp_table_data.append([Paragraph("Overhead (10.0%)", table_cell_style), "FEE OVR", "10.00 %", f"${subtotal_supp_val:,.2f}", f"${overhead_amt:,.2f}"])
+                        supp_table_data.append([Paragraph("Profit (10.0%)", table_cell_style), "FEE PRF", "10.00 %", f"${subtotal_supp_val:,.2f}", f"${profit_amt:,.2f}"])
+                        supp_table_data.append(["Total Supplemental Valuation", "", "", "", f"${total_supp_val:,.2f}"])
+                    else:
+                        total_supp_val = subtotal_supp_val
+                        supp_table_data.append(["Total Supplemental Valuation", "", "", "", f"${total_supp_val:,.2f}"])
+
                     st_table = Table(supp_table_data, colWidths=[180, 75, 75, 75, 95])
                     st_table.setStyle(TableStyle([
                         ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#1e3a8a")),
@@ -847,8 +864,8 @@ class SupplementGenerator(PDFEngine):
                 log.error("supp_pricing_table_build_failed", error=str(e))
             story.append(Spacer(1, 14))
             
-            # --- 6. Building Code & Manufacturer Specifications ---
-            story.append(Paragraph("Building Code & Manufacturer Mandates", section_style))
+            # --- 6. Building Code & Manufacturer Specifications Appendix ---
+            story.append(Paragraph("Applicable Building Codes & Statutory Justifications", section_style))
             story.append(Spacer(1, 4))
             
             try:
@@ -856,6 +873,7 @@ class SupplementGenerator(PDFEngine):
                 jurisdiction = db_context.get("jurisdiction_code_version", "2021_IRC")
                 rules = db_context.get("rules", [])
                 
+                code_elements: list[Any] = []
                 for r in rules:
                     ctype = r["citation_type"]
                     ctext = r["citation_text"]
@@ -870,26 +888,36 @@ class SupplementGenerator(PDFEngine):
                         framed = f"<b>Per Manufacturer Installation Warranty Requirements:</b> {ctext}"
                     else:
                         framed = f"<b>Policy Standard:</b> {ctext}"
-                    story.append(Paragraph(f"&bull; {framed}", narrative_style))
+                    code_elements.append(Paragraph(f"&bull; {framed}", narrative_style))
                 
+                # Also include code citations from discrepancy report if available
+                for d in report.discrepancies:
+                    if d.code_citation:
+                        code_elements.append(Paragraph(f"&bull; <b>Mandated by {d.code_citation}:</b> Required for {d.category}.", narrative_style))
+
                 weather = db_context.get("weather")
                 if weather:
-                    story.append(Spacer(1, 4))
-                    story.append(Paragraph(f"<b>NOAA Weather Event Verification:</b> {weather['magnitude']} in {weather['event_type']} documented on {weather['loss_date'][:10]}", legal_style))
-                    
+                    code_elements.append(Spacer(1, 4))
+                    code_elements.append(Paragraph(f"<b>NOAA Weather Event Verification:</b> {weather['magnitude']} in {weather['event_type']} documented on {weather['loss_date'][:10]}", legal_style))
+                
+                if code_elements:
+                    story.append(KeepTogether(code_elements))
             except Exception as e:
                 log.error("pdf_db_context_read_failed", error=str(e))
 
             story.append(Spacer(1, 8))
             
-            # --- 6. Technical AI Narrative ---
+            # --- 7. Technical AI Narrative ---
             story.append(Paragraph("Technical Justification Narrative", section_style))
+            narrative_elements: list[Any] = []
             for p in narrative.split("\n"):
                 if p.strip():
-                    story.append(Paragraph(html.escape(p.strip()), narrative_style))
+                    narrative_elements.append(Paragraph(html.escape(p.strip()), narrative_style))
+            if narrative_elements:
+                story.append(KeepTogether(narrative_elements))
             story.append(Spacer(1, 14))
             
-            # --- 7. SLA Warning & 1-Year Workmanship Warranty ---
+            # --- 8. SLA Warning & 1-Year Workmanship Warranty ---
             sla_warranty_text = (
                 "<b>14-DAY CARRIER RESPONSE NOTICE:</b> Prompt processing of this supplemental request is required under Georgia Insurance Regulations. "
                 "Failure to approve essential structural building code components exposes the property to secondary moisture intrusion.<br/><br/>"
@@ -899,7 +927,7 @@ class SupplementGenerator(PDFEngine):
             story.append(self._box_warning("CARRIER NOTICE & WORKMANSHIP WARRANTY", sla_warranty_text, colors.HexColor("#1e3a8a")))
             story.append(Spacer(1, 18))
             
-            # --- 8. Signature ---
+            # --- 9. Signature ---
             story.append(self._build_signature_block(title1="Authorized Contractor Representative — Wickham Roofing LLC", title2="Date"))
             
             doc.build(story)
@@ -911,5 +939,6 @@ class SupplementGenerator(PDFEngine):
         except Exception as exc:
             log.error("supplement_pdf_generation_failed", error=str(exc))
             raise
+
 
 
