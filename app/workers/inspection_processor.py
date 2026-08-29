@@ -19,7 +19,7 @@ from pathlib import Path
 
 import structlog
 from arq.worker import Retry
-from PIL import Image as PILImage
+from PIL import Image as PILImage, ImageOps
 
 from app.config import FIELD_DOCS_DIR, get_settings
 from app.core.cache import get_cached_analysis, set_cached_analysis
@@ -42,6 +42,8 @@ def resize_for_pdf(src: Path, max_width: int = 800) -> io.BytesIO:
     produces a lightweight PNG buffer that ReportLab can consume via
     ImageReader without OOM risk.
 
+    Corrects EXIF orientation via ImageOps.exif_transpose.
+
     Args:
         src: Path to the source image file on disk.
         max_width: Maximum pixel width for the output. Default 800.
@@ -53,6 +55,9 @@ def resize_for_pdf(src: Path, max_width: int = 800) -> io.BytesIO:
         max_width = get_settings().pdf_image_max_width
 
     with PILImage.open(src) as img:
+        # Correct smartphone photo orientation before downsampling
+        img = ImageOps.exif_transpose(img)
+
         # Convert HEIC/other modes to RGB for PNG compatibility
         if img.mode not in ("RGB", "RGBA"):
             img = img.convert("RGB")
@@ -60,7 +65,7 @@ def resize_for_pdf(src: Path, max_width: int = 800) -> io.BytesIO:
         if img.width > max_width:
             ratio = max_width / img.width
             new_height = int(img.height * ratio)
-            img = img.resize((max_width, new_height), PILImage.LANCZOS)
+            img = img.resize((max_width, new_height), PILImage.Resampling.LANCZOS)
 
         buf = io.BytesIO()
         img.save(buf, format="PNG", optimize=True)
@@ -76,6 +81,8 @@ def resize_for_ai(src: Path, max_width: int = 1600) -> str:
     and API processing time, while preserving enough detail for forensic
     damage analysis.
 
+    Corrects EXIF orientation via ImageOps.exif_transpose.
+
     Writes the output to a managed temporary file that will be cleaned up
     on process exit by temp_manager.
 
@@ -90,6 +97,9 @@ def resize_for_ai(src: Path, max_width: int = 1600) -> str:
         max_width = get_settings().ai_image_max_width
         
     with PILImage.open(src) as img:
+        # Correct smartphone photo orientation before downsampling
+        img = ImageOps.exif_transpose(img)
+
         if img.mode not in ("RGB", "RGBA"):
             img = img.convert("RGB")
 
@@ -101,6 +111,7 @@ def resize_for_ai(src: Path, max_width: int = 1600) -> str:
         temp_path = create_temp_file(suffix=".jpg")
         img.save(temp_path, format="JPEG", quality=85)
         return temp_path
+
 
 
 async def process_inspection(ctx: dict, job_id: str) -> InspectionJob:

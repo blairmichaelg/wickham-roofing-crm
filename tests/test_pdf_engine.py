@@ -115,3 +115,28 @@ def test_pdf_components_and_audience_styles():
     grid = create_photo_grid(photos, cols=2, sub_brand="homeowner")
     assert grid is not None
 
+
+def test_image_downsample_and_exif_correction(tmp_path):
+    from PIL import Image as PILImage
+    from app.workers.inspection_processor import resize_for_pdf, resize_for_ai
+    
+    # Create test image with dimensions 1200x900
+    img_path = tmp_path / "test_photo.jpg"
+    test_img = PILImage.new("RGB", (1200, 900), color=(255, 0, 0))
+    test_img.save(img_path, format="JPEG")
+
+    # Downsample for PDF (target 800px max width)
+    buf = resize_for_pdf(img_path, max_width=800)
+    assert buf is not None
+    with PILImage.open(buf) as out_img:
+        assert out_img.width == 800
+        assert out_img.height == 600  # Proportional 4:3 preserved
+
+    # Downsample for AI
+    ai_path = resize_for_ai(img_path, max_width=600)
+    assert Path(ai_path).exists()
+    with PILImage.open(ai_path) as out_ai:
+        assert out_ai.width == 600
+        assert out_ai.height == 450
+
+
