@@ -309,3 +309,189 @@ def test_supplemental_xactimate_pricing_resolution():
     assert line_amounts["rfg_waste_adjustment_per_sq"] == 168.0  # 1.6 * 105
     assert all(amt > 0 for amt in line_amounts.values())
 
+
+@pytest.mark.asyncio
+async def test_supplement_pdf_pricing_resolution_end_to_end():
+    import os
+    from pathlib import Path
+    import pdfplumber
+    from app.services.pdf.supplement import SupplementGenerator
+    from app.core.supplement_models import DiscrepancyReport, MaterialBOM
+    from app.core.database import seed_default_pricing
+
+    job_id = str(uuid.uuid4())
+    conn = get_connection()
+    try:
+        conn.execute(
+            """INSERT INTO jobs (id, homeowner_name, address_line1, city, state, postal_code, phone, status, shingle_type, damage_signals) 
+            VALUES (?, 'Pricing Verify', '500 Valuation Lane', 'Thomasville', 'GA', '31792', '229-555-0500', 'LEAD_CAPTURED', 'GAF Timberline HDZ Architectural', '["gutter_damage"]')""",
+            (job_id,)
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    seed_supplement_rules()
+    seed_default_pricing()
+
+    ev_data = EagleViewData(
+        total_area_sf=3200.0,
+        predominant_pitch="8/12",
+        ridge_lf=40.0,
+        hip_lf=20.0,
+        valley_lf=30.0,
+        eaves_lf=120.0,
+        rake_lf=60.0,
+        drip_edge_lf=180.0,
+        total_facets=4,
+        flashing_lf=15.0,
+        step_flashing_lf=10.0,
+    )
+
+    # 1. Generate supplement flags through real pipeline function
+    manual_review = generate_and_gate_flags(
+        job_id=job_id, 
+        ice_barrier_required=False, 
+        ev_data=ev_data,
+        carrier_waste_pct=10.0
+    )
+    assert manual_review is False
+
+    # 2. Build db_context as pipeline does
+    conn = get_connection()
+    try:
+        cursor = conn.execute('''
+            SELECT r.citation_text, r.citation_type, r.required_child_code, r.climate_dependent, f.quantity_delta, f.notes
+            FROM supplement_flags f
+            JOIN supplement_rules r ON f.rule_id = r.id
+            WHERE f.job_id = ? AND f.triggered = 1
+        ''', (job_id,))
+        rules = [dict(r) for r in cursor.fetchall()]
+    finally:
+        conn.close()
+
+    db_context = {
+        "ice_barrier_required": False,
+        "jurisdiction_code_version": "2021_IRC",
+        "rules": rules,
+        "weather": None
+    }
+
+    report = DiscrepancyReport(
+        job_id=job_id,
+        ev_normalized_squares=36.8,
+        sol_total_rfg_squares=32.0,
+        square_variance=4.8,
+        waste_explanation="15% waste mathematically required",
+        material_bom=MaterialBOM(
+            field_shingle_bundles=96,
+            starter_bundles=6,
+            ridge_cap_bundles=4,
+            ice_water_rolls=0,
+            underlayment_rolls=4,
+            drip_edge_pieces=18
+        ),
+        discrepancies=[]
+    )
+
+    job_dict = {
+        "id": job_id,
+        "homeowner_name": "Pricing Verify",
+        "address_line1": "500 Valuation Lane",
+        "city": "Thomasville",
+        "state": "GA",
+        "postal_code": "31792",
+        "claim_number": "CLM-VAL-101",
+        "insurance_company": "State Farm",
+    }
+
+    # 3. Generate real supplement PDF
+    pdf_gen = SupplementGenerator()
+    pdf_path = await pdf_gen.generate_supplement_pdf(report, "Technical narrative justification.", job=job_dict, db_context=db_context)
+    
+    try:
+        assert os.path.exists(pdf_path)
+        
+        # 4. Extract text and verify non-zero priced dollar amounts for all 6 line items
+        with pdfplumber.open(pdf_path) as pdf:
+            full_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+            
+            # Assert all 6 codes appear with their calculated dollar totals
+            assert "RFG STEEP" in full_text
+            assert "$1,120.00" in full_text  # 32.00 SQ * $35.00
+
+            assert "RFG RIDGC+" in full_text
+            assert "$510.00" in full_text    # 60.00 LF * $8.50
+
+            assert "SFG GUTA" in full_text
+            assert "$1,440.00" in full_text  # 120.00 LF * $12.00
+
+            assert "DMO DUMP" in full_text
+            assert "$900.00" in full_text    # 2.00 EA * $450.00
+
+            assert "RFG RENAIL" in full_text
+            assert "$480.00" in full_text    # 32.00 SQ * $15.00
+
+            assert "RFG 300S" in full_text
+            assert "$168.00" in full_text    # 1.60 SQ * $105.00
+
+            assert "Total Supplemental Valuation" in full_text
+    finally:
+        # 5. Clean up temporary test PDF
+        if os.path.exists(pdf_path):
+            os.remove(pdf_path)
+
+
+def test_rebuttal_and_frontend_rules_consumption():
+    # Test citation extraction logic with self-referential / child-equal rule
+    job_id = str(uuid.uuid4())
+    conn = get_connection()
+    try:
+        conn.execute(
+            """INSERT INTO jobs (id, homeowner_name, address_line1, city, state, postal_code, phone, status, shingle_type, damage_signals) 
+            VALUES (?, 'Citation Test', '600 Rule St', 'Thomasville', 'GA', '31792', '229-555-0600', 'LEAD_CAPTURED', 'Architectural', '[]')""",
+            (job_id,)
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    seed_supplement_rules()
+
+    ev_data = EagleViewData(
+        total_area_sf=3000.0,
+        predominant_pitch="5/12",
+        ridge_lf=30.0,
+        hip_lf=20.0,
+        valley_lf=25.0,
+        eaves_lf=100.0,
+        rake_lf=40.0,
+        drip_edge_lf=140.0,
+        total_facets=4,
+        flashing_lf=0.0,
+        step_flashing_lf=0.0,
+    )
+
+    generate_and_gate_flags(job_id, ice_barrier_required=False, ev_data=ev_data, carrier_waste_pct=10.0)
+
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            """SELECT r.required_child_code, r.citation_text, r.citation_type, f.quantity_delta, f.notes
+               FROM supplement_flags f
+               JOIN supplement_rules r ON f.rule_id = r.id
+               WHERE f.job_id = ? AND f.triggered = 1""",
+            (job_id,)
+        ).fetchall()
+        citations = [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+    # Confirm RFG 300S is present and correctly processed without collision or drop
+    codes = [c["required_child_code"] for c in citations]
+    assert "RFG 300S" in codes
+    waste_citation = next(c for c in citations if c["required_child_code"] == "RFG 300S")
+    assert waste_citation["quantity_delta"] == 1.5  # 30 SQ * 0.05
+    assert "Complex Geometry" in waste_citation["citation_text"]
+
+

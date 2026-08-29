@@ -1072,7 +1072,7 @@ async def run_supplement_pipeline(job_id: str, ev_pdf_path: str, sol_pdf_path: s
                 jurisdiction = job_row["jurisdiction_code_version"] if job_row else "2021_IRC"
 
                 cursor = conn.execute('''
-                    SELECT r.citation_text, r.citation_type, r.required_child_code, r.climate_dependent
+                    SELECT r.citation_text, r.citation_type, r.required_child_code, r.climate_dependent, f.quantity_delta, f.notes
                     FROM supplement_flags f
                     JOIN supplement_rules r ON f.rule_id = r.id
                     WHERE f.job_id = ? AND f.triggered = 1

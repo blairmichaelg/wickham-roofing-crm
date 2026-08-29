@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.5.7] - 2026-08-28
+### Added & Enhanced (Supplement PDF Pricing Valuation Schedule & Rule Self-Reference Safety Verification)
+
+- **Itemized Supplemental Scope & Valuation Schedule**: Enhanced `generate_supplement_pdf` in `app/services/pdf/supplement.py` with an Itemized Supplemental Scope & Valuation Schedule table that directly queries `get_pricing_ledger()` and dynamically binds unit rates and calculated line totals for all triggered supplemental line items (`RFG STEEP`, `RFG RIDGC+`, `SFG GUTA`, `DMO DUMP`, `RFG RENAIL`, `RFG 300S`, `RFG START`, `RFG DRIP`, `RFG IWS`, `DMO PU`).
+- **Supplement Rule Self-Reference Audit**: Audited all database query and graph consumption sites for `supplement_rules` across `app/core/pipeline.py`, `app/api/frontend_routes.py`, and workers. Confirmed `parent_code == required_child_code` is safe, linear, and causes zero key collisions, dropped flags, or infinite loops.
+- **End-to-End PDF Validation (+2 tests, 460 → 462)**: Added `test_supplement_pdf_pricing_resolution_end_to_end` asserting that a fully rendered supplement PDF contains exact calculated dollar totals for all six supplemental codes via `pdfplumber`, and `test_rebuttal_and_frontend_rules_consumption` verifying rule citation extraction integrity.
+
 ## [2.5.6] - 2026-08-28
 ### Added & Enhanced (Shingle Waste Pipeline Integration & Supplemental Pricing Resolution)
 

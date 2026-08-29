@@ -774,7 +774,80 @@ class SupplementGenerator(PDFEngine):
                 story.append(Paragraph("No line-item variances recorded.", normal_style))
             story.append(Spacer(1, 14))
             
-            # --- 5. Building Code & Manufacturer Specifications ---
+            # --- 5. Itemized Supplemental Scope & Valuation Schedule ---
+            story.append(Paragraph("Itemized Supplemental Scope & Valuation Schedule", section_style))
+            story.append(Spacer(1, 4))
+            
+            try:
+                from app.core.database import get_pricing_ledger
+                pricing_ledger = get_pricing_ledger()
+                CODE_PRICING_MAP = {
+                    "RFG STEEP": ("rfg_steep_per_sq", "SQ", "Steep Slope Safety Protocol"),
+                    "RFG RIDGC+": ("rfg_ridgc_plus_per_lf", "LF", "High-Profile Ridge Cap Upgrade"),
+                    "SFG GUTA": ("sfg_guta_per_lf", "LF", "Seamless Aluminum Gutter Replacement"),
+                    "DMO DUMP": ("dmo_dump_per_container", "EA", "Debris Disposal Container Fee"),
+                    "RFG RENAIL": ("rfg_renail_per_sq", "SQ", "Roof Decking Re-Nailing (IRC R905.2.1)"),
+                    "RFG 300S": ("rfg_waste_adjustment_per_sq", "SQ", "Complex Geometry Waste Adjustment"),
+                    "RFG START": ("starter_bundles", "BDL", "Starter Strip Shingles"),
+                    "RFG DRIP": ("drip_edge_pieces_10ft", "PC", "Drip Edge Metal Flashing"),
+                    "RFG IWS": ("ice_and_water_rolls", "RL", "Ice & Water Shield Membrane"),
+                    "DMO PU": ("dmo_dump_per_container", "EA", "Debris Pickup & Haul-Off"),
+                }
+                
+                table_cell_style = ParagraphStyle(
+                    "SuppTableCell",
+                    parent=self.styles["Normal"],
+                    fontSize=8.5,
+                    leading=11,
+                    textColor=colors.HexColor("#1e293b")
+                )
+                
+                rules = db_context.get("rules", [])
+                supp_table_data: list[list[Any]] = [["Item Description", "Code", "Quantity", "Unit Rate", "Total Amount"]]
+                total_supp_val = 0.0
+                
+                for r in rules:
+                    code = r.get("required_child_code", "")
+                    if code in CODE_PRICING_MAP:
+                        pkey, unit_label, default_desc = CODE_PRICING_MAP[code]
+                        unit_rate = pricing_ledger.get(pkey, 0.0)
+                        qty = float(r.get("quantity_delta") or 1.0)
+                        line_amt = qty * unit_rate
+                        total_supp_val += line_amt
+                        supp_table_data.append([
+                            Paragraph(default_desc, table_cell_style),
+                            code,
+                            f"{qty:.2f} {unit_label}",
+                            f"${unit_rate:.2f}",
+                            f"${line_amt:,.2f}"
+                        ])
+                
+                if len(supp_table_data) > 1:
+                    supp_table_data.append(["Total Supplemental Valuation", "", "", "", f"${total_supp_val:,.2f}"])
+                    st_table = Table(supp_table_data, colWidths=[180, 75, 75, 75, 95])
+                    st_table.setStyle(TableStyle([
+                        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#1e3a8a")),
+                        ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+                        ('ALIGN', (0,0), (1,-1), 'LEFT'),
+                        ('ALIGN', (2,0), (-1,-1), 'RIGHT'),
+                        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                        ('FONTSIZE', (0,0), (-1,-1), 8.5),
+                        ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+                        ('TOPPADDING', (0,0), (-1,-1), 5),
+                        ('ROWBACKGROUNDS', (0,1), (-1,-2), [colors.HexColor("#f8fafc"), colors.white]),
+                        ('LINEABOVE', (0,-1), (-1,-1), 1, colors.HexColor("#1e3a8a")),
+                        ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
+                        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#cbd5e1")),
+                        ('PADDING', (0,0), (-1,-1), 5),
+                    ]))
+                    story.append(st_table)
+                else:
+                    story.append(Paragraph("No itemized supplemental line items.", normal_style))
+            except Exception as e:
+                log.error("supp_pricing_table_build_failed", error=str(e))
+            story.append(Spacer(1, 14))
+            
+            # --- 6. Building Code & Manufacturer Specifications ---
             story.append(Paragraph("Building Code & Manufacturer Mandates", section_style))
             story.append(Spacer(1, 4))
             
