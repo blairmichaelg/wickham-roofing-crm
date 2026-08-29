@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.8.1] - 2026-08-29
+### Fixed & Enhanced (Documentation Drift Regression Testing & Role Guide Refresh)
+
+- **Documentation Drift Testing (`tests/test_docs_sync.py`)**: Added automated regression testing verifying that all active core FastAPI routes from `app.openapi()["paths"]` match documentation and preventing drift across sprints.
+- **Legacy Schema Cleanup in Documentation**: Verified and confirmed operator guides in `docs/` (`admin_tech_guide.md`, `accounting_guide.md`, `operations_guide.md`, `field_runbook.md`) do not reference dropped database columns (`acv_check_amount`, `carrier_initial_rcv`, etc.).
+- **Runbook Version Synchronization**: Refreshed stale version stamps across operational runbooks and testing documentation.
+- **Test Suite (+3 tests, 486 → 489)**: Added `tests/test_docs_sync.py` testing OpenAPI endpoint presence, guide file validity, and legacy column absence.
+
 ## [2.8.0] - 2026-08-29
 ### Added & Enhanced (Crew Job-Alert Push Notifications via Web Push / VAPID)
 
