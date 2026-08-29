@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.8.6] - 2026-08-29
+### Added (Negative-Path & Idempotency Tests for Document Intake Endpoints)
+
+- **Negative-Path & Idempotency Test Coverage (+4 tests, 495 → 499)**: Added focused test cases in `tests/test_document_intake_decoupling.py` covering:
+  - `upload_measurement_report` non-PDF header and non-PDF magic-byte validation (HTTP 400 rejection).
+  - `upload_statement_of_loss` non-PDF header and non-PDF magic-byte validation (HTTP 400 rejection).
+  - Malformed `job_id` UUID string rejection (HTTP 400) on both intake endpoints.
+  - Duplicate Statement of Loss upload idempotency ensuring repeat uploads short-circuit with `"Duplicate file detected"` without re-triggering pipeline generation.
+- **Zero Production Changes**: Pure test-coverage enhancement; zero modifications made to production application code.
+
 ## [2.8.5] - 2026-08-29
 ### Fixed (Message Accuracy on Deprecated Legacy Upload Wrapper)
 

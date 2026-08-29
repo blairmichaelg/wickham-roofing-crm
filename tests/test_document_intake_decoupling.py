@@ -517,3 +517,117 @@ def test_upload_supplement_docs_retail_job_message_accuracy(monkeypatch):
         conn.close()
 
 
+def test_upload_measurement_report_rejects_non_pdf():
+    client = TestClient(app)
+    admin_token = create_access_token("admin")
+    job_id = str(uuid.uuid4())
+
+    # 1. Test wrong content-type header
+    res1 = client.post(
+        f"/api/office/jobs/{job_id}/measurement-report",
+        files={"file": ("report.txt", io.BytesIO(b"Plain text content"), "text/plain")},
+        cookies={"auth_token": admin_token}
+    )
+    assert res1.status_code == 400
+    assert "File must be a PDF" in res1.json()["detail"]
+
+    # 2. Test PDF content-type header with non-PDF magic bytes
+    res2 = client.post(
+        f"/api/office/jobs/{job_id}/measurement-report",
+        files={"file": ("fake.pdf", io.BytesIO(b"NOT_A_REAL_PDF_HEADER"), "application/pdf")},
+        cookies={"auth_token": admin_token}
+    )
+    assert res2.status_code == 400
+    assert "Invalid file type" in res2.json()["detail"]
+
+
+def test_upload_statement_of_loss_rejects_non_pdf():
+    client = TestClient(app)
+    admin_token = create_access_token("admin")
+    job_id = str(uuid.uuid4())
+
+    # 1. Test wrong content-type header
+    res1 = client.post(
+        f"/api/office/jobs/{job_id}/statement-of-loss",
+        files={"file": ("sol.txt", io.BytesIO(b"Plain text content"), "text/plain")},
+        cookies={"auth_token": admin_token}
+    )
+    assert res1.status_code == 400
+    assert "File must be a PDF" in res1.json()["detail"]
+
+    # 2. Test PDF content-type header with non-PDF magic bytes
+    res2 = client.post(
+        f"/api/office/jobs/{job_id}/statement-of-loss",
+        files={"file": ("fake_sol.pdf", io.BytesIO(b"NOT_A_REAL_PDF_HEADER"), "application/pdf")},
+        cookies={"auth_token": admin_token}
+    )
+    assert res2.status_code == 400
+    assert "Invalid file type" in res2.json()["detail"]
+
+
+def test_document_intake_endpoints_reject_invalid_job_id():
+    client = TestClient(app)
+    admin_token = create_access_token("admin")
+    malformed_job_id = "invalid-uuid-format-12345"
+
+    dummy_pdf = io.BytesIO(b"%PDF-1.4 dummy content")
+    res1 = client.post(
+        f"/api/office/jobs/{malformed_job_id}/measurement-report",
+        files={"file": ("report.pdf", dummy_pdf, "application/pdf")},
+        cookies={"auth_token": admin_token}
+    )
+    assert res1.status_code == 400
+    assert "Invalid job_id format" in res1.json()["detail"]
+
+    dummy_pdf2 = io.BytesIO(b"%PDF-1.4 dummy content")
+    res2 = client.post(
+        f"/api/office/jobs/{malformed_job_id}/statement-of-loss",
+        files={"file": ("sol.pdf", dummy_pdf2, "application/pdf")},
+        cookies={"auth_token": admin_token}
+    )
+    assert res2.status_code == 400
+    assert "Invalid job_id format" in res2.json()["detail"]
+
+
+def test_upload_statement_of_loss_idempotent_duplicate(monkeypatch):
+    client = TestClient(app)
+    admin_token = create_access_token("admin")
+    job_id = str(uuid.uuid4())
+
+    conn = get_connection()
+    conn.execute(
+        "INSERT INTO jobs (id, homeowner_name, address_line1, city, state, postal_code, phone, status, job_type) VALUES (?, 'Idempotent SoL Homeowner', '110 Idempotent St', 'Valdosta', 'GA', '31601', '555-0111', 'LEAD_CAPTURED', 'INSURANCE')",
+        (job_id,)
+    )
+    conn.commit()
+    conn.close()
+
+    monkeypatch.setattr("app.api.office_routes.detect_pdf_format", lambda p: "EAGLEVIEW")
+    app.state.redis_pool = None
+
+    try:
+        content = b"%PDF-1.4 identical statement of loss content for idempotency"
+        dummy1 = io.BytesIO(content)
+        res1 = client.post(
+            f"/api/office/jobs/{job_id}/statement-of-loss",
+            files={"file": ("statement_of_loss.pdf", dummy1, "application/pdf")},
+            cookies={"auth_token": admin_token}
+        )
+        assert res1.status_code == 200
+
+        dummy2 = io.BytesIO(content)
+        res2 = client.post(
+            f"/api/office/jobs/{job_id}/statement-of-loss",
+            files={"file": ("statement_of_loss.pdf", dummy2, "application/pdf")},
+            cookies={"auth_token": admin_token}
+        )
+        assert res2.status_code == 200
+        assert "Duplicate file detected" in res2.json()["message"]
+    finally:
+        conn = get_connection()
+        conn.execute("DELETE FROM job_documents WHERE job_id = ?", (job_id,))
+        conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
+        conn.commit()
+        conn.close()
+
+
