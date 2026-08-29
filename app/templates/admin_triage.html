@@ -48,7 +48,13 @@
                 </div>
                 <span class="px-3 py-1 bg-red-900 text-red-300
                              rounded text-xs font-bold uppercase">
-                    {{ 'PIPELINE FAILED' if job.status == 'PIPELINE_FAILED' else 'PENDING REVIEW' }}
+                    {% if job.status == 'PIPELINE_FAILED' %}
+                        PIPELINE FAILED
+                    {% elif job.status == 'INSPECTION_FAILED' %}
+                        INSPECTION FAILED
+                    {% else %}
+                        PENDING REVIEW
+                    {% endif %}
                 </span>
             </div>
 

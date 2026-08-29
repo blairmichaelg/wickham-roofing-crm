@@ -1261,14 +1261,14 @@ async def admin_triage_view(request: Request):
                        FROM job_tasks jt
                        WHERE jt.job_id = j.id
                          AND jt.last_error IS NOT NULL
-                       ORDER BY CASE jt.task_type WHEN 'SUPPLEMENT_DRAFTING' THEN 0 ELSE 1 END
+                       ORDER BY CASE jt.task_type WHEN 'SUPPLEMENT_DRAFTING' THEN 0 WHEN 'INSPECTION_VISION' THEN 1 ELSE 2 END
                        LIMIT 1
                    ) AS last_error,
                    j.ev_total_area_sf, j.ev_predominant_pitch,
                    j.ev_ridge_lf, j.ev_hip_lf,
                    j.ev_valley_lf, j.ev_eaves_lf, j.ev_rakes_lf
             FROM jobs j
-            WHERE j.status IN ('PENDING_OPERATOR_REVIEW', 'PIPELINE_FAILED')
+            WHERE j.status IN ('PENDING_OPERATOR_REVIEW', 'PIPELINE_FAILED', 'INSPECTION_FAILED')
             ORDER BY j.created_at ASC
         """)
         stuck_jobs = [dict(r) for r in cursor.fetchall()]

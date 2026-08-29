@@ -315,7 +315,7 @@ def test_mark_commission_paid(monkeypatch):
 
 
 def test_admin_triage_view_surfaces_review_and_failed_jobs():
-    """Verify that /api/office/admin/triage surfaces both PENDING_OPERATOR_REVIEW and PIPELINE_FAILED jobs, and excludes normal jobs."""
+    """Verify that /api/office/admin/triage surfaces PENDING_OPERATOR_REVIEW, PIPELINE_FAILED, and INSPECTION_FAILED jobs, and excludes normal jobs."""
     from app.api.auth import create_access_token
     from app.core.database import get_connection
     import uuid
@@ -323,6 +323,7 @@ def test_admin_triage_view_surfaces_review_and_failed_jobs():
     admin_token = create_access_token("admin")
     job_review = f"job-rev-{uuid.uuid4().hex[:8]}"
     job_failed = f"job-fail-{uuid.uuid4().hex[:8]}"
+    job_insp_failed = f"job-insp-{uuid.uuid4().hex[:8]}"
     job_normal = f"job-norm-{uuid.uuid4().hex[:8]}"
 
     conn = get_connection()
@@ -335,7 +336,11 @@ def test_admin_triage_view_surfaces_review_and_failed_jobs():
         (job_failed,)
     )
     conn.execute(
-        "INSERT INTO jobs (id, homeowner_name, address_line1, city, state, postal_code, phone, status) VALUES (?, 'Normal Lead Homeowner', '789 Normal Rd', 'Valdosta', 'GA', '31601', '555-3333', 'LEAD_CAPTURED')",
+        "INSERT INTO jobs (id, homeowner_name, address_line1, city, state, postal_code, phone, status) VALUES (?, 'Inspection Failed Homeowner', '789 Inspection Rd', 'Valdosta', 'GA', '31601', '555-3333', 'INSPECTION_FAILED')",
+        (job_insp_failed,)
+    )
+    conn.execute(
+        "INSERT INTO jobs (id, homeowner_name, address_line1, city, state, postal_code, phone, status) VALUES (?, 'Normal Lead Homeowner', '999 Normal Rd', 'Valdosta', 'GA', '31601', '555-4444', 'LEAD_CAPTURED')",
         (job_normal,)
     )
     conn.commit()
@@ -346,14 +351,19 @@ def test_admin_triage_view_surfaces_review_and_failed_jobs():
         assert response.status_code == 200
         # (a) Pre-existing PENDING_OPERATOR_REVIEW status surfaces
         assert "Review Homeowner" in response.text
-        # (b) Newly-included PIPELINE_FAILED status surfaces
+        # (b) PIPELINE_FAILED status surfaces with distinct badge
         assert "Failed Homeowner" in response.text
-        # (c) Normal/unrelated status does NOT surface in triage
+        assert "PIPELINE FAILED" in response.text
+        # (c) INSPECTION_FAILED status surfaces with distinct badge
+        assert "Inspection Failed Homeowner" in response.text
+        assert "INSPECTION FAILED" in response.text
+        # (d) Normal/unrelated status does NOT surface in triage
         assert "Normal Lead Homeowner" not in response.text
     finally:
         conn = get_connection()
-        conn.execute("DELETE FROM jobs WHERE id IN (?, ?, ?)", (job_review, job_failed, job_normal))
+        conn.execute("DELETE FROM jobs WHERE id IN (?, ?, ?, ?)", (job_review, job_failed, job_insp_failed, job_normal))
         conn.commit()
         conn.close()
+
 
 

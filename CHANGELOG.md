@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.6.0] - 2026-08-28
+### Fixed & Enhanced (INSPECTION_FAILED Triage Visibility Resolution)
+
+- **INSPECTION_FAILED Triage Visibility**: Resolved blind spot in `admin_triage_view` (`app/api/office_routes.py`) by expanding the query filter to `WHERE j.status IN ('PENDING_OPERATOR_REVIEW', 'PIPELINE_FAILED', 'INSPECTION_FAILED')`. Updated subquery ordering to prioritize `INSPECTION_VISION` task errors.
+- **Dynamic Triage Status Badges**: Enhanced `app/templates/admin_triage.html` with explicit status badge branching for `INSPECTION FAILED` and `PIPELINE FAILED` alongside `PENDING REVIEW`.
+- **Regression Test Coverage**: Extended `test_admin_triage_view_surfaces_review_and_failed_jobs` in `tests/test_office_routes.py` asserting that `INSPECTION_FAILED` jobs surface with the distinct `INSPECTION FAILED` badge alongside `PENDING_OPERATOR_REVIEW` and `PIPELINE_FAILED`, while normal jobs (`LEAD_CAPTURED`) remain strictly excluded.
+
 ## [2.5.9] - 2026-08-28
 ### Fixed & Enhanced (Admin Triage View Completeness, Field Guides & Offline Runbook Alignment)
 

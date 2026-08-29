@@ -1,6 +1,6 @@
 [project]
 name = "wickham-roofing-crm"
-version = "2.5.9"
+version = "2.6.0"
 description = "Insurance restoration CRM for roofing contractors with AI-powered forensic photo analysis and automated supplement generation."
 authors = [{name = "Wickham Roofing LLC"}]
 requires-python = ">=3.11"
