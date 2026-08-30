@@ -166,7 +166,7 @@ class NeighborLetterGenerator(PDFEngine):
             # ── Legal footer ─────────────────────────────────────────────────
             footer = (
                 "Wickham Roofing LLC is a licensed and insured Georgia roofing contractor. "
-                "We operate in compliance with O.C.G.A. § 33-24-59.27 (HB 423). "
+                "We operate in compliance with O.C.G.A. § 33-23-43(c)(4) (HB 423). "
                 "Homeowners are responsible for their insurance deductible as required by law. "
                 f"Letter generated {datetime.date.today().isoformat()}."
             )

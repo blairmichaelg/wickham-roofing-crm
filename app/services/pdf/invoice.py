@@ -448,7 +448,7 @@ class InvoiceGenerator(PDFEngine):
             
             # --- Statutory Deductible & Legal Terms ---
             deductible_disclosure = (
-                "<b>GEORGIA STATUTORY DEDUCTIBLE DISCLOSURE (O.C.G.A. § 33-24-59.27 / HB 423):</b> "
+                "<b>GEORGIA STATUTORY DEDUCTIBLE DISCLOSURE (O.C.G.A. § 33-23-43(c)(4) / HB 423):</b> "
                 "It is unlawful under Georgia law for a contractor to pay, rebate, waive, or promise to waive all or any part of an insurance deductible. "
                 "The property owner is legally obligated to pay the deductible amount specified in their insurance policy directly to the contractor upon project completion.<br/><br/>"
                 "<b>Scope of Work & Change Orders:</b> This estimate covers explicitly listed materials and applications. "
@@ -512,7 +512,7 @@ class InvoiceGenerator(PDFEngine):
             balance_due = subtotal - payments_applied
 
             if deductible > 0:
-                rows.append(["Homeowner Deductible Responsibility (O.C.G.A. § 33-24-59.27)", f"${deductible:,.2f}"])
+                rows.append(["Homeowner Deductible Responsibility (O.C.G.A. § 33-23-43(c)(4))", f"${deductible:,.2f}"])
             if payments_applied > 0:
                 rows.append(["Less: Insurance & Prior Payments Applied", f"(${payments_applied:,.2f})"])
             rows.append(["TOTAL BALANCE DUE UPON RECEIPT", f"${balance_due:,.2f}"])
@@ -538,7 +538,7 @@ class InvoiceGenerator(PDFEngine):
 
             # Statutory Deductible Notice
             deductible_disclosure = (
-                "<b>GEORGIA STATUTORY DEDUCTIBLE DISCLOSURE (O.C.G.A. § 33-24-59.27 / HB 423):</b> "
+                "<b>GEORGIA STATUTORY DEDUCTIBLE DISCLOSURE (O.C.G.A. § 33-23-43(c)(4) / HB 423):</b> "
                 "It is unlawful under Georgia law for a contractor to pay, rebate, waive, or promise to waive all or any part of an insurance deductible. "
                 "The property owner is legally obligated to pay the deductible amount specified in their insurance policy directly to the contractor upon project completion.<br/><br/>"
                 "<b>Workmanship Warranty:</b> All restoration work completed by Wickham Roofing LLC is backed by our explicit <b>1-Year Workmanship Warranty</b>."

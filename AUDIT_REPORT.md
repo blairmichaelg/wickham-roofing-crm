@@ -40,7 +40,7 @@ Seven bugs confirmed and patched in a deep workspace audit session:
 ## 5. PDF DOCUMENT ENGINE & LEGAL COMPLIANCE AUDIT
 - **Centralized Letterhead & Branding**: Upgraded `app/services/pdf/engine.py` with top-right logo positioning (`x=430, y=712, width=130, height=52`) on multi-page document templates, preventing text overlap.
 - **Mandatory 1-Year Workmanship Warranty**: Embedded explicit 1-Year Workmanship Warranty guarantee boxes across all customer-facing contracts, quotes, estimates, inspection reports, and completion certificates.
-- **Georgia HB 423 Compliance**: Hardened Georgia statutory disclosures (O.C.G.A. § 33-24-59.27 deductible rebate warnings, statutory 5-day cancellation rights, public adjuster representation disclaimers, and 15% default clauses).
+- **Georgia HB 423 Compliance**: Hardened Georgia statutory disclosures (O.C.G.A. § 33-23-43(c)(4) deductible rebate warnings, statutory 5-day cancellation rights, public adjuster representation disclaimers, and 15% default clauses).
 - **Digital Signatures & Auditing**: Embedded cryptographic IP, signer name, and UTC timestamp logs into signed PDFs.
 
 ## 6. DATA INTEGRITY & FINANCIAL AUDIT

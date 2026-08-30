@@ -600,10 +600,10 @@ class DocumentsGenerator(PDFEngine):
 
             # --- Section 3: HB 423 Georgia Law Deductible Disclosure ---
             warning_text = (
-                "WARNING: It is a violation of Georgia law (O.C.G.A. § 33-24-59.27) for a contractor to pay, waive, rebate, or promise to pay or rebate "
+                "WARNING: It is a violation of Georgia law (O.C.G.A. § 33-23-43(c)(4)) for a contractor to pay, waive, rebate, or promise to pay or rebate "
                 "all or any portion of an insurance deductible. Homeowner is strictly responsible for payment of the insurance deductible in full."
             )
-            story.append(self._box_warning("HB 423 Deductible Compliance Disclosure (O.C.G.A. § 33-24-59.27)", warning_text, BRAND_RED))
+            story.append(self._box_warning("HB 423 Deductible Compliance Disclosure (O.C.G.A. § 33-23-43(c)(4))", warning_text, BRAND_RED))
             story.append(Spacer(1, 10))
 
             # --- Section 4: Georgia Statutory Cancellation Disclosure (O.C.G.A. § 10-1-393.12) ---
@@ -953,10 +953,10 @@ class DocumentsGenerator(PDFEngine):
 
             # --- Section 3: HB 423 Georgia Law Deductible Disclosure ---
             warning_text = (
-                "WARNING: It is a violation of Georgia law (O.C.G.A. § 33-24-59.27) for a contractor to pay, waive, rebate, or promise to pay or rebate "
+                "WARNING: It is a violation of Georgia law (O.C.G.A. § 33-23-43(c)(4)) for a contractor to pay, waive, rebate, or promise to pay or rebate "
                 "all or any portion of an insurance deductible. Homeowner is strictly responsible for payment of the insurance deductible in full."
             )
-            story.append(self._box_warning("HB 423 Deductible Compliance Disclosure (O.C.G.A. § 33-24-59.27)", warning_text, BRAND_RED))
+            story.append(self._box_warning("HB 423 Deductible Compliance Disclosure (O.C.G.A. § 33-23-43(c)(4))", warning_text, BRAND_RED))
             story.append(Spacer(1, 10))
 
             # --- Section 4: Georgia Statutory Cancellation Disclosure (O.C.G.A. § 10-1-393.12) ---

@@ -1,12 +1,32 @@
 # Changelog
 
+## [2.8.13] - 2026-08-29
+### Fixed (Georgia Statutory Deductible-Waiver Citation Correction)
+
+- **Statutory Citation Correction (O.C.G.A. § 33-23-43(c)(4) / HB 423)**:
+  - Corrected Georgia insurance deductible-waiver prohibition citation across all customer-facing contracts, quotes, estimates, invoices, field templates, and neighbor letters from the erroneous `O.C.G.A. § 33-24-59.27` (an unrelated 2020 health insurance price-transparency statute) to the primary-source statutory citation: **O.C.G.A. § 33-23-43(c)(4)**, enacted by Georgia HB 423 (2011-2012 session).
+  - Maintained distinct separation from **O.C.G.A. § 10-1-393.12** (5-business-day post-denial cancellation right and invoicing lock) and **Georgia SB 201 / O.C.G.A. § 33-24-59.28** (Assignment of Benefits prohibition), leaving both untouched.
+  - **Touched Files**:
+    - `app/templates/field_app.html`
+    - `app/templates/help.html`
+    - `app/services/pdf/documents.py`
+    - `app/services/pdf/invoice.py`
+    - `app/services/pdf/neighbor_letter.py`
+    - `docs/canvasser_field_guide.md`
+    - `tests/test_georgia_compliance.py`
+    - `AUDIT_REPORT.md`
+- **Regression Protection (+1 test, 507 → 508)**:
+  - Added `test_zero_obsolete_deductible_citation_in_source_files` in `tests/test_georgia_compliance.py` to enforce zero occurrences of `33-24-59.27` in application templates and PDF generators during CI.
+  - Updated `test_invoice_statutory_compliance_and_post_denial_lock` assertions to verify `33-23-43` appears in generated estimates and invoices.
+- **Legal Review Advisory**: *NOTE: This citation is corrected based on direct primary-source legislative review of Georgia General Assembly HB 423 bill text and codified Georgia Code (O.C.G.A. § 33-23-43(c)(4) & (d)), not formal legal advice. Contractors and operators should have counsel confirm this citation before further legal reliance.*
+
 ## [2.8.12] - 2026-08-29
 ### Changed (Phase 6: Invoice Legal-Text Correctness Pass & Layout Overhaul)
 
 - **Audience-Tiered Invoice Styling (`app/services/pdf/invoice.py`)**: Applied homeowner and internal sub-brand palettes, unified typography hierarchies, and strict right-alignment on all financial currency columns so decimals stack vertically.
 - **Georgia Statutory Compliance Disclosures**:
   - Enforced 5-business-day post-denial invoicing lock under O.C.G.A. § 10-1-393.12 via `is_post_denial_invoicing_locked`.
-  - Updated statutory deductible-waiver disclosure to cite **O.C.G.A. § 33-24-59.27 (HB 423)**.
+  - Updated statutory deductible-waiver disclosure to cite **O.C.G.A. § 33-23-43(c)(4) (HB 423)**.
   - Ensured zero references to `"33-1-9"` and zero Assignment of Benefits (AOB) language across all invoices and estimates.
 - **Test Suite (+1 test)**: Added `test_invoice_statutory_compliance_and_post_denial_lock` in `tests/test_georgia_compliance.py`.
 
@@ -437,7 +457,7 @@
 ### Added & Professionalized
 - **PDF Engine & Executive Branding Overhaul**: Re-architected PDF layout infrastructure in `app/services/pdf/engine.py` (`_universal_letterhead`, metadata grids, warning callout boxes, signature blocks) featuring top-right logo positioning, navy headers (`#1e3a8a`), and crisp slate borders.
 - **Mandatory 1-Year Workmanship Warranty**: Embedded explicit 1-Year Workmanship Warranty Guarantee callouts across all 10 system-generated PDF document types (`documents.py`, `supplement.py`, `inspection_report.py`, `invoice.py`, `commission.py`).
-- **Georgia Statutory Legal Disclosures**: Hardened legal protection in contracts, quotes, and estimates with Georgia HB 423 deductible rebate disclaimers (O.C.G.A. § 33-24-59.27), public adjuster representation limits, 5-day cancellation notices, 15% default clauses, and mechanics lien waivers.
+- **Georgia Statutory Legal Disclosures**: Hardened legal protection in contracts, quotes, and estimates with Georgia HB 423 deductible rebate disclaimers (O.C.G.A. § 33-23-43(c)(4)), public adjuster representation limits, 5-day cancellation notices, 15% default clauses, and mechanics lien waivers.
 - **Auth & RBAC Hardening**: Audited authentication endpoints, purged non-standard generic fallback PINs, and strictly enforced field rep job ownership checks (`assert_field_rep_owns_job`).
 - **Full Verification Suite**: Executed end-to-end smoke test validating all 10 document types and passed all 256 test modules in `pytest`.
 

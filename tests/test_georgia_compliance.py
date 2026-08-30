@@ -292,8 +292,9 @@ async def test_invoice_statutory_compliance_and_post_denial_lock(tmp_path, monke
     
     with pdfplumber.open(est_path) as pdf:
         est_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
-        assert "33-24-59.27" in est_text
+        assert "33-23-43" in est_text
         assert "HB 423" in est_text
+        assert "33-24-59.27" not in est_text
         assert "33-1-9" not in est_text
         assert len(detect_aob_language(est_text)) == 0
 
@@ -309,8 +310,9 @@ async def test_invoice_statutory_compliance_and_post_denial_lock(tmp_path, monke
     
     with pdfplumber.open(inv_path) as pdf:
         inv_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
-        assert "33-24-59.27" in inv_text
+        assert "33-23-43" in inv_text
         assert "HB 423" in inv_text
+        assert "33-24-59.27" not in inv_text
         assert "33-1-9" not in inv_text
         assert len(detect_aob_language(inv_text)) == 0
 
@@ -338,4 +340,28 @@ async def test_invoice_statutory_compliance_and_post_denial_lock(tmp_path, monke
         await generator.generate_final_invoice(denial_job, inv_data)
     assert "post-denial invoicing lock" in str(exc_info.value)
     assert "10-1-393.12" in str(exc_info.value)
+
+
+def test_zero_obsolete_deductible_citation_in_source_files():
+    """
+    Regression-proof Georgia statutory citation integrity:
+    Asserts that the obsolete citation '33-24-59.27' has zero occurrences across
+    all application template files and PDF generator service files, and that the
+    correct citation '33-23-43' is present.
+    """
+    repo_root = Path(__file__).resolve().parent.parent
+    target_files = [
+        repo_root / "app" / "templates" / "field_app.html",
+        repo_root / "app" / "templates" / "help.html",
+        repo_root / "app" / "services" / "pdf" / "invoice.py",
+        repo_root / "app" / "services" / "pdf" / "neighbor_letter.py",
+        repo_root / "app" / "services" / "pdf" / "documents.py",
+    ]
+
+    for file_path in target_files:
+        assert file_path.exists(), f"Target file does not exist: {file_path}"
+        content = file_path.read_text(encoding="utf-8")
+        assert "33-24-59.27" not in content, f"Obsolete citation '33-24-59.27' found in {file_path.name}"
+        assert "33-23-43" in content, f"Correct citation '33-23-43' missing from {file_path.name}"
+
 

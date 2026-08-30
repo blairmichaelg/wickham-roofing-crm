@@ -86,7 +86,7 @@ Field reps can submit a **Naked Lead** (Name, Address, Phone, and optional Date 
 
 If the homeowner accepts the terms during intake or during a follow-up visit:
 
-1. Review the **Insurance Contingency Agreement Summary** with the homeowner (including deductible warnings under O.C.G.A. § 33-24-59.27).
+1. Review the **Insurance Contingency Agreement Summary** with the homeowner (including deductible warnings under O.C.G.A. § 33-23-43(c)(4) / HB 423).
 2. Check the acknowledgment box: *"Homeowner accepts terms & conditions"*.
 3. Draw the signature on the canvas and tap **Lock Signature** or **✓ Save E-Signature**.
 
