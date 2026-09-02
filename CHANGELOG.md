@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.8.14] - 2026-09-01
+### Added (Non-Core Sales Representative Provisioning)
+
+- **Sales Representative Provisioning**:
+  - Added new non-core field sales representative **Ormand Hunter** (PIN: `3852`) to the system with active status.
+  - Configured default field rep seed entries in `app/core/database.py` (`seed_core_team_reps`) and demo reset routines in `scripts/db_demo_reset.py` to ensure reproducible provisioning across environments.
+  - Retained standard non-core access boundaries (unassigned job intake and assigned job ownership controls).
+- **Test Suite (+1 test, 508 → 509)**:
+  - Added `test_ormand_hunter_seeded_and_login` in `tests/test_phase9.py` to verify automated seeding, bcrypt PIN resolution, and field portal session authentication.
+
 ## [2.8.13] - 2026-08-29
 ### Fixed (Georgia Statutory Deductible-Waiver Citation Correction)
 

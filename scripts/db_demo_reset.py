@@ -74,6 +74,12 @@ def reset_demo_db():
         print(f"Demo field rep 'Matthew Zellers' creation note: {e}")
 
     try:
+        create_field_rep("Ormand Hunter", "3852")
+        print("Successfully created demo field rep 'Ormand Hunter' with PIN 3852.")
+    except Exception as e:
+        print(f"Demo field rep 'Ormand Hunter' creation note: {e}")
+
+    try:
         from app.core.cache import init_db as init_cache_db, _get_connection as get_cache_connection
         init_cache_db()
         with get_cache_connection() as cache_conn:

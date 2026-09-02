@@ -399,7 +399,7 @@ def seed_supplement_rules() -> None:
         conn.close()
 
 def seed_core_team_reps() -> None:
-    """Ensure Michael, Scott, Debi, Alex Wickham, Jerry Grubb, and Matthew Zellers exist in field_reps."""
+    """Ensure Michael, Scott, Debi, Alex Wickham, Jerry Grubb, Matthew Zellers, and Ormand Hunter exist in field_reps."""
     conn = get_connection()
     try:
         all_reps = [
@@ -409,6 +409,7 @@ def seed_core_team_reps() -> None:
             ("rep-alex", "Alex Wickham", "1999"),
             ("rep-jerry", "Jerry Grubb", "1111"),
             ("rep-matthew", "Matthew Zellers", "1628"),
+            ("rep-ormand", "Ormand Hunter", "3852"),
         ]
         for rep_id, name, default_pin in all_reps:
             row = conn.execute("SELECT id FROM field_reps WHERE name = ?", (name,)).fetchone()

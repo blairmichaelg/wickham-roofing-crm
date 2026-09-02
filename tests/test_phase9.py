@@ -361,3 +361,34 @@ def test_alex_wickham_read_only():
     assert "Accounting Guide" in help_res.text
     assert "Operations Guide" in help_res.text
     assert "Field Guide" in help_res.text
+
+
+# ── Test 16: Ormand Hunter Non-Core Rep Verification ──────────────────────────
+
+def test_ormand_hunter_seeded_and_login():
+    """Verify that Ormand Hunter (PIN 3852) is seeded, can authenticate into field portal, and is non-core."""
+    from app.core.database import seed_core_team_reps, get_field_rep_by_pin
+    seed_core_team_reps()
+
+    rep = get_field_rep_by_pin("3852")
+    assert rep is not None
+    assert rep["name"] == "Ormand Hunter"
+    assert rep["is_active"] == 1
+
+    # Login as Ormand Hunter via auth endpoint
+    login_res = client.post(
+        "/auth/login",
+        data={"pin": "3852", "redirect_url": "/field"},
+        follow_redirects=False,
+    )
+    assert login_res.status_code == 303
+    token = login_res.cookies.get("auth_token")
+    assert token is not None
+
+    # Verify field portal access
+    field_view_res = client.get(
+        "/field",
+        cookies={"auth_token": token},
+    )
+    assert field_view_res.status_code == 200
+
