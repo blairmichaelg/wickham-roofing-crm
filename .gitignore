@@ -19,6 +19,7 @@ ENV/
 .env
 .env.local
 .env.production
+seed_reps.local.json
 
 # === IDE ===
 .vscode/

@@ -58,26 +58,15 @@ def reset_demo_db():
     finally:
         conn.close()
 
-    # Re-seed core team reps (Michael, Scott, Debi) and demo rep Jerry Grubb
-    from app.core.database import seed_core_team_reps
-    seed_core_team_reps()
-    try:
-        create_field_rep("Jerry Grubb", "1111")
-        print("Successfully created demo field rep 'Jerry Grubb' with PIN 1111.")
-    except Exception as e:
-        print(f"Demo field rep 'Jerry Grubb' creation note: {e}")
-
-    try:
-        create_field_rep("Matthew Zellers", "1628")
-        print("Successfully created demo field rep 'Matthew Zellers' with PIN 1628.")
-    except Exception as e:
-        print(f"Demo field rep 'Matthew Zellers' creation note: {e}")
-
-    try:
-        create_field_rep("Ormand Hunter", "3852")
-        print("Successfully created demo field rep 'Ormand Hunter' with PIN 3852.")
-    except Exception as e:
-        print(f"Demo field rep 'Ormand Hunter' creation note: {e}")
+    # Re-seed field reps from untracked local config file (seed_reps.local.json)
+    from app.core.database import seed_core_team_reps, get_seed_reps_config_path, list_field_reps
+    config_path = get_seed_reps_config_path()
+    if config_path.exists():
+        seed_core_team_reps()
+        seeded_names = [r["name"] for r in list_field_reps()]
+        print(f"Successfully re-seeded field reps from {config_path.name}: {', '.join(seeded_names)}")
+    else:
+        print(f"Warning: {config_path.name} not found. Skipped field rep re-seeding. (Copy seed_reps.local.json.example to seed_reps.local.json to configure)")
 
     try:
         from app.core.cache import init_db as init_cache_db, _get_connection as get_cache_connection

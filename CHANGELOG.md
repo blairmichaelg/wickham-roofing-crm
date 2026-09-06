@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.8.15] - 2026-09-06
+### Security (Field Rep PIN Relocation Out of Tracked Source)
+
+- **Field Rep PIN Relocation**:
+  - Relocated field sales representative 4-digit seed PIN literals out of tracked source code (`app/core/database.py` and `scripts/db_demo_reset.py`) into an untracked, gitignored configuration file (`seed_reps.local.json`).
+  - **Zero PIN Values Changed**: Every representative (Michael, Scott, Debi, Alex Wickham, Jerry Grubb, Matthew Zellers, Ormand Hunter) retains their existing PIN values verbatim.
+  - **Graceful Failure & Security**: If `seed_reps.local.json` is absent at runtime, `seed_core_team_reps()` logs a clear warning and safely skips seeding rather than crashing or falling back to hardcoded defaults (preventing silent reintroduction of plaintext literals).
+  - **Local Setup & CI Provisioning**: Added tracked `seed_reps.local.json.example` with template `"0000"` values, documented local machine setup in `README.md` and `docs/testing.md`, and added dynamic test-fixture fallback in `tests/conftest.py` and `tests/test_phase9.py` so CI runs remain fully isolated and reproducible.
+  - **Accepted Residual Risk**: Pre-existing commits in git history retain old plaintext literals as an accepted, out-of-scope residual exposure; history rewriting was explicitly deferred.
+
 ## [2.8.14] - 2026-09-01
 ### Added (Non-Core Sales Representative Provisioning)
 

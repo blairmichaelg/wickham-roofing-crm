@@ -5,7 +5,7 @@
 [![SQLite WAL](https://img.shields.io/badge/Database-SQLite%20WAL-003B57.svg)](https://www.sqlite.org/wal.html)
 [![AI Engine: Gemini 2.5 Flash](https://img.shields.io/badge/AI%20Engine-Gemini%202.5%20Flash-8A2BE2.svg)](https://deepmind.google/technologies/gemini/)
 [![Tests: 509 Passing (100%)](https://img.shields.io/badge/Tests-509%20Passed%20(100%25)-brightgreen.svg)](https://pytest.org/)
-[![Version](https://img.shields.io/badge/Version-2.8.14-orange.svg)](https://github.com/blairmichaelg/wickham-roofing-crm)
+[![Version](https://img.shields.io/badge/Version-2.8.15-orange.svg)](https://github.com/blairmichaelg/wickham-roofing-crm)
 
 The **Wickham Roofing CRM (V4)** is a proprietary, local-first operational platform designed to automate insurance roofing production from field lead intake to financial ledger reconciliation.
 
@@ -129,16 +129,19 @@ pip install -r requirements.txt
 
 ### 2. Environment Configuration
 
-Copy the supplied template and inject your Gemini API credentials:
+Copy the supplied templates and configure your local environment credentials and field representative PINs:
 
 ```powershell
 cp .env.example .env
 # Open .env and enter your valid GEMINI_API_KEY
+
+cp seed_reps.local.json.example seed_reps.local.json
+# Open seed_reps.local.json and fill in your real rep names and 4-digit PINs
 ```
 
 ### 3. Verification & Execution
 
-Validate system stability against the 312-test verification matrix before firing the application engines:
+Validate system stability against the test verification matrix before firing the application engines:
 
 ```powershell
 # Execute comprehensive automated test matrix
@@ -156,7 +159,7 @@ If you need the CRM in a completely clean, empty-job state for a presentation, r
 python scripts/db_demo_reset.py
 ```
 
-This clears all jobs, resets the demo database to a pristine state, removes uploaded artifacts from the document directories, and restores the default demo field rep `Jerry Grubb` with PIN `1111`.
+This clears all jobs, resets the demo database to a pristine state, removes uploaded artifacts from the document directories, and re-seeds the field representatives defined in your local `seed_reps.local.json` file.
 
 > [!TIP]
 > **Windows One-Click Automation**: On Windows desktop environments, the server is now configured to boot automatically via **Task Scheduler** on login. Task Scheduler invokes a suite of wrapper scripts (`scripts\services\srv_redis.ps1`, `srv_fastapi.ps1`, `srv_worker.ps1`, `srv_tunnel.ps1`) that handle automated recovery, logging, and port binding.

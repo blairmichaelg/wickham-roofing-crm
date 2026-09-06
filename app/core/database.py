@@ -398,23 +398,57 @@ def seed_supplement_rules() -> None:
     finally:
         conn.close()
 
-def seed_core_team_reps() -> None:
-    """Ensure Michael, Scott, Debi, Alex Wickham, Jerry Grubb, Matthew Zellers, and Ormand Hunter exist in field_reps."""
+def get_seed_reps_config_path() -> Path:
+    """Resolve path to the local seed reps configuration file.
+    
+    Checks SEED_REPS_CONFIG_PATH environment variable first, then defaults
+    to seed_reps.local.json at the project root.
+    """
+    import os
+    env_path = os.getenv("SEED_REPS_CONFIG_PATH")
+    if env_path:
+        return Path(env_path)
+    base_dir = Path(__file__).resolve().parent.parent.parent
+    return base_dir / "seed_reps.local.json"
+
+def seed_core_team_reps(config_path: Path | str | None = None) -> None:
+    """Seed initial field reps from untracked local configuration file.
+    
+    If the configuration file is missing, logs a warning and skips seeding
+    rather than crashing or silently falling back to hardcoded defaults.
+    """
+    import json
+    target_path = Path(config_path) if config_path else get_seed_reps_config_path()
+    if not target_path.exists():
+        logger.warning(
+            "seed_reps_file_missing_skipping_seed",
+            path=str(target_path),
+            hint="Copy seed_reps.local.json.example to seed_reps.local.json to configure seed reps."
+        )
+        return
+
+    try:
+        with open(target_path, encoding="utf-8") as f:
+            all_reps = json.load(f)
+    except Exception as e:
+        logger.error("seed_reps_file_read_failed", path=str(target_path), error=str(e))
+        return
+
+    if not isinstance(all_reps, list):
+        logger.error("seed_reps_file_invalid_format", path=str(target_path))
+        return
+
     conn = get_connection()
     try:
-        all_reps = [
-            ("rep-michael", "Michael", "7194"),
-            ("rep-scott", "Scott", "4826"),
-            ("rep-debi", "Debi", "6315"),
-            ("rep-alex", "Alex Wickham", "1999"),
-            ("rep-jerry", "Jerry Grubb", "1111"),
-            ("rep-matthew", "Matthew Zellers", "1628"),
-            ("rep-ormand", "Ormand Hunter", "3852"),
-        ]
-        for rep_id, name, default_pin in all_reps:
+        for rep in all_reps:
+            name = rep.get("name")
+            default_pin = rep.get("pin")
+            rep_id = rep.get("id") or f"rep-{str(name).lower().replace(' ', '-')}"
+            if not name or not default_pin:
+                continue
             row = conn.execute("SELECT id FROM field_reps WHERE name = ?", (name,)).fetchone()
             if not row:
-                pin_hash = pwd_context.hash(default_pin)
+                pin_hash = pwd_context.hash(str(default_pin))
                 conn.execute(
                     """INSERT OR IGNORE INTO field_reps (id, name, pin_hash, is_active)
                        VALUES (?, ?, ?, 1)""",

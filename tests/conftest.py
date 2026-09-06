@@ -25,6 +25,24 @@ def setup_test_db(tmp_path_factory):
     import app.core.database
     app.core.database.get_db_path = lambda: test_db
     
+    # Ensure test seed reps config exists in test environments (e.g. CI)
+    import json
+    if not app.core.database.get_seed_reps_config_path().exists():
+        test_seed_config = tmp_path_factory.mktemp("config") / "seed_reps.test.json"
+        test_seed_config.write_text(
+            json.dumps([
+                {"id": "rep-michael", "name": "Michael", "pin": "7194"},
+                {"id": "rep-scott", "name": "Scott", "pin": "4826"},
+                {"id": "rep-debi", "name": "Debi", "pin": "6315"},
+                {"id": "rep-alex", "name": "Alex Wickham", "pin": "1999"},
+                {"id": "rep-jerry", "name": "Jerry Grubb", "pin": "1111"},
+                {"id": "rep-matthew", "name": "Matthew Zellers", "pin": "1628"},
+                {"id": "rep-ormand", "name": "Ormand Hunter", "pin": "3852"},
+            ]),
+            encoding="utf-8"
+        )
+        os.environ["SEED_REPS_CONFIG_PATH"] = str(test_seed_config)
+
     # Initialize schema
     init_db()
 

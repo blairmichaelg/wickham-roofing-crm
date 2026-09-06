@@ -18,6 +18,14 @@ This guide documents the **73 test modules** (508 assertions) comprising the Wic
 # Then open: htmlcov/index.html
 ```
 
+### Local Test Configuration (Field Rep PIN Seeding)
+
+Field representative PIN seeds are loaded from a local, gitignored configuration file (`seed_reps.local.json`). Before running end-to-end tests or seeding demo databases locally, copy the tracked template:
+```powershell
+cp seed_reps.local.json.example seed_reps.local.json
+```
+The automated test suite (`tests/conftest.py`) automatically provisions an isolated test-local configuration during pytest execution if `seed_reps.local.json` is not present.
+
 ---
 
 ## Coverage Thresholds
@@ -27,7 +35,7 @@ This guide documents the **73 test modules** (508 assertions) comprising the Wic
 | `app/core/` | ≥ 90% |
 | `app/services/` | ≥ 90% |
 | Rest of `app/` | ≥ 75% |
-| Overall | ≥ 75% (enforced via `fail_under = 75` in `pyproject.toml`; current: **78.15%**) |
+| Overall | ≥ 75% (enforced via `fail_under = 75` in `pyproject.toml`; current: **78.25%**) |
 
 ---
 

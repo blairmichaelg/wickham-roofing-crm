@@ -304,11 +304,17 @@ def test_admin_reps_api_requires_admin_role(field_rep_and_cookie):
 
 # ── Test 15: Alex Wickham Read-Only Verification ──────────────────────────────
 
-def test_alex_wickham_read_only():
-    """Verify that Alex Wickham (PIN 1999) has office read-only access and cannot perform mutations."""
-    # Ensure Alex Wickham is seeded in the test DB
+def test_alex_wickham_read_only(tmp_path):
+    """Verify that Alex Wickham (test PIN 1999) has office read-only access and cannot perform mutations."""
+    import json
     from app.core.database import seed_core_team_reps
-    seed_core_team_reps()
+    # Provision a test-local config file with known test PIN
+    test_reps_file = tmp_path / "seed_reps.test.json"
+    test_reps_file.write_text(
+        json.dumps([{"id": "rep-alex", "name": "Alex Wickham", "pin": "1999"}]),
+        encoding="utf-8"
+    )
+    seed_core_team_reps(config_path=test_reps_file)
 
     # Login as Alex Wickham
     login_res = client.post(
@@ -365,10 +371,17 @@ def test_alex_wickham_read_only():
 
 # ── Test 16: Ormand Hunter Non-Core Rep Verification ──────────────────────────
 
-def test_ormand_hunter_seeded_and_login():
-    """Verify that Ormand Hunter (PIN 3852) is seeded, can authenticate into field portal, and is non-core."""
+def test_ormand_hunter_seeded_and_login(tmp_path):
+    """Verify that Ormand Hunter (test PIN 3852) is seeded via local config, can authenticate into field portal, and is non-core."""
+    import json
     from app.core.database import seed_core_team_reps, get_field_rep_by_pin
-    seed_core_team_reps()
+    # Provision a test-local config file with known test PIN
+    test_reps_file = tmp_path / "seed_reps.test.json"
+    test_reps_file.write_text(
+        json.dumps([{"id": "rep-ormand", "name": "Ormand Hunter", "pin": "3852"}]),
+        encoding="utf-8"
+    )
+    seed_core_team_reps(config_path=test_reps_file)
 
     rep = get_field_rep_by_pin("3852")
     assert rep is not None
