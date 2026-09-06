@@ -2039,8 +2039,8 @@
                 if (!resp.ok) throw new Error('HTTP ' + resp.status);
                 const d = await resp.json();
                 const cachedNote = d.cached
-                    ? '<p class="text-[9px] text-gray-600 italic">Cached result</p>'
-                    : '<p class="text-[9px] text-gray-600 italic">AI-generated · grounded in real job data</p>';
+                    ? '<p class="text-[9px] text-gray-300 italic">Cached result</p>'
+                    : '<p class="text-[9px] text-gray-300 italic">AI-generated · grounded in real job data</p>';
                 const trustNote = '<p class="text-[9px] text-gray-300 mt-1">🛡️ Generated from this job\'s details and recent local storms (not a generic template).</p>';
                 const guardrailNote = '<p class="text-[9px] text-yellow-500/80 mt-1 font-semibold">⚠️ Use this script to start conversations; do not promise deductible waivers or outcomes beyond the carrier\'s decision.</p>';
                 el.innerHTML =

@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.8.16] - 2026-09-06
+### Fixed (Close Remaining Low-Contrast Text Instances in Field Portal)
+
+- **AI Sales Tools Fine-Print Contrast (`app/templates/field_app.html`)**:
+  - Upgraded remaining low-contrast `text-gray-600` fine-print notes in the AI sales tools section ("Cached result" and "AI-generated · grounded in real job data") to `text-gray-300`, closing the final sunlight readability gap identified after the initial contrast pass.
+
 ## [2.8.15] - 2026-09-06
 ### Security (Field Rep PIN Relocation Out of Tracked Source)
 
