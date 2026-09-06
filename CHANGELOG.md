@@ -10,6 +10,14 @@
   - **Local Setup & CI Provisioning**: Added tracked `seed_reps.local.json.example` with template `"0000"` values, documented local machine setup in `README.md` and `docs/testing.md`, and added dynamic test-fixture fallback in `tests/conftest.py` and `tests/test_phase9.py` so CI runs remain fully isolated and reproducible.
   - **Accepted Residual Risk**: Pre-existing commits in git history retain old plaintext literals as an accepted, out-of-scope residual exposure; history rewriting was explicitly deferred.
 
+### Fixed (Field Portal Outdoor Text Contrast for High-Ambient Sunlight)
+
+- **Outdoor Sunlight Readability (`app/templates/field_app.html`)**:
+  - Replaced low-contrast `text-gray-400` form labels with high-contrast `text-gray-200` against dark `bg-gray-800`/`bg-gray-900` cards to eliminate washout in direct outdoor sunlight during field inspections.
+  - Upgraded helper text, storm radar monitor summaries, pipeline widget counters, document loading states, and modal descriptions from `text-gray-400`/`text-gray-500` to `text-gray-300`, maintaining clear visual hierarchy beneath form labels.
+  - Synchronized client-side WebSocket alert query selector (`listEl.querySelector('p.text-gray-300')`) with the updated storm alert empty state.
+  - **Intentional Exclusions**: Inactive navigation switcher buttons (`/admin`, `/accounting`, `/api/operations/board`), utility logout button, and dynamic signature lock button states were preserved with intentional subdued styling to maintain active-state contrast.
+
 ## [2.8.14] - 2026-09-01
 ### Added (Non-Core Sales Representative Provisioning)
 
