@@ -69,11 +69,37 @@ A comprehensive rebrand, architectural refactor, and testing/DevOps hardening pa
 - **Admin Dashboard Layout Update**: Refactored the Storm Radar floating widget into a top-level, collapsible card integrated directly into the Kanban layout content flow.
 - **UI Nomenclature Realignment**: Standardized labels from "County" to "Location" to match NWS data structures.
 
+## 10. STORM RADAR, SALES INTELLIGENCE & AUTH HARDENING AUDIT (2026-09-08)
+- **Unified Storm Radar & Canvassing Intelligence**:
+  - Replaced opaque counters with thresholded context across Admin and Field dashboards ("Hail events ≥ 1.00\" in last 72h: X").
+  - Extracted shared client module (`app/static/js/storm_radar.js`) providing resilient timestamp formatting, WebSocket alert filtering, dynamic card rendering, and target ranking without client drift.
+  - Surfaced `window_hours`, `min_hail_inches`, `min_wind_mph`, and `last_refreshed_utc` on all summary and target APIs.
+- **Sales Enablement & Pipeline Acceleration**:
+  - Field intake form automatically fetches `/api/field/storms/{zip}` on ZIP blur to present rep-ready, compliant talking points (mentioning recent local hail/wind dates without false outcome promises).
+  - Enriched job APIs (`add_storm_flags_to_jobs`) with `has_recent_hail`, `has_recent_wind`, `recent_hail_max_inches`, `recent_wind_max_mph`, and `storm_window_hours`.
+  - Added visual storm badges and dynamic "Next Best Action" hints in "My Recent Jobs".
+  - Field app features clickable target ZIP cards with active filter indicators and instant clear buttons.
+- **Payment Ingestion & Legacy Toggle Safety**:
+  - Locked in `record_financial_payment` as the canonical payment entry path with strict Pydantic range validation (`0.0 <= amount <= 1,000,000.0`, valid ISO dates).
+  - Standardized `last_payment_received_at` across `jobs` and `financials` as full ISO 8601 UTC timestamps.
+  - Constrained `toggle_payment_flag` as an admin emergency shortcut; routes status advancement through `advance_status_for_payment` and preserves ledger history on toggle OFF.
+- **Authentication & RBAC Hardening**:
+  - Added sliding window brute-force lockout on `/auth/login` and PIN authentication routes (`app/services/rate_limit.py`), rejecting after 5 failed attempts per IP with HTTP 429 Too Many Requests.
+  - Supported standard `Authorization: Bearer <token>` extraction in addition to internal headers and cookies.
+  - Validated HS256 cryptographic signature and reject tampered tokens with HTTP 401.
+  - Enforced strict admin-only boundary on `/api/office/jobs/sanity-check` (returns 403 for field reps and non-core accounting staff).
+- **Tests Enforcing Behavior**:
+  - `tests/test_auth_security.py`: 6 tests verifying login rate limiting, lockout, success reset, RBAC rejections, and JWT tampering.
+  - `tests/test_storm_targets.py`: 21 tests verifying distinct counts, timestamps, talking points, and targets payload.
+  - `tests/test_ui_contracts.py`: 9 tests verifying sanity check endpoints, storm flags on job lists, and dashboard renders.
+  - `tests/test_database_integration.py`: 8 tests verifying UTC payment timestamps and financial operations.
+
 ---
 
 ### Final Summary & Metrics
-- **Test Count**: 304 Passed (288 Integration/Unit Tests + 16 Property-Based Tests)
+- **Test Count**: 527+ Passing (100% Pass Rate)
 - **PDF Engine Document Types Verified**: 10 / 10
 - **CVEs Detected**: 0
-- **System Health**: Hardened, Modular, Production-Grade (v2.3.0)
+- **System Health**: Hardened, Modular, Local-First, Production-Grade (v2.8.17)
+
 

@@ -120,13 +120,27 @@ def is_office_or_core(claims: dict | None, method: str = "GET") -> bool:
         return method in ("GET", "HEAD", "OPTIONS")
     return False
 
+def _extract_token(
+    authorization: str | None,
+    x_internal_token: str | None,
+    auth_token: str | None,
+) -> str | None:
+    """Extracts JWT token from Bearer Authorization header, x-internal-token, or cookie."""
+    if authorization:
+        parts = authorization.split(" ", 1)
+        if len(parts) == 2 and parts[0].lower() == "bearer":
+            return parts[1].strip()
+        return authorization.strip()
+    return x_internal_token or auth_token
+
+
 async def get_current_role(
     auth_token: str | None = Cookie(None),
-    x_internal_token: str | None = Header(None, alias="x-internal-token")
+    x_internal_token: str | None = Header(None, alias="x-internal-token"),
+    authorization: str | None = Header(None, alias="authorization"),
 ) -> str:
     """Returns only the role string from the JWT. Used by all role-check dependencies."""
-    # Support both cookie and header for API access
-    token = x_internal_token or auth_token
+    token = _extract_token(authorization, x_internal_token, auth_token)
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
     payload = decode_token(token)
@@ -135,13 +149,14 @@ async def get_current_role(
 async def get_current_claims(
     request: Request,
     auth_token: str | None = Cookie(None),
-    x_internal_token: str | None = Header(None, alias="x-internal-token")
+    x_internal_token: str | None = Header(None, alias="x-internal-token"),
+    authorization: str | None = Header(None, alias="authorization"),
 ) -> dict:
     """
     Returns the full decoded JWT payload dict.
     Used by routes that need rep_name or rep_id in addition to the role.
     """
-    token = x_internal_token or auth_token
+    token = _extract_token(authorization, x_internal_token, auth_token)
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
     claims = decode_token(token)

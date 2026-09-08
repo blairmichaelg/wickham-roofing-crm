@@ -2059,6 +2059,9 @@
                 const el = document.getElementById('summaryWindCount');
                 el.innerText = parseInt(el.innerText) + 1;
             }
+
+            // Refresh storm targets and summary to keep prioritized ZIPs up-to-date
+            loadStormRadar();
         }
         
         function showToastHTML(htmlContent, type = 'error') {

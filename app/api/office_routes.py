@@ -166,7 +166,7 @@ def get_all_jobs() -> list[dict[str, str | float | int | list | None]]:
         conn.close()
 
 
-@router.get("/jobs/sanity-check", dependencies=[Depends(verify_office_role)])
+@router.get("/jobs/sanity-check", dependencies=[Depends(verify_admin)])
 async def get_jobs_sanity_check(limit: int = 50):
     """
     Lightweight read-only operator/admin sanity check view.

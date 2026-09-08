@@ -81,8 +81,17 @@ To provide door-knocking sales reps with real-time, zero-cost weather reports ne
 2. **Idempotence & Unique Constraints**:
    - Uses SQLite `INSERT OR IGNORE` with a unique index constraint on `dedup_key` (constructed via event type, latitude/longitude coordinates rounded to 3 decimal places, and event timestamp).
 3. **Real-time Alerting and WebSocket Propagation**:
-   - The ARQ background worker (`app/workers/storm_worker.py`) polls NWS hourly. If a new report exceeds severity thresholds (hail >= 1.0 inch, wind >= 58 mph, or tornado), it publishes a storm event to the Redis channels (`channel:storm_alerts`).
-   - WebSockets client-side in the office admin dashboard and mobile field app receive instant pushes to render alert overlays and notifications.
+   - The ARQ background worker (`app/workers/storm_worker.py`) polls NWS hourly. If a new report exceeds severity thresholds (hail >= 1.0 inch, wind >= 50 mph, or tornado), it publishes a storm event to Redis (`channel:storm_alerts`).
+   - WebSockets client-side in the office admin dashboard and mobile field app receive instant pushes to render alert overlays, increment in-memory event tallies, and automatically trigger a background refresh of prioritized storm-target ZIPs.
+4. **Unified Storm Radar & Canvassing Intelligence**:
+   - Standardized `StormRadar` client module (`app/static/js/storm_radar.js`) shared between the Admin Dashboard and Field Mobile PWA.
+   - All summaries enforce configured thresholds (`min_hail_inches`, `min_wind_mph`) and lookback windows (`storm_canvassing_window_hours`, `storm_fresh_window_hours`).
+   - Both widgets render top canvassing target ZIPs ranked by deterministic storm severity scores, showing distinct hail/wind event counts, max magnitudes, and human-friendly relative event ages.
+5. **Sales Enablement & Field Pipeline Acceleration**:
+   - Job APIs automatically inject storm activity flags (`has_recent_hail`, `has_recent_wind`, `recent_hail_max_inches`, `recent_wind_max_mph`, `storm_window_hours`) derived from live SQLite weather data into job objects across field and admin boards.
+   - Field app renders contextual badges in "My Recent Jobs" and surfaces "Next Best Action" hints (guiding reps to review storm evidence and request contingency signatures for storm-impacted leads).
+   - Intake form calls `/api/field/storms/{zip}` on ZIP entry to present pre-computed, compliant sales pitch talking points.
+   - Target ZIP cards feature one-click filtering for instant territory job isolation with active filter badges.
 
 ---
 
@@ -90,11 +99,13 @@ To provide door-knocking sales reps with real-time, zero-cost weather reports ne
 
 ### A. Cryptographic Authentication & RBAC
 - **No Silent Zeros Command**: All user accounts and field representatives authenticate using 4-digit PINs stored securely using `bcrypt` adaptive hashing.
-- **Symmetric Token Pinging**: System tokens rely exclusively on signed JSON Web Tokens utilizing the `HS256` symmetric signing algorithm. `None` algorithms or unsigned headers are rejected at the edge.
+- **Symmetric Token Architecture**: System tokens rely exclusively on signed JSON Web Tokens utilizing the `HS256` symmetric signing algorithm with environment-provided secrets (`JWT_SECRET`). `None` algorithms, tampered signatures, or missing claims are rejected at the edge with HTTP 401.
+- **Flexible Token Extraction**: Token dependencies inspect standard `Authorization: Bearer <token>` headers, legacy `x-internal-token` headers, or HttpOnly `auth_token` cookies.
 - **Role Isolation Matrix**: API endpoints depend strictly on architectural decorators (`verify_admin`, `verify_accounting`, `verify_operations`, `verify_field`). Background ARQ workers reject any enqueued payload lacking an authenticated execution context role.
 
 ### B. Defense-in-Depth Protection Layers
-- **Sliding-Window Rate Limiting**: Heavy asynchronous endpoints (`/material_order`, `/supplement_docs/upload`, `/resume-supplement`) pass through an in-memory sliding window limiter (capped at 3 requests per 10-second window per IP) to guard against queue starvation.
+- **Authentication Brute-Force Lockout**: `/auth/login` and PIN authentication routes enforce an IP-aware sliding window lockout (`app/services/rate_limit.py`). Failing 5 consecutive attempts within a 60-second window triggers an immediate HTTP 429 Too Many Requests lockout. Successful authentication immediately clears the failure counter.
+- **Sliding-Window Rate Limiting**: Heavy asynchronous endpoints (`/material_order`, `/supplement_docs/upload`, `/resume-supplement`, `/statement-of-loss`) pass through an in-memory sliding window limiter (capped at 3 requests per 10-second window per IP) to guard against queue starvation.
 - **Path Traversal Shield**: Document rendering and file retrieval routes utilize rigorous filename sanitization (`sanitize_download_filename` and strict `uuid.UUID()` parameter binding) to eliminate Relative Path Inclusion (`../`) vulnerabilities.
 - **IDOR Protection**: Field endpoints enforce ownership queries via compound constraints (`WHERE id = ? AND canvasser_rep_id = ?`), preventing cross-canvasser data enumeration.
 

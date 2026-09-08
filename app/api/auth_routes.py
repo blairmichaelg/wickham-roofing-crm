@@ -10,6 +10,11 @@ from fastapi.responses import RedirectResponse
 
 from app.api.auth import create_access_token
 from app.config import get_settings
+from app.services.rate_limit import (
+    check_login_rate_limit,
+    record_login_failure,
+    record_login_success,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -28,6 +33,9 @@ async def login(request: Request, response: Response, pin: str = Form(...), redi
     Returns:
         Any: The resulting output.
     """
+    # Enforce brute-force lockout / rate limit per IP
+    await check_login_rate_limit(request)
+
     settings = get_settings()
 
     # Map PINs to roles — .env is the ONLY source of truth.
@@ -61,6 +69,7 @@ async def login(request: Request, response: Response, pin: str = Form(...), redi
             rep_id = rep["id"]
 
     if not role:
+        await record_login_failure(request)
         # Brute-force delay: 10,000 attempts x 1s ~= 2.7 hours via Ngrok
         import asyncio
         await asyncio.sleep(1)
@@ -70,6 +79,9 @@ async def login(request: Request, response: Response, pin: str = Form(...), redi
             url=f"/login?redirect_url={safe_redirect}&error=1",
             status_code=303,
         )
+
+    await record_login_success(request)
+
 
     token = create_access_token(
         role,

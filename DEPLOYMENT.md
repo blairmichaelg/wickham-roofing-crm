@@ -46,7 +46,13 @@ Open `.env` in a secure editor and configure your production parameter tokens:
 | `LOG_LEVEL` | `INFO` | Controls structural console verbosity (set to `DEBUG` during active diagnostics). |
 | `GEMINI_API_KEY` | `AIzaSy...` | Valid Google AI Studio Gemini API Key for vision and narrative processing. |
 | `WEBHOOK_SECRET` | `32-char hex string` | Cryptographic secret for signing external notification endpoints. |
+| `JWT_SECRET` | `64-char hex string` | Cryptographic secret for signing and verifying HS256 auth tokens. |
 | `REDIS_URL` | `redis://127.0.0.1:6379/0` | Connection locator for local or networked Redis task queue broker. |
+| `STORM_ALERT_MIN_HAIL_INCHES` | `1.0` | Minimum hail size in inches to trigger real-time storm alerts and canvassing targets. |
+| `STORM_ALERT_MIN_WIND_MPH` | `50.0` | Minimum wind speed in mph to trigger storm alerts and canvassing targets. |
+| `STORM_CANVASSING_WINDOW_HOURS` | `168` | Look-back window in hours (default 7 days) for canvassing target prioritization. |
+| `STORM_FRESH_WINDOW_HOURS` | `48` | Look-back window in hours (default 48h) for fresh alert badges on job cards. |
+| `STORM_CANVASSING_RADIUS_MILES` | `90.0` | Radius in miles around the office center for canvassing territory operations. |
 
 
 > [!CAUTION]

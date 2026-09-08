@@ -48,6 +48,13 @@ async def serve_login(request: Request, redirect_url: str = "/"):
     )
 
 
+from app.services.rate_limit import (
+    check_login_rate_limit,
+    record_login_failure,
+    record_login_success,
+)
+
+
 @router.post("/auth/login", tags=["frontend"])
 async def process_login_form(
     request: Request,
@@ -55,6 +62,7 @@ async def process_login_form(
     redirect_url: str = Form(default="/"),
 ):
     """Process login form (used by test suite via /auth/login)."""
+    await check_login_rate_limit(request)
     from app.api.auth import create_access_token
     from app.config import get_settings
 
@@ -89,6 +97,7 @@ async def process_login_form(
             target_url = "/field"
 
     if role:
+        await record_login_success(request)
         token = create_access_token(
             role,
             rep_name=rep_name,
@@ -104,6 +113,7 @@ async def process_login_form(
         )
         return response
 
+    await record_login_failure(request)
     return templates.TemplateResponse(
         request, "login.html", {"request": request, "error": "Invalid Access Code"}
     )
@@ -112,6 +122,7 @@ async def process_login_form(
 @router.post("/login", tags=["frontend"])
 async def process_login(request: Request, access_code: str = Form(...)):
     """Process login and route to persona dashboard based on PIN."""
+    await check_login_rate_limit(request)
     from app.api.auth import create_access_token
     from app.config import get_settings
 
@@ -146,6 +157,7 @@ async def process_login(request: Request, access_code: str = Form(...)):
             redirect_url = "/field"
 
     if role:
+        await record_login_success(request)
         token = create_access_token(
             role,
             rep_name=rep_name,
@@ -161,6 +173,7 @@ async def process_login(request: Request, access_code: str = Form(...)):
         )
         return response
 
+    await record_login_failure(request)
     return templates.TemplateResponse(
         request, "login.html", {"request": request, "error": "Invalid Access Code"}
     )

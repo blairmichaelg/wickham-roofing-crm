@@ -24,6 +24,12 @@
   - Documented `last_payment_received_at` date semantics and emergency toggle rules in `docs/accounting_guide.md`.
 - **Operator Monitoring & Sanity Checks (`app/api/office_routes.py`, `tests/test_ui_contracts.py`)**:
   - Created lightweight read-only admin endpoint `GET /api/office/jobs/sanity-check` that surfaces recent jobs, status, `last_payment_received_at`, storm flags, and flags workflow discrepancies (e.g. `PAYMENT_RECEIVED` status missing timestamp, or timestamp set on pre-invoiced jobs).
+- **Authentication Hardening & Brute Force Lockout (`app/services/rate_limit.py`, `app/api/auth_routes.py`, `app/api/auth.py`, `tests/test_auth_security.py`)**:
+  - Implemented sliding-window rate limiting on PIN authentication (`/auth/login`), enforcing a lockout of HTTP 429 Too Many Requests after 5 failed attempts per IP within 60 seconds.
+  - Successful authentication clears the failure counter immediately.
+  - Added support for standard `Authorization: Bearer <token>` HTTP header extraction alongside cookies and internal headers.
+  - Verified JWT HS256 algorithm enforcement and rejection of tampered tokens with HTTP 401.
+  - Updated WebSocket listeners on Field and Admin dashboards to trigger background refreshes of prioritized storm-target ZIPs upon receiving significant weather alerts.
 - **Canonical Payment Metadata & Schema Migration 0024 (`app/core/migrations/0024_add_last_payment_received_at.py`, `app/core/database.py`, `app/api/office_routes.py`)**:
   - Added Migration 0024 introducing canonical `last_payment_received_at` TIMESTAMP column across both `jobs` and `financials` tables.
   - Automated UTC ISO timestamp population via `now_utc_iso()` on committed ledger events for ACV, Depreciation, and Retail payments.
