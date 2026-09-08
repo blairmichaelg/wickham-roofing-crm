@@ -9,6 +9,21 @@
     - `apply_payment_ledger_entry(conn, job_id, payment_type, amount_cents, ...)`: Updates payment columns and `last_payment_received_at`.
     - `advance_status_for_payment(conn, job_id, payment_type)`: Safe transition wrapper around `_update_job_status_internal`.
   - Implemented Option B payment recording: Accounting can record checks/payments at any job status without failing transaction if status advancement is not permitted by the state machine.
+- **Storm Radar Semantics & UI Unification (`app/templates/admin_dashboard.html`, `app/templates/field_app.html`, `app/static/js/storm_radar.js`)**:
+  - Unified naming to "Storm Radar" across both Admin and Field dashboards.
+  - Replaced opaque "Hail 0 / Wind 11" with thresholded labels: "Hail events (≥ {min_hail}\") in last {N}h: X" and "Wind events (≥ {min_wind} mph) in last {N}h: Y", visually surfacing active window and `last_refreshed_utc` (NWS sync time).
+  - Integrated ranked canvassing target ZIPs card rendering using shared `StormRadar.renderTargetZipCard()`.
+  - Added real-time rep-focused summary banner ("🎯 X hot ZIPs with hail ≥ 1.00\" in last 72h — priority canvassing zone!").
+- **Storm-Driven Sales Enablement (`app/templates/field_app.html`, `app/api/field_routes.py`, `app/core/database.py`)**:
+  - Attached `has_recent_hail`, `has_recent_wind`, `recent_hail_max_inches`, `recent_wind_max_mph`, and `storm_window_hours` to field job payloads (`list_my_jobs` and `get_field_job_details`).
+  - Added storm badges to "My Recent Jobs" cards: `⚡ Storm ZIP (hail 1.75" in last 72h)` and `💨 High wind (60 mph in last 72h)` with direct 1-click Evidence Grid link.
+  - Enhanced ZIP intake banner (`checkZipStorms`) into a sales talking point aide with verified NOAA/NWS talking points (e.g., "This ZIP had 1.75\" hail on Aug 13 — mention local damage.").
+- **Canonical Payment Validation & Emergency Toggle Decoupling (`app/api/office_routes.py`, `docs/accounting_guide.md`)**:
+  - Added strict Pydantic range validation (`amount >= 0.0, amount <= 1_000_000.0`, valid ISO dates) to `MarkPaymentPayload` and `TogglePaymentPayload`.
+  - Refactored `toggle_payment_route` status advancement through canonical `advance_status_for_payment`.
+  - Documented `last_payment_received_at` date semantics and emergency toggle rules in `docs/accounting_guide.md`.
+- **Operator Monitoring & Sanity Checks (`app/api/office_routes.py`, `tests/test_ui_contracts.py`)**:
+  - Created lightweight read-only admin endpoint `GET /api/office/jobs/sanity-check` that surfaces recent jobs, status, `last_payment_received_at`, storm flags, and flags workflow discrepancies (e.g. `PAYMENT_RECEIVED` status missing timestamp, or timestamp set on pre-invoiced jobs).
 - **Canonical Payment Metadata & Schema Migration 0024 (`app/core/migrations/0024_add_last_payment_received_at.py`, `app/core/database.py`, `app/api/office_routes.py`)**:
   - Added Migration 0024 introducing canonical `last_payment_received_at` TIMESTAMP column across both `jobs` and `financials` tables.
   - Automated UTC ISO timestamp population via `now_utc_iso()` on committed ledger events for ACV, Depreciation, and Retail payments.

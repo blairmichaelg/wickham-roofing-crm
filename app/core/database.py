@@ -1999,7 +1999,9 @@ def get_recent_storm_zips_detail(
 
 def add_storm_flags_to_jobs(jobs: list[dict]) -> list[dict]:
     """Enriches job records with recent storm attributes based on their normalized ZIP code."""
-    storm_zips = get_recent_storm_zips_detail()
+    settings = get_settings()
+    window_hours = settings.storm_fresh_window_hours
+    storm_zips = get_recent_storm_zips_detail(window_hours=window_hours)
     for job in jobs:
         job_zip = normalize_zip(job.get("postal_code"))
         zip_info = storm_zips.get(job_zip, {
@@ -2009,6 +2011,7 @@ def add_storm_flags_to_jobs(jobs: list[dict]) -> list[dict]:
             "recent_wind_max_mph": 0.0
         })
         job.update(zip_info)
+        job["storm_window_hours"] = window_hours
     return jobs
 
 

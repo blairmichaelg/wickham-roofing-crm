@@ -640,7 +640,13 @@ async def get_recent_storms(
         row_ref = cursor_ref.fetchone()
         last_refreshed = row_ref[0] if (row_ref and row_ref[0]) else datetime.now(UTC).isoformat()
         
-        return {"events": events, "last_refreshed_utc": last_refreshed}
+        return {
+            "events": events,
+            "last_refreshed_utc": last_refreshed,
+            "window_hours": hours,
+            "min_hail_inches": hail_threshold,
+            "min_wind_mph": wind_threshold,
+        }
     finally:
         conn.close()
 
@@ -678,7 +684,7 @@ async def get_storms_summary(
                 OR
                 (event_type = 'WIND' AND wind_speed_mph >= ?)
                 OR
-                (event_type NOT IN ('HAIL', 'WIND'))
+                (event_type = 'TORNADO')
               )
         """
         params = [threshold, radius_miles, hail_threshold, wind_threshold]
@@ -799,8 +805,19 @@ async def get_storms_summary(
         reverse=True
     )
     
+    total_hail = sum(c["hail_count"] for c in summary.values())
+    total_wind = sum(c["wind_count"] for c in summary.values())
+    total_tornado = sum(c["tornado_count"] for c in summary.values())
+
     return {
         "summary": summary,
         "target_zips": target_zips,
-        "last_refreshed_utc": last_refreshed
+        "total_hail_events": total_hail,
+        "total_wind_events": total_wind,
+        "total_tornado_events": total_tornado,
+        "total_qualifying_events": total_hail + total_wind + total_tornado,
+        "window_hours": hours,
+        "min_hail_inches": hail_threshold,
+        "min_wind_mph": wind_threshold,
+        "last_refreshed_utc": last_refreshed,
     }

@@ -243,6 +243,10 @@ class TestFieldStormTargetsEndpoint:
         assert resp.status_code == 200
         data = resp.json()
         assert data["count"] >= 1
+        assert "window_hours" in data
+        assert "min_hail_inches" in data
+        assert "min_wind_mph" in data
+        assert "last_refreshed_utc" in data
         t = data["targets"][0]
         assert t["latest_event_time_utc"] != ""
         assert t["last_event_utc"] != ""
@@ -250,4 +254,15 @@ class TestFieldStormTargetsEndpoint:
         assert t["wind_events"] == 1
         assert t["max_hail"] == 2.0
         assert t["max_wind"] == 60.0
+
+    def test_field_zip_storms_talking_point_and_thresholds(self):
+        _insert_storm(event_type="HAIL", hail_size=1.75, wind_speed=0.0, severity_score=8.0, county="Thomasville, GA", zipcode="31757")
+        resp = client.get("/api/field/storms/31757", headers=FIELD_HEADERS)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "events" in data
+        assert "talking_point" in data
+        assert data["talking_point"] is not None
+        assert "1.75\" hail" in data["talking_point"]
+        assert "last_refreshed_utc" in data
 

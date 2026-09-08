@@ -150,12 +150,16 @@
                 </div>
             </div>
 
-            <!-- Zip Storm Notice Banner -->
-            <div id="zipStormNotice" class="hidden bg-purple-950/80 border border-purple-700/80 p-3 rounded-lg text-xs text-purple-200 mt-2 space-y-1">
-                <p class="font-bold text-purple-300 flex items-center gap-1">
-                    <span>⚡</span> Recent Storms in Zip Code <span id="zipStormCode"></span>:
-                </p>
-                <div id="zipStormList" class="space-y-1 pt-1 font-mono"></div>
+            <!-- Zip Storm Notice / Sales Enablement Banner -->
+            <div id="zipStormNotice" class="hidden bg-purple-950/90 border border-purple-600 p-3.5 rounded-xl text-xs text-purple-200 mt-2 space-y-2 shadow-md">
+                <div class="flex items-center justify-between">
+                    <p class="font-bold text-amber-300 flex items-center gap-1.5 text-sm">
+                        <span>⚡</span> <span>Storm Verified: ZIP <span id="zipStormCode"></span></span>
+                    </p>
+                    <span class="text-[10px] bg-purple-900 text-purple-200 px-2 py-0.5 rounded font-bold border border-purple-700">Sales Pitch Aide</span>
+                </div>
+                <div id="zipStormPitch" class="bg-purple-900/80 border border-purple-700/80 p-2.5 rounded text-xs font-semibold text-white"></div>
+                <div id="zipStormList" class="space-y-1 pt-1 font-mono text-[11px]"></div>
             </div>
             
             <div class="grid grid-cols-2 gap-4 pt-4 border-t border-gray-700">
@@ -277,35 +281,43 @@
             <button type="submit" id="submitBtn" class="w-full bg-blue-600 text-white p-4 rounded-lg font-bold text-xl mt-8 active:bg-blue-800 transition-colors shadow-lg">Submit Lead</button>
         </form>
 
-        <!-- Storm Activity Monitor Widget -->
+        <!-- Storm Radar Widget -->
         <div id="stormRadarWidget" class="mt-12 pt-8 border-t border-gray-700">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-bold text-white flex items-center gap-2">
-                    <span class="animate-pulse">⚡</span> Storm Activity Monitor
+                    <span class="animate-pulse">⚡</span> Storm Radar
                 </h2>
-                <span class="text-xs bg-red-900/80 text-red-300 border border-red-700 px-2.5 py-1 rounded-full font-bold">Live NWS Data</span>
+                <div class="flex items-center gap-2">
+                    <span id="fieldNwsSyncBadge" class="text-xs bg-red-900/80 text-red-300 border border-red-700 px-2.5 py-1 rounded-full font-bold">Live NWS Data</span>
+                </div>
             </div>
             
             <div class="bg-gray-800 border border-gray-700 rounded-xl p-4 shadow-xl space-y-4">
                 <div class="flex items-center justify-between text-[10px] text-gray-300 border-b border-gray-700 pb-2 flex-wrap gap-2">
-                    <div class="flex gap-2">
-                        <span>Window: last 72 hours</span>
-                        <span>·</span>
-                        <span id="fieldStormLastUpdated">Last updated: --:--</span>
+                    <div class="flex gap-2 items-center">
+                        <span id="fieldStormWindowLabel">Window: last 72 hours</span>
+                        <span>—</span>
+                        <span id="fieldStormLastUpdated">Updated: --:-- UTC</span>
                     </div>
                     <div>
-                        <span>Thresholds: hail ≥ {{ settings.storm_alert_min_hail_inches }}" or wind ≥ {{ settings.storm_alert_min_wind_mph }} mph</span>
+                        <span id="fieldStormThresholdsLabel">Thresholds: hail ≥ {{ settings.storm_alert_min_hail_inches }}" or wind ≥ {{ settings.storm_alert_min_wind_mph }} mph</span>
                     </div>
                 </div>
+
+                <!-- Rep-focused summary banner -->
+                <div id="fieldStormRepBanner" class="p-3 bg-purple-950/60 border border-purple-700/80 rounded-lg text-xs text-purple-200 font-semibold flex items-center justify-between">
+                    <span id="fieldStormRepSummary">Checking recent storm targets...</span>
+                </div>
+
                 <!-- Summary Stats -->
-                <div id="stormSummaryContainer" class="grid grid-cols-2 gap-3 text-center">
+                <div id="stormSummaryContainer" class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
                     <div class="p-3 bg-gray-900/60 rounded-lg border border-gray-800">
-                        <div class="text-2xl font-bold text-amber-400" id="summaryHailCount">0</div>
-                        <div class="text-[10px] text-gray-300 uppercase tracking-wider font-bold">Hail Events</div>
+                        <div class="text-[11px] text-gray-400 font-semibold" id="fieldHailLabel">Hail events (≥ {{ settings.storm_alert_min_hail_inches }}") in last 72h:</div>
+                        <div class="text-2xl font-bold text-amber-400 mt-1" id="summaryHailCount">0</div>
                     </div>
                     <div class="p-3 bg-gray-900/60 rounded-lg border border-gray-800">
-                        <div class="text-2xl font-bold text-blue-400" id="summaryWindCount">0</div>
-                        <div class="text-[10px] text-gray-300 uppercase tracking-wider font-bold">Wind Events</div>
+                        <div class="text-[11px] text-gray-400 font-semibold" id="fieldWindLabel">Wind events (≥ {{ settings.storm_alert_min_wind_mph }} mph) in last 72h:</div>
+                        <div class="text-2xl font-bold text-blue-400 mt-1" id="summaryWindCount">0</div>
                     </div>
                 </div>
 
@@ -316,9 +328,9 @@
 
                 <!-- Storm-Target ZIPs -->
                 <div id="stormTargetZipsSection" class="mt-4 pt-4 border-t border-gray-700/80 space-y-2">
-                    <h3 class="text-[10px] font-bold text-purple-300 uppercase tracking-wider flex items-center justify-between flex-wrap gap-2">
-                        <span>🔥 Recent Storm-Target ZIPs</span>
-                        <span class="text-gray-300 font-normal normal-case text-[9px]">Tap a ZIP to filter your jobs in this area.</span>
+                    <h3 class="text-[11px] font-bold text-purple-300 uppercase tracking-wider flex items-center justify-between flex-wrap gap-2">
+                        <span>🔥 Storm-Target ZIPs (Canvassing Priority)</span>
+                        <span class="text-gray-300 font-normal normal-case text-[10px]">Tap a ZIP to filter your leads.</span>
                     </h3>
                     <div id="targetZipsList" class="flex flex-col gap-2">
                         <p class="text-gray-300 italic text-xs">No storm-target ZIPs in service area.</p>
@@ -650,11 +662,12 @@
                 
                 // Storm target badges for jobs located in high-risk ZIPs
                 let stormBadges = '';
+                const winHours = job.storm_window_hours || 72;
                 if (job.has_recent_hail && job.recent_hail_max_inches > 0) {
-                    stormBadges += `<span class="inline-block text-[10px] bg-amber-950/80 text-amber-300 border border-amber-700/80 px-2 py-0.5 rounded font-bold mr-1">⚡ Hail ${job.recent_hail_max_inches.toFixed(2)}" in last 72h</span>`;
+                    stormBadges += `<span class="inline-block text-[10px] bg-amber-950/80 text-amber-300 border border-amber-700/80 px-2 py-0.5 rounded font-bold mr-1">⚡ Storm ZIP (hail ${job.recent_hail_max_inches.toFixed(2)}" in last ${winHours}h)</span>`;
                 }
                 if (job.has_recent_wind && job.recent_wind_max_mph > 0) {
-                    stormBadges += `<span class="inline-block text-[10px] bg-blue-950/80 text-blue-300 border border-blue-700/80 px-2 py-0.5 rounded font-bold mr-1">💨 ${Math.round(job.recent_wind_max_mph)} mph wind in last 72h</span>`;
+                    stormBadges += `<span class="inline-block text-[10px] bg-blue-950/80 text-blue-300 border border-blue-700/80 px-2 py-0.5 rounded font-bold mr-1">💨 High wind (${Math.round(job.recent_wind_max_mph)} mph in last ${winHours}h)</span>`;
                 }
  
                 const hasStorm = job.has_recent_hail || job.has_recent_wind;
@@ -847,12 +860,13 @@
             }
         }
 
-        // NOTE: Depends on standard envelope shape {"events": [...], "last_refreshed_utc": ...} from /api/field/storms/{zipcode}
+        // NOTE: Depends on standard envelope shape {"events": [...], "talking_point": ..., "last_refreshed_utc": ...} from /api/field/storms/{zipcode}
         async function checkZipStorms(zip) {
             if (!zip || zip.trim().length < 5) return;
             const container = document.getElementById('zipStormNotice');
             const codeEl = document.getElementById('zipStormCode');
             const listEl = document.getElementById('zipStormList');
+            const pitchEl = document.getElementById('zipStormPitch');
             try {
                 const res = await fetch(`/api/field/storms/${encodeURIComponent(zip.trim())}`, {
                     headers: { 'x-internal-token': FIELD_TOKEN }
@@ -862,10 +876,13 @@
                 const storms = data.events || [];
                 if (storms && storms.length > 0) {
                     codeEl.textContent = zip.trim();
+                    if (pitchEl) {
+                        pitchEl.textContent = data.talking_point || `Verified storm activity in ${zip.trim()} — use as conversation starter.`;
+                    }
                     listEl.innerHTML = storms.map(s => {
                         let detail = s.event_type;
-                        if (s.hail_size_inches) detail += ` ${s.hail_size_inches}" Hail`;
-                        if (s.wind_speed_mph) detail += ` ${s.wind_speed_mph} mph Wind`;
+                        if (s.hail_size_inches) detail += ` ${parseFloat(s.hail_size_inches).toFixed(2)}" Hail`;
+                        if (s.wind_speed_mph) detail += ` ${Math.round(s.wind_speed_mph)} mph Wind`;
                         return `<div class="flex justify-between items-center bg-purple-900/60 px-2.5 py-1 rounded"><span>🌩️ ${detail}</span><span class="text-purple-300 font-bold">${s.event_date ? s.event_date.substring(0, 10) : ''}</span></div>`;
                     }).join('');
                     container.classList.remove('hidden');
@@ -1919,11 +1936,12 @@
                 const summaryData = await StormRadar.fetchStormSummary(72, FIELD_TOKEN);
                 const summary = summaryData.summary || {};
                 let targetZips = [];
+                let targetsMeta = {};
                 try {
                     const targetsResp = await fetch('/api/field/storms/targets', { headers: { 'x-internal-token': FIELD_TOKEN } });
                     if (targetsResp.ok) {
-                        const targetsData = await targetsResp.json();
-                        targetZips = targetsData.targets || [];
+                        targetsMeta = await targetsResp.json();
+                        targetZips = targetsMeta.targets || [];
                     }
                 } catch(e) {}
                 if (targetZips.length === 0) {
@@ -1936,20 +1954,50 @@
                     totalHail += summary[county].hail_count || 0;
                     totalWind += summary[county].wind_count || 0;
                 }
-                document.getElementById('summaryHailCount').innerText = totalHail;
-                document.getElementById('summaryWindCount').innerText = totalWind;
+                const threshHail = targetsMeta.min_hail_inches || data.min_hail_inches || window.STORM_MIN_HAIL_INCHES || 1.0;
+                const threshWind = targetsMeta.min_wind_mph || data.min_wind_mph || window.STORM_MIN_WIND_MPH || 50.0;
+                const winHours = targetsMeta.window_hours || data.window_hours || 72;
+
+                const hailLabel = document.getElementById('fieldHailLabel');
+                if (hailLabel) hailLabel.textContent = `Hail events (≥ ${threshHail.toFixed(2)}") in last ${winHours}h:`;
+                const windLabel = document.getElementById('fieldWindLabel');
+                if (windLabel) windLabel.textContent = `Wind events (≥ ${Math.round(threshWind)} mph) in last ${winHours}h:`;
+
+                document.getElementById('summaryHailCount').innerText = summaryData.total_hail_events ?? totalHail;
+                document.getElementById('summaryWindCount').innerText = summaryData.total_wind_events ?? totalWind;
                 
                 const lastUpdatedEl = document.getElementById('fieldStormLastUpdated');
+                const lastRefTime = targetsMeta.last_refreshed_utc || data.last_refreshed_utc;
                 if (lastUpdatedEl) {
-                    lastUpdatedEl.textContent = `Last updated: ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+                    const refTime = lastRefTime ? new Date(lastRefTime) : new Date();
+                    lastUpdatedEl.textContent = `Updated: ${refTime.toISOString().replace('T', ' ').substring(0, 19)} UTC`;
+                }
+                const syncBadge = document.getElementById('fieldNwsSyncBadge');
+                if (syncBadge && lastRefTime) {
+                    const d = new Date(lastRefTime);
+                    syncBadge.textContent = `NWS Synced: ${d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+                }
+
+                // Rep-focused summary banner
+                const repSummaryEl = document.getElementById('fieldStormRepSummary');
+                if (repSummaryEl) {
+                    const hailZips = targetZips.filter(tz => (tz.max_hail_inches || tz.max_hail || 0) >= threshHail).length;
+                    const windZips = targetZips.filter(tz => (tz.max_wind_mph || tz.max_wind || 0) >= threshWind).length;
+                    if (hailZips > 0) {
+                        repSummaryEl.innerHTML = `🎯 <span class="text-white font-bold">${hailZips} hot ZIP${hailZips !== 1 ? 's' : ''}</span> with hail ≥ ${threshHail.toFixed(2)}" in last ${winHours}h — priority canvassing zone!`;
+                    } else if (windZips > 0) {
+                        repSummaryEl.innerHTML = `💨 <span class="text-white font-bold">${windZips} wind damage target ZIP${windZips !== 1 ? 's' : ''}</span> (≥ ${Math.round(threshWind)} mph) in last ${winHours}h.`;
+                    } else {
+                        repSummaryEl.innerHTML = `📍 Service area storm radar quiet (last ${winHours}h). No major hail damage reported.`;
+                    }
                 }
                 
                 const listEl = document.getElementById('stormAlertsList');
                 if (recent.length === 0) {
-                    listEl.innerHTML = '<p class="text-gray-300 text-sm text-center py-4">No severe storm events in the last 72 hours.</p>';
+                    listEl.innerHTML = `<p class="text-gray-300 text-sm text-center py-4">No severe storm events in the last ${winHours} hours.</p>`;
                 } else {
                     const displayItems = recent.slice(0, 5);
-                    listEl.innerHTML = displayItems.map(alert => StormRadar.renderAlertItem(alert, false)).join('');
+                    listEl.innerHTML = displayItems.map(alert => StormRadar.renderAlertItem(alert, true)).join('');
                     if (recent.length > 5) {
                         listEl.innerHTML += '<p class="text-gray-300 text-[10px] text-center mt-1">Showing 5 most recent significant reports</p>';
                     }
@@ -1960,20 +2008,7 @@
                 if (targetZips.length === 0) {
                     zipsListEl.innerHTML = '<p class="text-gray-300 italic text-xs">No storm-target ZIPs in service area.</p>';
                 } else {
-                    zipsListEl.innerHTML = targetZips.slice(0, 5).map(tz => {
-                        let severityInfo = [];
-                        if (tz.max_hail_inches > 0) severityInfo.push(`${tz.max_hail_inches.toFixed(2)}" Hail`);
-                        if (tz.max_wind_mph > 0) severityInfo.push(`${Math.round(tz.max_wind_mph)}mph Wind`);
-                        const sevText = severityInfo.join(', ');
-                        const prio = tz.priority_label || '🟢 Low';
-                        const reason = tz.priority_reason || sevText;
-                        return `
-                            <button type="button" onclick="filterJobsByZip('${tz.zip}')" class="bg-purple-900/40 hover:bg-purple-800/60 border border-purple-700/80 text-purple-200 text-[11px] font-bold p-2.5 rounded transition-colors text-left flex justify-between items-center w-full gap-2">
-                                <span>📍 ZIP ${tz.zip}</span>
-                                <span class="text-purple-400 font-normal">${prio} — ${reason}</span>
-                            </button>
-                        `;
-                    }).join('');
+                    zipsListEl.innerHTML = targetZips.slice(0, 5).map(tz => StormRadar.renderTargetZipCard(tz, false, 'filterJobsByZip')).join('');
                 }
             } catch (err) {
                 console.error("Failed to load storm radar data:", err);

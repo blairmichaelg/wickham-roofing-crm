@@ -138,3 +138,49 @@ def test_job_detail_page_exposes_inspection_report_action(set_auth, db_conn):
 
     assert "Generate Homeowner Inspection Report" in html
     assert "OFFICE_TOKEN" in html
+
+
+def test_office_jobs_sanity_check_endpoint(set_auth, db_conn):
+    anomaly_job_id = setup_test_job(db_conn, "PAYMENT_RECEIVED")
+    response = client.get("/api/office/jobs/sanity-check")
+    assert response.status_code == 200
+    data = response.json()
+    assert "total_inspected" in data
+    assert "anomaly_count" in data
+    assert "jobs" in data
+    assert data["anomaly_count"] >= 1
+    target = next((j for j in data["jobs"] if j["job_id"] == anomaly_job_id), None)
+    assert target is not None
+    assert target["has_anomaly"] is True
+    assert "storm_window_hours" in target
+    assert any("last_payment_received_at is missing" in a for a in target["anomalies"])
+
+
+def test_field_jobs_include_storm_flags():
+    from app.api.auth import create_access_token
+    token = create_access_token("field", rep_name="Test Rep", rep_id="rep_1")
+    headers = {"x-internal-token": token}
+    conn = get_connection()
+    job_id = str(uuid.uuid4())
+    try:
+        conn.execute(
+            """
+            INSERT INTO jobs (id, homeowner_name, address_line1, city, state, postal_code, phone, status, canvasser_name, canvasser_rep_id)
+            VALUES (?, 'Field Rep Lead', '456 Elm St', 'Thomasville', 'GA', '31757', '555-1234', 'LEAD_CAPTURED', 'Test Rep', 'rep_1')
+            """,
+            (job_id,)
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    resp = client.get("/api/field/jobs", headers=headers)
+    assert resp.status_code == 200
+    jobs = resp.json()
+    job = next((j for j in jobs if j["id"] == job_id), None)
+    assert job is not None
+    assert "has_recent_hail" in job
+    assert "has_recent_wind" in job
+    assert "storm_window_hours" in job
+    from app.config import get_settings
+    assert job["storm_window_hours"] == get_settings().storm_fresh_window_hours

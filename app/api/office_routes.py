@@ -8,8 +8,9 @@ import csv
 import io
 import json
 import uuid
+from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import structlog
 from fastapi import (
@@ -29,7 +30,7 @@ from fastapi.responses import (
     JSONResponse,
     StreamingResponse,
 )
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.api.auth import (
     get_current_claims,
@@ -163,6 +164,80 @@ def get_all_jobs() -> list[dict[str, str | float | int | list | None]]:
         raise HTTPException(status_code=500, detail="Failed to fetch jobs")
     finally:
         conn.close()
+
+
+@router.get("/jobs/sanity-check", dependencies=[Depends(verify_office_role)])
+async def get_jobs_sanity_check(limit: int = 50):
+    """
+    Lightweight read-only operator/admin sanity check view.
+    Surfaces recent jobs, their status, last_payment_received_at, storm flags,
+    and flags known financial or workflow anomalies.
+    """
+    conn = get_connection()
+    try:
+        cur = conn.execute(
+            """
+            SELECT id, homeowner_name, postal_code, status, last_payment_received_at, created_at
+            FROM jobs
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            (limit,)
+        )
+        raw_jobs = [dict(r) for r in cur.fetchall()]
+        from app.core.database import add_storm_flags_to_jobs
+        flagged_jobs = add_storm_flags_to_jobs(raw_jobs)
+
+        results = []
+        anomaly_count = 0
+        for job in flagged_jobs:
+            status = job.get("status")
+            last_pmt = job.get("last_payment_received_at")
+            anomalies = []
+
+            # Check 1: Payment received status but missing timestamp
+            if status in ("PAYMENT_RECEIVED", "ACV_PAYMENT_RECEIVED", "DEPRECIATION_PAYMENT_RECEIVED", "RETAIL_PAYMENT_RECEIVED") and not last_pmt:
+                anomalies.append(f"Status is '{status}' but last_payment_received_at is missing.")
+
+            # Check 2: Payment timestamp exists but job is still pre-invoiced or unbilled
+            pre_invoice_statuses = {
+                "LEAD_CAPTURED", "CONTINGENCY_SIGNED", "CLAIM_FILED",
+                "INSPECTION_COMPLETED", "SCOPE_APPROVED", "SUPPLEMENT_GENERATED",
+                "SUPPLEMENT_APPROVED", "MATERIAL_ORDERED", "MATERIALS_ON_SITE",
+                "INSTALL_SCHEDULED", "INSTALL_COMPLETED", "FINAL_INSPECTION_COMPLETED"
+            }
+            if last_pmt and status in pre_invoice_statuses:
+                anomalies.append(f"last_payment_received_at is set ({last_pmt}) but status is '{status}' (pre-invoiced).")
+
+            if last_pmt and status == "INVOICED":
+                anomalies.append(f"Payment timestamp set ({last_pmt}) but status is still 'INVOICED'.")
+
+            if anomalies:
+                anomaly_count += 1
+
+            results.append({
+                "job_id": job["id"],
+                "homeowner_name": job.get("homeowner_name"),
+                "postal_code": job.get("postal_code"),
+                "status": status,
+                "last_payment_received_at": last_pmt,
+                "has_recent_hail": job.get("has_recent_hail", False),
+                "has_recent_wind": job.get("has_recent_wind", False),
+                "recent_hail_max_inches": job.get("recent_hail_max_inches", 0.0),
+                "recent_wind_max_mph": job.get("recent_wind_max_mph", 0.0),
+                "storm_window_hours": job.get("storm_window_hours", 72),
+                "anomalies": anomalies,
+                "has_anomaly": len(anomalies) > 0,
+            })
+
+        return {
+            "total_inspected": len(results),
+            "anomaly_count": anomaly_count,
+            "jobs": results
+        }
+    finally:
+        conn.close()
+
 
 @router.get("/jobs/{job_id}", dependencies=[Depends(verify_admin)])
 def get_job_details(job_id: str) -> dict[str, dict[str, str | float | int | list | None] | list[dict[str, str | float | int | None]] | None]:
@@ -2016,18 +2091,34 @@ def reassign_canvasser(job_id: str, payload: dict = Body(...)):
         conn.close()
 
 class TogglePaymentPayload(BaseModel):
-    flag: str
-    amount: float
-    date_received: str
+    flag: Literal["acv_received", "supplement_received"]
+    amount: float | None = Field(None, ge=0.0, le=1_000_000.0)
+    date_received: str | None = None
+
+    @field_validator("date_received")
+    @classmethod
+    def validate_date_received(cls, v: str | None) -> str | None:
+        if v is not None and v != "":
+            try:
+                datetime.fromisoformat(v)
+            except ValueError:
+                raise ValueError("date_received must be a valid ISO date string (e.g. YYYY-MM-DD)")
+        return v
 
 @router.post("/accounting/jobs/{job_id}/toggle-payment", dependencies=[Depends(verify_accounting)])
 async def toggle_payment_route(job_id: str, payload: TogglePaymentPayload, request: Request):
-    from app.core.database import toggle_payment_flag, update_job_status
+    from app.core.database import advance_status_for_payment, toggle_payment_flag
     try:
         result = toggle_payment_flag(job_id, payload.flag, payload.amount, payload.date_received)
         if result.get("commission_triggered"):
-            # Update status to PAYMENT_RECEIVED
-            await asyncio.to_thread(update_job_status, job_id, "PAYMENT_RECEIVED", "Both ACV and Supplement checks received.")
+            # Promote status safely via canonical advance_status_for_payment
+            conn = get_connection()
+            try:
+                payment_type = "acv" if payload.flag == "acv_received" else "depreciation"
+                advance_status_for_payment(conn, job_id, payment_type, amount=payload.amount)
+                conn.commit()
+            finally:
+                conn.close()
             await request.app.state.redis_pool.enqueue_job(
                 "process_commission",
                 job_id=job_id
@@ -2038,10 +2129,20 @@ async def toggle_payment_route(job_id: str, payload: TogglePaymentPayload, reque
         raise HTTPException(status_code=400, detail=str(e))
 
 class MarkPaymentPayload(BaseModel):
-    payment_type: str
-    amount: float | None = None
+    payment_type: Literal["acv", "depreciation", "retail", "deductible"]
+    amount: float | None = Field(None, ge=0.0, le=1_000_000.0)
     date_received: str | None = None
     deductible_paid: bool | None = None
+
+    @field_validator("date_received")
+    @classmethod
+    def validate_date_received(cls, v: str | None) -> str | None:
+        if v is not None and v != "":
+            try:
+                datetime.fromisoformat(v)
+            except ValueError:
+                raise ValueError("date_received must be a valid ISO date string (e.g. YYYY-MM-DD)")
+        return v
 
 @router.post("/accounting/jobs/{job_id}/mark-payment", dependencies=[Depends(verify_accounting)])
 async def mark_payment_route(job_id: str, payload: MarkPaymentPayload, request: Request):
@@ -2231,7 +2332,9 @@ async def get_storm_canvassing_targets(
             "window_hours": window_hours,
             "count": len(targets),
             "min_hail": settings.storm_alert_min_hail_inches,
+            "min_hail_inches": settings.storm_alert_min_hail_inches,
             "min_wind": settings.storm_alert_min_wind_mph,
+            "min_wind_mph": settings.storm_alert_min_wind_mph,
             "last_refreshed_utc": last_refreshed,
         }
     except Exception as exc:
@@ -2327,3 +2430,5 @@ async def office_add_referral(job_id: str, payload: ReferralPayload):
     except Exception as exc:
         logger.error("office_add_referral_failed", job_id=job_id, error=str(exc))
         raise HTTPException(status_code=500, detail="Failed to record referral.")
+
+

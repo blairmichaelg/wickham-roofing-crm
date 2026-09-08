@@ -62,7 +62,17 @@ If the check amount you enter is lower than the expected value by about 2% or mo
 This is not an error! It is simply a warning to double-check your typing. If the carrier genuinely shorted us on the payment, confirm the amount anyway so the system has the correct record, and follow up with the insurance carrier separately to collect the missing funds.
 
 ### Canonical Payment Timestamps & Ledger Decoupling
-Every recorded payment (ACV, Depreciation, or Retail) immediately updates the canonical `last_payment_received_at` timestamp across the job record and the financials ledger. Normal accounting entries use `record_financial_payment` as the single source of truth, committing payments safely even when job workflow advancement is deferred. Legacy check toggles synchronize with this ledger automatically without data loss.
+Every recorded payment (ACV, Depreciation, Retail, or Deductible) immediately updates the canonical `last_payment_received_at` timestamp across the job record and the financials ledger.
+- **Single Source of Truth**: All standard payment entries use `record_financial_payment` as the canonical backend path. Payments commit and persist in the financial ledger even if workflow advancement is temporarily deferred.
+- **Validation**: Payment amounts must be non-negative numbers up to $1,000,000.00, and receipt dates must be valid ISO date strings (e.g. `YYYY-MM-DD`).
+- **Date Semantics**: The `last_payment_received_at` field in both `jobs` and `financials` tables is stored as a full ISO 8601 UTC timestamp (e.g. `2026-09-08T18:00:00+00:00`). Accounting should interpret this as the exact UTC moment the most recent payment was recorded or confirmed in the CRM.
+- **Legacy Quick Toggles (`toggle_payment_flag`)**: Strictly designated as administrative emergency overrides. Permitted only on `acv_received` and `supplement_received`. Toggling ON sets the job check flag and `last_payment_received_at` without overwriting granular ledger data; toggling OFF clears the job-level flag and timestamp while fully preserving historical ledger transactions. Status promotion routes exclusively through `advance_status_for_payment`.
+
+### Operator Sanity Checks & Anomaly Detection
+To ensure ledger sanity, operators and administrators can access the lightweight sanity check view at `GET /api/office/jobs/sanity-check`. This report scans recent jobs for workflow discrepancies:
+- Jobs in `PAYMENT_RECEIVED` status that are missing `last_payment_received_at`.
+- Jobs with `last_payment_received_at` set while status remains `INVOICED` or in an earlier pre-invoiced state.
+- Inspection of recent hail/wind flags alongside billing progress.
 
 ---
 

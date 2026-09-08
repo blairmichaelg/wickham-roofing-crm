@@ -430,7 +430,9 @@ async def get_field_job_details(job_id: str, request: Request, claims: dict = De
     job_dict = await asyncio.to_thread(_sync_fetch_job_contingency, job_id)
     if not job_dict:
         raise HTTPException(status_code=404, detail="Job not found.")
-    return job_dict
+    from app.core.database import add_storm_flags_to_jobs
+    flagged = add_storm_flags_to_jobs([job_dict])
+    return flagged[0] if flagged else job_dict
 
 
 @router.get("/jobs/{job_id}/docs/contingency")
@@ -1029,7 +1031,26 @@ async def get_field_storm_targets(
             "last_event_utc": t.get("latest_event_time_utc") or t.get("last_event_utc") or "",
             "latest_event_time_utc": t.get("latest_event_time_utc") or t.get("last_event_utc") or "",
         })
-    return {"status": "success", "count": len(sanitized), "targets": sanitized}
+    from app.core.database import get_connection
+    conn = get_connection()
+    try:
+        row = conn.execute("SELECT MAX(ingested_at) FROM storm_events").fetchone()
+        last_refreshed = row[0] if (row and row[0]) else None
+    finally:
+        conn.close()
+
+    return {
+        "status": "success",
+        "count": len(sanitized),
+        "window_hours": settings.storm_canvassing_window_hours,
+        "min_hail": settings.storm_alert_min_hail_inches,
+        "min_hail_inches": settings.storm_alert_min_hail_inches,
+        "min_wind": settings.storm_alert_min_wind_mph,
+        "min_wind_mph": settings.storm_alert_min_wind_mph,
+        "radius_miles": settings.storm_canvassing_radius_miles,
+        "last_refreshed_utc": last_refreshed,
+        "targets": sanitized,
+    }
 
 
 @router.get("/storms/{zipcode}")
@@ -1102,7 +1123,27 @@ async def get_zip_storms(
         row_ref = cursor_ref.fetchone()
         last_refreshed = row_ref[0] if (row_ref and row_ref[0]) else now_utc_iso()
 
-        return {"events": formatted_events, "last_refreshed_utc": last_refreshed}
+        talking_point = None
+        if formatted_events:
+            top = formatted_events[0]
+            top_hail = top.get("hail_size_inches") or 0.0
+            top_wind = top.get("wind_speed_mph") or 0.0
+            top_date = top.get("formatted_date", "")
+            if top_hail > 0:
+                talking_point = f"This ZIP had {top_hail:.2f}\" hail on {top_date} — mention local damage."
+            elif top_wind > 0:
+                talking_point = f"This ZIP had {top_wind:.0f} mph wind on {top_date} — mention local roof and shingle uplift."
+            else:
+                talking_point = f"Severe storm reported on {top_date} — mention local insurance claim activity."
+
+        return {
+            "events": formatted_events,
+            "talking_point": talking_point,
+            "window_hours": hours,
+            "min_hail_inches": hail_threshold,
+            "min_wind_mph": wind_threshold,
+            "last_refreshed_utc": last_refreshed,
+        }
     finally:
         conn.close()
 

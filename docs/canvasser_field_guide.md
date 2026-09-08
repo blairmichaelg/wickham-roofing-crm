@@ -377,10 +377,15 @@ To help close deals faster and streamline nearby jobsite canvassing, the Field A
 - **Storm-Grounded Pitch**: Generates a professionally designed, single-page PDF letter featuring our corporate letterhead. The letter references the exact completed job address ("We just replaced a roof on your street") and highlights verified NWS storm events that occurred nearby.
 - **Call-to-Action**: Invites neighbors to book a free roofing inspection. You can download and print these to drop at adjacent houses, maximizing lead gen around completed installs.
 
-### 3. 🎯 Hot ZIPs Storm Canvassing Targets
-- **7-Day Canvassing Intelligence**: The Field Portal's "Hot ZIPs" widget displays high-priority canvassing target areas within our 90-mile operational radius over the 7-day (168-hour) canvassing window.
-- **Accurate Weather Event Metrics**: Displays distinct counts for hail and wind events, peak hail size in inches, maximum wind gust in mph, tornado indicators, priority badges, and human-usable event timestamps (`latest_event_time_utc`).
-- **Privacy Enforcement**: Exclusively displays verified weather metrics without any company financial or contract figures.
+### 3. 🎯 Storm Radar & Hot Canvassing Target ZIPs
+- **Storm Radar Intelligence**: The Field Portal's "Storm Radar" widget displays high-priority canvassing target areas within our 90-mile operational radius over configured canvassing windows (72 hours or 7 days).
+- **Thresholded Weather Metrics**: Counts and lists exclusively reflect qualifying severe weather—ignoring sub-threshold noise (hail < 1.00", wind < 50 mph). Shows distinct counts for hail, wind, and tornado events, peak hail size in inches, maximum wind gust in mph, priority badges, and relative event recency (e.g. `2d ago (Aug 15)`).
+- **One-Tap Lead Filtering**: Tapping any target ZIP in the radar immediately filters your "My Recent Jobs" list to that specific ZIP code, making it easy to spot unsigned leads or active jobs in the damage swath.
+- **Job-Level Storm Badges**: In "My Recent Jobs", jobs located in qualifying storm zones display visual callouts:
+  - `⚡ Storm ZIP (hail 1.75" in last 72h)`
+  - `💨 High wind (60 mph in last 72h)`
+  - Direct 1-click access to the property's **📄 Evidence Grid** PDF.
+- **Intake Sales Aide Banner**: When typing or tabbing out of the ZIP field during new lead entry, the app automatically checks verified NOAA/NWS data for that ZIP. If qualifying storms occurred, an amber Sales Pitch banner appears with a tailored door-opening line (e.g. *"This ZIP had 1.75\" hail on Aug 13 — mention local damage."*).
 
 ## 14. Spoken Field Voice Notes (Voice-to-Text)
 

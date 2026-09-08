@@ -226,3 +226,48 @@ def test_insert_material_order_integration(clean_job):
     assert row["supplier_name"] == "ABC Roofing Supplies"
     assert row["delivery_date"] == "2026-09-01"
     conn.close()
+
+
+def test_payment_api_validation_and_advancement(clean_job):
+    """Test validation constraints on payment routes."""
+    from fastapi.testclient import TestClient
+    from app.main import app
+    from app.api.auth import create_access_token
+
+    client = TestClient(app)
+    accounting_token = create_access_token("accounting")
+    headers = {"x-internal-token": accounting_token}
+    job_id = clean_job
+
+    # 1. Negative amount rejected by Pydantic
+    resp = client.post(
+        f"/api/office/accounting/jobs/{job_id}/mark-payment",
+        json={"payment_type": "acv", "amount": -50.0},
+        headers=headers
+    )
+    assert resp.status_code == 422
+
+    # 2. Exorbitant amount rejected
+    resp = client.post(
+        f"/api/office/accounting/jobs/{job_id}/mark-payment",
+        json={"payment_type": "acv", "amount": 2_000_000.0},
+        headers=headers
+    )
+    assert resp.status_code == 422
+
+    # 3. Invalid date format rejected
+    resp = client.post(
+        f"/api/office/accounting/jobs/{job_id}/mark-payment",
+        json={"payment_type": "acv", "amount": 100.0, "date_received": "not-a-date"},
+        headers=headers
+    )
+    assert resp.status_code == 422
+
+    # 4. Valid payment accepted and recorded
+    resp = client.post(
+        f"/api/office/accounting/jobs/{job_id}/mark-payment",
+        json={"payment_type": "acv", "amount": 4500.0, "date_received": "2026-08-20"},
+        headers=headers
+    )
+    assert resp.status_code == 200
+
