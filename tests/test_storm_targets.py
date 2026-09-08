@@ -140,6 +140,29 @@ class TestGetStormTargetSummaries:
         assert results_by_zip["31703"]["priority_label"] == "🟢 Low"
         assert results_by_zip["31703"]["severity_score"] == 0.8
 
+    def test_default_canvassing_window_includes_older_event(self):
+        # Event 100 hours ago should be included in the default 168h canvassing window
+        _insert_storm(county="Thomasville, GA", zipcode="31757", hours_ago=100, hail_size=1.75, severity_score=8.0)
+        results = get_storm_target_summaries()  # uses default window
+        assert len(results) == 1
+        assert results[0]["zipcode"] == "31757"
+        assert results[0]["window_hours"] == 168
+
+    def test_distinct_hail_and_wind_counts(self):
+        _insert_storm(event_type="HAIL", hail_size=1.5, wind_speed=0.0, county="Alpha, GA", zipcode="31701", severity_score=6.0)
+        _insert_storm(event_type="HAIL", hail_size=2.0, wind_speed=0.0, county="Alpha, GA", zipcode="31701", severity_score=8.0)
+        _insert_storm(event_type="WIND", hail_size=0.0, wind_speed=65.0, county="Alpha, GA", zipcode="31701", severity_score=7.0)
+        results = get_storm_target_summaries(window_hours=72)
+        assert len(results) == 1
+        t = results[0]
+        assert t["event_count"] == 3
+        assert t["hail_events"] == 2
+        assert t["wind_events"] == 1
+        assert t["max_hail_inches"] == 2.0
+        assert t["max_wind_mph"] == 65.0
+        assert t["latest_event_time_utc"] != ""
+        assert t["last_event_utc"] != ""
+
 
 class TestStormTargetsEndpoint:
     def test_requires_auth(self):
@@ -212,3 +235,19 @@ class TestFieldStormTargetsEndpoint:
         assert "commission" not in t
         assert "contract_total" not in t
         assert "price" not in t
+
+    def test_field_targets_timestamp_and_distinct_counts(self):
+        _insert_storm(event_type="HAIL", hail_size=2.0, wind_speed=0.0, severity_score=9.0, county="Thomasville, GA", zipcode="31757")
+        _insert_storm(event_type="WIND", hail_size=0.0, wind_speed=60.0, severity_score=7.0, county="Thomasville, GA", zipcode="31757")
+        resp = client.get("/api/field/storms/targets", headers=FIELD_HEADERS)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["count"] >= 1
+        t = data["targets"][0]
+        assert t["latest_event_time_utc"] != ""
+        assert t["last_event_utc"] != ""
+        assert t["hail_events"] == 1
+        assert t["wind_events"] == 1
+        assert t["max_hail"] == 2.0
+        assert t["max_wind"] == 60.0
+

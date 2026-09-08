@@ -1289,7 +1289,8 @@ def get_accounting_brief():
                    j.supplement_received, j.supplement_received_at,
                    f.carrier_rcv_cents, f.recoverable_depreciation_cents,
                    f.qbo_exported, f.acv_payment_received_at, f.depreciation_payment_received_at,
-                   f.retail_payment_received_at, f.deductible_paid, f.deductible_paid_cents, f.deductible_cents
+                   f.retail_payment_received_at, f.deductible_paid, f.deductible_paid_cents, f.deductible_cents,
+                   COALESCE(f.last_payment_received_at, j.last_payment_received_at) AS last_payment_received_at
             FROM jobs j
             LEFT JOIN financials f ON j.id = f.job_id
             WHERE j.status IN (
@@ -1310,7 +1311,8 @@ def get_accounting_brief():
                    j.supplement_received, j.supplement_received_at,
                    f.carrier_rcv_cents, f.recoverable_depreciation_cents,
                    f.qbo_exported, f.acv_payment_received_at, f.depreciation_payment_received_at,
-                   f.retail_payment_received_at, f.deductible_paid, f.deductible_paid_cents, f.deductible_cents
+                   f.retail_payment_received_at, f.deductible_paid, f.deductible_paid_cents, f.deductible_cents,
+                   COALESCE(f.last_payment_received_at, j.last_payment_received_at) AS last_payment_received_at
             FROM jobs j
             LEFT JOIN financials f ON j.id = f.job_id
             WHERE j.status = 'CLOSED'
@@ -1349,6 +1351,7 @@ def get_accounting_brief():
                 "acv_payment_received_at": r["acv_payment_received_at"],
                 "depreciation_payment_received_at": r["depreciation_payment_received_at"],
                 "retail_payment_received_at": r["retail_payment_received_at"],
+                "last_payment_received_at": r["last_payment_received_at"],
                 "deductible_paid": bool(r["deductible_paid"]) if r["deductible_paid"] is not None else False,
                 "deductible_paid_cents": r["deductible_paid_cents"] or 0,
                 "deductible_cents": r["deductible_cents"] or 0
@@ -2021,8 +2024,7 @@ class TogglePaymentPayload(BaseModel):
 async def toggle_payment_route(job_id: str, payload: TogglePaymentPayload, request: Request):
     from app.core.database import toggle_payment_flag, update_job_status
     try:
-        amount_cents = int(round(payload.amount * 100))
-        result = toggle_payment_flag(job_id, payload.flag, amount_cents, payload.date_received)
+        result = toggle_payment_flag(job_id, payload.flag, payload.amount, payload.date_received)
         if result.get("commission_triggered"):
             # Update status to PAYMENT_RECEIVED
             await asyncio.to_thread(update_job_status, job_id, "PAYMENT_RECEIVED", "Both ACV and Supplement checks received.")

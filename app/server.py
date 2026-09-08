@@ -20,6 +20,7 @@ from __future__ import annotations
 import os
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import structlog
 from fastapi import FastAPI, HTTPException, Request, Response
@@ -169,12 +170,28 @@ async def lifespan(app: FastAPI):
 # ---------------------------------------------------------------------------
 
 
+def _get_app_version() -> str:
+    """Resolve semantic app version from pyproject.toml as single source of truth."""
+    try:
+        import tomllib
+        pyproject_path = Path(__file__).resolve().parent.parent / "pyproject.toml"
+        if pyproject_path.exists():
+            with open(pyproject_path, "rb") as f:
+                data = tomllib.load(f)
+                ver = data.get("project", {}).get("version")
+                if ver:
+                    return str(ver)
+    except Exception:
+        pass
+    return "2.8.17"
+
+
 def create_app() -> FastAPI:
     """Create and fully configure the FastAPI application."""
     application = FastAPI(
         title="Wickham Roofing AI Orchestrator",
         description="Standalone CRM orchestrator and Google Gemini AI middleware.",
-        version="2.2.0",
+        version=_get_app_version(),
         lifespan=lifespan,
     )
 

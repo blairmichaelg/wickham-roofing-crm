@@ -9,6 +9,20 @@
     - `apply_payment_ledger_entry(conn, job_id, payment_type, amount_cents, ...)`: Updates payment columns and `last_payment_received_at`.
     - `advance_status_for_payment(conn, job_id, payment_type)`: Safe transition wrapper around `_update_job_status_internal`.
   - Implemented Option B payment recording: Accounting can record checks/payments at any job status without failing transaction if status advancement is not permitted by the state machine.
+- **Canonical Payment Metadata & Schema Migration 0024 (`app/core/migrations/0024_add_last_payment_received_at.py`, `app/core/database.py`, `app/api/office_routes.py`)**:
+  - Added Migration 0024 introducing canonical `last_payment_received_at` TIMESTAMP column across both `jobs` and `financials` tables.
+  - Automated UTC ISO timestamp population via `now_utc_iso()` on committed ledger events for ACV, Depreciation, and Retail payments.
+  - Exposed `last_payment_received_at` in accounting dashboard projections (`get_accounting_brief`).
+- **Clarified Role & Synchronization for `toggle_payment_flag` (`app/core/database.py`, `app/api/office_routes.py`)**:
+  - Formally documented `toggle_payment_flag` as a legacy/admin quick-toggle interface, establishing `record_financial_payment` as the canonical payment entrypoint.
+  - Synchronized toggle actions to ensure financials rows and `last_payment_received_at` are maintained without corrupting financial ledger history.
+  - Fixed dollar-to-cents parameter conversion in office toggle payment route.
+- **Storm Target Timestamps & Event Counts (`app/core/database.py`, `app/api/field_routes.py`)**:
+  - Ensured `latest_event_time_utc` and `last_event_utc` are returned as non-empty ISO 8601 UTC timestamps across database queries and field endpoints whenever qualifying storm events exist.
+  - Upgraded storm target aggregation to compute distinct event counts for hail (`hail_events`), wind (`wind_events`), and tornado (`tornado_events`), eliminating ambiguity from previously shared `event_count` values.
+  - Set canvassing window default for `get_storm_target_summaries` to `settings.storm_canvassing_window_hours` (168h / 7 days).
+- **FastAPI Version Alignment (`app/server.py`)**:
+  - Dynamically resolved FastAPI app version from `pyproject.toml` (`v2.8.17`) with fallback, ensuring OpenAPI and Swagger metadata stays strictly aligned with project versioning.
 - **Sales & Field Pipeline Visibility Alignment (`app/core/database.py`, `app/api/field_routes.py`, `app/templates/`)**:
   - Extended Admin `SALES_STAGES` to include `INSTALL_SCHEDULED`, `ACV_PAYMENT_RECEIVED`, and `PAYMENT_RECEIVED`.
   - Expanded Field `SALES_STAGES` to 9 milestone stages (`LEAD_CAPTURED`, `CONTINGENCY_SIGNED`, `CLAIM_FILED`, `RETAIL_CONTRACT_SIGNED`, `SCOPE_APPROVED`, `INSTALL_SCHEDULED`, `INSTALL_COMPLETED`, `PAYMENT_RECEIVED`, `CLOSED`).

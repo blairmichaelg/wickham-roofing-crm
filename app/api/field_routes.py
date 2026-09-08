@@ -1016,17 +1016,18 @@ async def get_field_storm_targets(
             "zipcode": zip_val,
             "location": t.get("location", "Unknown"),
             "event_count": t.get("event_count", 0),
-            "hail_events": t.get("event_count", 0),  # or hail events count
+            "hail_events": t.get("hail_events", 0),
             "max_hail": t.get("max_hail_inches", 0.0),
             "max_hail_inches": t.get("max_hail_inches", 0.0),
-            "wind_events": t.get("event_count", 0),
+            "wind_events": t.get("wind_events", 0),
             "max_wind": t.get("max_wind_mph", 0.0),
             "max_wind_mph": t.get("max_wind_mph", 0.0),
             "priority_label": t.get("priority_label", "Standard"),
             "reasons": t.get("priority_reason", ""),
             "priority_reason": t.get("priority_reason", ""),
             "has_tornado": t.get("has_tornado", False),
-            "latest_event_time_utc": t.get("latest_event_time_utc", ""),
+            "last_event_utc": t.get("latest_event_time_utc") or t.get("last_event_utc") or "",
+            "latest_event_time_utc": t.get("latest_event_time_utc") or t.get("last_event_utc") or "",
         })
     return {"status": "success", "count": len(sanitized), "targets": sanitized}
 

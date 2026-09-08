@@ -15,7 +15,8 @@ from app.core.database import (
     update_field_rep,
     list_field_reps,
     insert_material_order,
-    update_job_status
+    update_job_status,
+    toggle_payment_flag,
 )
 
 @pytest.fixture
@@ -64,33 +65,88 @@ def test_mark_supplement_sent_integration(clean_job):
     assert row["supplement_sent_at"] is not None
 
 def test_record_financial_payment_integration(clean_job):
-    """Test record_financial_payment successfully updates financials and jobs tables."""
+    """Test record_financial_payment successfully updates financials and jobs tables, including last_payment_received_at."""
     job_id = clean_job
 
     # 1. ACV payment
     record_financial_payment(job_id, payment_type="acv", amount=5000.0, date_received="2026-08-21")
     
     conn = get_connection()
-    row_fin = conn.execute("SELECT acv_payment_received_at FROM financials WHERE job_id = ?", (job_id,)).fetchone()
-    row_job = conn.execute("SELECT acv_received, acv_check_amount_cents FROM jobs WHERE id = ?", (job_id,)).fetchone()
+    row_fin = conn.execute("SELECT acv_payment_received_at, last_payment_received_at FROM financials WHERE job_id = ?", (job_id,)).fetchone()
+    row_job = conn.execute("SELECT acv_received, acv_check_amount_cents, last_payment_received_at FROM jobs WHERE id = ?", (job_id,)).fetchone()
     assert row_fin is not None
     assert row_fin["acv_payment_received_at"] == "2026-08-21"
+    assert row_fin["last_payment_received_at"] is not None
     assert row_job is not None
     assert row_job["acv_received"] == 1
     assert row_job["acv_check_amount_cents"] == 500000
+    assert row_job["last_payment_received_at"] is not None
 
-    # 2. Depreciation payment (instead of deductible due to pre-existing SQLite schema mismatch in database.py)
+    # 2. Depreciation payment
     # Reset job status back to INVOICED so state machine check passes
     conn.execute("UPDATE jobs SET status = 'INVOICED' WHERE id = ?", (job_id,))
     conn.commit()
     
     record_financial_payment(job_id, payment_type="depreciation", amount=3500.0, date_received="2026-08-22")
-    row_fin2 = conn.execute("SELECT depreciation_payment_received_at FROM financials WHERE job_id = ?", (job_id,)).fetchone()
-    row_job2 = conn.execute("SELECT supplement_received, supplement_check_amount_cents FROM jobs WHERE id = ?", (job_id,)).fetchone()
+    row_fin2 = conn.execute("SELECT depreciation_payment_received_at, last_payment_received_at FROM financials WHERE job_id = ?", (job_id,)).fetchone()
+    row_job2 = conn.execute("SELECT supplement_received, supplement_check_amount_cents, last_payment_received_at FROM jobs WHERE id = ?", (job_id,)).fetchone()
     assert row_fin2["depreciation_payment_received_at"] == "2026-08-22"
+    assert row_fin2["last_payment_received_at"] is not None
     assert row_job2["supplement_received"] == 1
     assert row_job2["supplement_check_amount_cents"] == 350000
+    assert row_job2["last_payment_received_at"] is not None
+
+    # 3. Retail payment
+    record_financial_payment(job_id, payment_type="retail", amount=1200.0, date_received="2026-08-23")
+    row_fin3 = conn.execute("SELECT retail_payment_received_at, last_payment_received_at FROM financials WHERE job_id = ?", (job_id,)).fetchone()
+    row_job3 = conn.execute("SELECT last_payment_received_at FROM jobs WHERE id = ?", (job_id,)).fetchone()
+    assert row_fin3["retail_payment_received_at"] == "2026-08-23"
+    assert row_fin3["last_payment_received_at"] is not None
+    assert row_job3["last_payment_received_at"] is not None
+
+    # 4. Payment commits even when state machine cannot advance
+    conn.execute("UPDATE jobs SET status = 'LEAD_CAPTURED' WHERE id = ?", (job_id,))
+    conn.commit()
+    advanced = record_financial_payment(job_id, payment_type="retail", amount=500.0)
+    assert advanced is False  # Cannot advance from LEAD_CAPTURED to RETAIL_PAYMENT_RECEIVED
+    row_fin4 = conn.execute("SELECT last_payment_received_at FROM financials WHERE job_id = ?", (job_id,)).fetchone()
+    assert row_fin4["last_payment_received_at"] is not None
     
+    conn.close()
+
+
+def test_toggle_payment_flag_ledger_safety(clean_job):
+    """Test toggle_payment_flag does not corrupt financials ledger and maintains timestamps."""
+    job_id = clean_job
+
+    # Toggle ON without check details
+    res = toggle_payment_flag(job_id, "acv_received")
+    assert res["new_value"] == 1
+    conn = get_connection()
+    row_job = conn.execute("SELECT acv_received, last_payment_received_at FROM jobs WHERE id = ?", (job_id,)).fetchone()
+    row_fin = conn.execute("SELECT last_payment_received_at FROM financials WHERE job_id = ?", (job_id,)).fetchone()
+    assert row_job["acv_received"] == 1
+    assert row_job["last_payment_received_at"] is not None
+    assert row_fin is not None
+    assert row_fin["last_payment_received_at"] is not None
+
+    # Toggle with check amount and date
+    res2 = toggle_payment_flag(job_id, "supplement_received", amount=2500.0, date_received="2026-08-25")
+    assert res2["new_value"] == 1
+    row_job2 = conn.execute("SELECT supplement_received, supplement_check_amount_cents, supplement_check_date, last_payment_received_at FROM jobs WHERE id = ?", (job_id,)).fetchone()
+    row_fin2 = conn.execute("SELECT depreciation_payment_received_at, last_payment_received_at FROM financials WHERE job_id = ?", (job_id,)).fetchone()
+    assert row_job2["supplement_received"] == 1
+    assert row_job2["supplement_check_amount_cents"] == 250000
+    assert row_job2["supplement_check_date"] == "2026-08-25"
+    assert row_fin2["depreciation_payment_received_at"] == "2026-08-25"
+
+    # Toggle OFF does not erase financials ledger
+    res3 = toggle_payment_flag(job_id, "supplement_received")
+    assert res3["new_value"] == 0
+    row_job3 = conn.execute("SELECT supplement_received FROM jobs WHERE id = ?", (job_id,)).fetchone()
+    row_fin3 = conn.execute("SELECT depreciation_payment_received_at FROM financials WHERE job_id = ?", (job_id,)).fetchone()
+    assert row_job3["supplement_received"] == 0
+    assert row_fin3["depreciation_payment_received_at"] == "2026-08-25"
     conn.close()
 
 def test_standardize_existing_job_documents_integration(clean_job):

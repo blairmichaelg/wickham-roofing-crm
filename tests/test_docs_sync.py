@@ -31,6 +31,18 @@ def test_openapi_schema_contains_all_core_endpoints():
     assert "post" in paths["/api/field/push/subscribe"]
 
 
+def test_app_version_matches_pyproject_and_openapi():
+    """Verify app.version and OpenAPI info.version match pyproject.toml."""
+    import tomllib
+    pyproject_path = Path("pyproject.toml")
+    assert pyproject_path.exists()
+    with open(pyproject_path, "rb") as f:
+        pyproject_data = tomllib.load(f)
+    expected_version = pyproject_data["project"]["version"]
+    assert app.version == expected_version
+    assert app.openapi()["info"]["version"] == expected_version
+
+
 def test_guide_documents_exist_and_version_stamped():
     """Ensure all core role guides exist and have valid content without stale drift."""
     docs_dir = Path("docs")

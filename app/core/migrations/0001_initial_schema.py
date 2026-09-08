@@ -85,7 +85,8 @@ def up(conn: sqlite3.Connection) -> None:
             "commission_generated_at TIMESTAMP",
             "escalation_sent_at TIMESTAMP",
             "carrier_sla_days INTEGER DEFAULT 14",
-            "canvasser_rep_id TEXT"
+            "canvasser_rep_id TEXT",
+            "last_payment_received_at TIMESTAMP"
         ]:
             try:
                 conn.execute(f"ALTER TABLE jobs ADD COLUMN {col}")
@@ -133,6 +134,7 @@ def up(conn: sqlite3.Connection) -> None:
                 qbo_invoice_id TEXT,
                 qbo_exported INTEGER NOT NULL DEFAULT 0,
                 qbo_exported_at TIMESTAMP,
+                last_payment_received_at TIMESTAMP,
                 FOREIGN KEY(job_id) REFERENCES jobs(id)
             )
         ''')

@@ -309,8 +309,14 @@ def run_migrations() -> None:
             m23.up(conn)
             conn.execute("UPDATE schema_version SET version = 23, applied_at = CURRENT_TIMESTAMP WHERE id = 1")
 
+        if current_version < 24:
+            import importlib
+            m24 = importlib.import_module("app.core.migrations.0024_add_last_payment_received_at")
+            m24.up(conn)
+            conn.execute("UPDATE schema_version SET version = 24, applied_at = CURRENT_TIMESTAMP WHERE id = 1")
+
         conn.execute("COMMIT")
-        logger.info("migrations_applied", current_version=current_version, target_version=23)
+        logger.info("migrations_applied", current_version=current_version, target_version=24)
         
         # Since seed logic was removed from up(), do it here outside the transaction
         if current_version < 1:
@@ -1331,6 +1337,7 @@ def apply_payment_ledger_entry(
     """
     Writes the payment directly into the financials ledger and updates
     payment-related fields on the jobs table.
+    Sets canonical last_payment_received_at on both financials and jobs tables.
     """
     today_iso = date_received or now_utc().date().isoformat()
     ts_now = now_utc_iso()
@@ -1338,38 +1345,54 @@ def apply_payment_ledger_entry(
     if payment_type == "acv":
         rec_date = date_received or ts_now
         conn.execute(
-            "UPDATE financials SET acv_payment_received_at = ? WHERE job_id = ?",
-            (rec_date, job_id)
+            "UPDATE financials SET acv_payment_received_at = ?, last_payment_received_at = ? WHERE job_id = ?",
+            (rec_date, ts_now, job_id)
         )
         if amount_cents is not None:
             conn.execute(
                 """UPDATE jobs 
                    SET acv_received = 1, acv_received_at = CURRENT_TIMESTAMP, 
-                       acv_check_amount_cents = ?, acv_check_date = ? 
+                       acv_check_amount_cents = ?, acv_check_date = ?,
+                       last_payment_received_at = ?
                    WHERE id = ?""",
-                (amount_cents, today_iso, job_id)
+                (amount_cents, today_iso, ts_now, job_id)
+            )
+        else:
+            conn.execute(
+                "UPDATE jobs SET last_payment_received_at = ? WHERE id = ?",
+                (ts_now, job_id)
             )
 
     elif payment_type == "depreciation":
         rec_date = date_received or ts_now
         conn.execute(
-            "UPDATE financials SET depreciation_payment_received_at = ? WHERE job_id = ?",
-            (rec_date, job_id)
+            "UPDATE financials SET depreciation_payment_received_at = ?, last_payment_received_at = ? WHERE job_id = ?",
+            (rec_date, ts_now, job_id)
         )
         if amount_cents is not None:
             conn.execute(
                 """UPDATE jobs 
                    SET supplement_received = 1, supplement_received_at = CURRENT_TIMESTAMP, 
-                       supplement_check_amount_cents = ?, supplement_check_date = ? 
+                       supplement_check_amount_cents = ?, supplement_check_date = ?,
+                       last_payment_received_at = ?
                    WHERE id = ?""",
-                (amount_cents, today_iso, job_id)
+                (amount_cents, today_iso, ts_now, job_id)
+            )
+        else:
+            conn.execute(
+                "UPDATE jobs SET last_payment_received_at = ? WHERE id = ?",
+                (ts_now, job_id)
             )
 
     elif payment_type == "retail":
         rec_date = date_received or ts_now
         conn.execute(
-            "UPDATE financials SET retail_payment_received_at = ? WHERE job_id = ?",
-            (rec_date, job_id)
+            "UPDATE financials SET retail_payment_received_at = ?, last_payment_received_at = ? WHERE job_id = ?",
+            (rec_date, ts_now, job_id)
+        )
+        conn.execute(
+            "UPDATE jobs SET last_payment_received_at = ? WHERE id = ?",
+            (ts_now, job_id)
         )
 
     elif payment_type == "deductible":
@@ -1485,15 +1508,25 @@ def record_financial_payment(
 
 def toggle_payment_flag(job_id: str, flag: str, amount: float | None = None, date_received: str | None = None) -> dict:
     """
-    Toggles acv_received or supplement_received for a job.
-    Returns the new state. flag must be one of the two allowed
-    values — hard-coded whitelist, no dynamic SQL construction.
+    LEGACY / ADMIN QUICK-TOGGLE OVERRIDE.
+
+    Normal payment flows MUST use `record_financial_payment` to record payments
+    into the financial ledger and advance job status.
+
+    This function provides a legacy/quick-toggle interface for administrative overrides
+    (e.g., toggling check receipt flags on jobs). When toggled ON or when check details
+    are provided, it synchronizes with the `financials` table by ensuring a financials
+    row exists and updating `last_payment_received_at` without corrupting ledger data.
+    When toggled OFF, only the flag on `jobs` is cleared, preserving ledger integrity.
+
+    Allowed flags: 'acv_received', 'supplement_received'.
     """
     allowed = {"acv_received", "supplement_received"}
     if flag not in allowed:
         raise ValueError(f"Invalid flag: {flag}")
 
     ts_col = flag + "_at"
+    ts_now = now_utc_iso()
     conn = get_connection()
     try:
         conn.execute("BEGIN IMMEDIATE")
@@ -1507,27 +1540,58 @@ def toggle_payment_flag(job_id: str, flag: str, amount: float | None = None, dat
         # If amount is provided, we are capturing a check. This forces it to ON.
         if amount is not None and date_received is not None:
             new_val = 1
-            amount_cents = int(round(amount * 100))
+            amount_cents = int(round(amount * 100)) if isinstance(amount, float) else int(amount)
+            ensure_financials_row(conn, job_id)
             if flag == "acv_received":
                 conn.execute(
-                    "UPDATE jobs SET acv_received=1, acv_received_at=CURRENT_TIMESTAMP, acv_check_amount_cents=?, acv_check_date=? WHERE id=?",
-                    (amount_cents, date_received, job_id)
+                    """UPDATE jobs 
+                       SET acv_received=1, acv_received_at=CURRENT_TIMESTAMP, 
+                           acv_check_amount_cents=?, acv_check_date=?,
+                           last_payment_received_at=? 
+                       WHERE id=?""",
+                    (amount_cents, date_received, ts_now, job_id)
+                )
+                conn.execute(
+                    "UPDATE financials SET acv_payment_received_at = COALESCE(acv_payment_received_at, ?), last_payment_received_at = ? WHERE job_id = ?",
+                    (date_received, ts_now, job_id)
                 )
             else:
                 conn.execute(
-                    "UPDATE jobs SET supplement_received=1, supplement_received_at=CURRENT_TIMESTAMP, supplement_check_amount_cents=?, supplement_check_date=? WHERE id=?",
-                    (amount_cents, date_received, job_id)
+                    """UPDATE jobs 
+                       SET supplement_received=1, supplement_received_at=CURRENT_TIMESTAMP, 
+                           supplement_check_amount_cents=?, supplement_check_date=?,
+                           last_payment_received_at=? 
+                       WHERE id=?""",
+                    (amount_cents, date_received, ts_now, job_id)
+                )
+                conn.execute(
+                    "UPDATE financials SET depreciation_payment_received_at = COALESCE(depreciation_payment_received_at, ?), last_payment_received_at = ? WHERE job_id = ?",
+                    (date_received, ts_now, job_id)
                 )
         else:
             new_val = 0 if row[flag] else 1
-            ts_val = "CURRENT_TIMESTAMP" if new_val else "NULL"
-            conn.execute(
-                f"""UPDATE jobs
-                    SET {flag} = ?,
-                        {ts_col} = {ts_val}
-                    WHERE id = ?""",
-                (new_val, job_id)
-            )
+            if new_val == 1:
+                conn.execute(
+                    f"""UPDATE jobs
+                        SET {flag} = 1,
+                            {ts_col} = CURRENT_TIMESTAMP,
+                            last_payment_received_at = ?
+                        WHERE id = ?""",
+                    (ts_now, job_id)
+                )
+                ensure_financials_row(conn, job_id)
+                conn.execute(
+                    "UPDATE financials SET last_payment_received_at = ? WHERE job_id = ?",
+                    (ts_now, job_id)
+                )
+            else:
+                conn.execute(
+                    f"""UPDATE jobs
+                        SET {flag} = 0,
+                            {ts_col} = NULL
+                        WHERE id = ?""",
+                    (job_id,)
+                )
         conn.commit()
         row2 = conn.execute(
             "SELECT acv_received, supplement_received "
@@ -1979,7 +2043,7 @@ def get_storm_target_summaries(
     from datetime import timedelta
 
     settings = get_settings()
-    hours = window_hours if window_hours is not None else settings.storm_fresh_window_hours
+    hours = window_hours if window_hours is not None else settings.storm_canvassing_window_hours
     radius = radius_miles if radius_miles is not None else settings.storm_canvassing_radius_miles
     if min_hail is None:
         min_hail = settings.storm_alert_min_hail_inches
@@ -1994,6 +2058,9 @@ def get_storm_target_summaries(
                 county                                       AS location,
                 zipcode,
                 COUNT(*)                                     AS event_count,
+                SUM(CASE WHEN event_type = 'HAIL' THEN 1 ELSE 0 END) AS hail_event_count,
+                SUM(CASE WHEN event_type = 'WIND' THEN 1 ELSE 0 END) AS wind_event_count,
+                SUM(CASE WHEN event_type = 'TORNADO' THEN 1 ELSE 0 END) AS tornado_event_count,
                 MAX(COALESCE(severity_score, 0.0))           AS max_severity_score,
                 MAX(COALESCE(hail_size_inches, 0.0))         AS max_hail_inches,
                 MAX(COALESCE(wind_speed_mph, 0.0))           AS max_wind_mph,
@@ -2045,6 +2112,9 @@ def get_storm_target_summaries(
                 "location": r["location"] or "Unknown",
                 "zipcode": r["zipcode"] or "",
                 "event_count": r["event_count"],
+                "hail_events": r["hail_event_count"] or 0,
+                "wind_events": r["wind_event_count"] or 0,
+                "tornado_events": r["tornado_event_count"] or 0,
                 "max_severity_score": sev,
                 "severity_score": sev,
                 "priority_label": label,
@@ -2054,7 +2124,7 @@ def get_storm_target_summaries(
                 "has_tornado": has_tor,
                 "last_event_utc": last_event or "",
                 "latest_event_time_utc": last_event or "",
-                "window_hours": window_hours,
+                "window_hours": hours,
                 "event_types": r["event_types"] or "",
                 "latitude": round(r["latitude"], 5) if r["latitude"] is not None else None,
                 "longitude": round(r["longitude"], 5) if r["longitude"] is not None else None,

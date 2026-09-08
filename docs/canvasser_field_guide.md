@@ -377,6 +377,11 @@ To help close deals faster and streamline nearby jobsite canvassing, the Field A
 - **Storm-Grounded Pitch**: Generates a professionally designed, single-page PDF letter featuring our corporate letterhead. The letter references the exact completed job address ("We just replaced a roof on your street") and highlights verified NWS storm events that occurred nearby.
 - **Call-to-Action**: Invites neighbors to book a free roofing inspection. You can download and print these to drop at adjacent houses, maximizing lead gen around completed installs.
 
+### 3. 🎯 Hot ZIPs Storm Canvassing Targets
+- **7-Day Canvassing Intelligence**: The Field Portal's "Hot ZIPs" widget displays high-priority canvassing target areas within our 90-mile operational radius over the 7-day (168-hour) canvassing window.
+- **Accurate Weather Event Metrics**: Displays distinct counts for hail and wind events, peak hail size in inches, maximum wind gust in mph, tornado indicators, priority badges, and human-usable event timestamps (`latest_event_time_utc`).
+- **Privacy Enforcement**: Exclusively displays verified weather metrics without any company financial or contract figures.
+
 ## 14. Spoken Field Voice Notes (Voice-to-Text)
 
 To speed up intake without typing long notes on a phone keyboard, the Field App includes an integrated **Voice Note Recorder**:

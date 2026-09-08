@@ -61,6 +61,9 @@ If the check amount you enter is lower than the expected value by about 2% or mo
 
 This is not an error! It is simply a warning to double-check your typing. If the carrier genuinely shorted us on the payment, confirm the amount anyway so the system has the correct record, and follow up with the insurance carrier separately to collect the missing funds.
 
+### Canonical Payment Timestamps & Ledger Decoupling
+Every recorded payment (ACV, Depreciation, or Retail) immediately updates the canonical `last_payment_received_at` timestamp across the job record and the financials ledger. Normal accounting entries use `record_financial_payment` as the single source of truth, committing payments safely even when job workflow advancement is deferred. Legacy check toggles synchronize with this ledger automatically without data loss.
+
 ---
 
 ## 4. Paying Commissions
