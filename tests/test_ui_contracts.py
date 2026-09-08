@@ -7,9 +7,8 @@ from fastapi.testclient import TestClient
 
 from app.core.database import (
     JobStatus,
+    atomic_qbo_export,
     get_connection,
-    get_qbo_export_batch,
-    mark_qbo_exported,
     transition_material_flags,
 )
 from app.main import app
@@ -89,19 +88,23 @@ def test_qbo_export_batch_excludes_already_exported(db_conn):
     setup_test_financials(db_conn, job1_id, qbo_exported=0)
     setup_test_financials(db_conn, job2_id, qbo_exported=1)
     
-    batch = get_qbo_export_batch()
+    batch = atomic_qbo_export()
     
     job_ids = [r["job_id"] for r in batch]
     assert job1_id in job_ids
     assert job2_id not in job_ids
 
-def test_qbo_mark_exported_idempotent(db_conn):
+def test_qbo_atomic_export_idempotent(db_conn):
     job_id = setup_test_job(db_conn, "INVOICED")
     setup_test_financials(db_conn, job_id, qbo_exported=0)
     
-    # Call mark twice
-    mark_qbo_exported([job_id])
-    mark_qbo_exported([job_id])
+    # First export
+    batch1 = atomic_qbo_export()
+    assert any(r["job_id"] == job_id for r in batch1)
+
+    # Second call returns nothing pending
+    batch2 = atomic_qbo_export()
+    assert not any(r["job_id"] == job_id for r in batch2)
     
     cursor = db_conn.execute("SELECT qbo_exported FROM financials WHERE job_id = ?", (job_id,))
     row = cursor.fetchone()

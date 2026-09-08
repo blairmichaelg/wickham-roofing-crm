@@ -58,6 +58,7 @@ from app.core.job_costing import compute_job_profitability
 from app.core.pipeline import run_full_office_pipeline, run_supplement_pipeline
 from app.core.templates import templates
 from app.core.upload_utils import stream_upload_safely
+from app.core.utils import now_utc
 from app.services.hover_extractor import detect_pdf_format
 from app.services.inspection_summary import get_inspection_summary
 from app.services.pdf import PDFGenerator
@@ -1216,8 +1217,7 @@ def get_operations_brief():
         
         material_rows = []
         deliveries_today = 0
-        import datetime
-        today_str = datetime.datetime.now().strftime("%Y-%m-%d")
+        today_str = now_utc().strftime("%Y-%m-%d")
         
         for r in m_rows:
             d_date = r["delivery_date"]
@@ -1380,7 +1380,7 @@ async def export_qbo_csv(token=Depends(verify_accounting)):
         )
 
     import datetime
-    today_dt = datetime.datetime.now()
+    today_dt = now_utc()
     today_str = today_dt.strftime("%Y-%m-%d")
     due_date_str = (today_dt + datetime.timedelta(days=30)).strftime("%Y-%m-%d")
 
@@ -2267,10 +2267,29 @@ async def office_request_review(job_id: str, payload: ReviewRequestPayload):
     Admin/office: mark that a review (e.g. Google/Facebook) has been requested for this job.
     Idempotent — safe to call multiple times.
     """
+    conn = get_connection()
     try:
-        job_id = str(uuid.UUID(job_id))
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid job_id format.")
+        j_row = conn.execute("SELECT status FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        if not j_row:
+            raise HTTPException(status_code=404, detail="Job not found.")
+        current_status = j_row["status"]
+    finally:
+        conn.close()
+
+    ALLOWED_REVIEW_STATUSES = {
+        JobStatus.INSTALL_COMPLETED.value,
+        JobStatus.FINAL_INSPECTION.value,
+        JobStatus.FINAL_INSPECTION_COMPLETED.value,
+        JobStatus.INVOICED.value,
+        JobStatus.PAYMENT_RECEIVED.value,
+        JobStatus.CLOSED.value,
+    }
+    if current_status not in ALLOWED_REVIEW_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail="Reviews can only be requested on completed installations."
+        )
+
     from app.core.database import request_review
     try:
         result = await asyncio.to_thread(request_review, job_id, payload.requested_by)

@@ -180,3 +180,35 @@ class TestStormTargetsEndpoint:
         resp = client.get("/api/office/storms/targets?limit=3", headers=ADMIN_HEADERS)
         assert resp.status_code == 200
         assert resp.json()["count"] <= 3
+
+
+class TestFieldStormTargetsEndpoint:
+    def test_requires_auth(self):
+        resp = client.get("/api/field/storms/targets")
+        assert resp.status_code == 401
+
+    def test_field_rep_can_access(self):
+        resp = client.get("/api/field/storms/targets", headers=FIELD_HEADERS)
+        assert resp.status_code == 200
+
+    def test_field_targets_payload_shape_and_no_financials(self):
+        _insert_storm(hail_size=2.0, wind_speed=65.0, severity_score=9.0, county="Thomasville, GA", zipcode="31757")
+        resp = client.get("/api/field/storms/targets", headers=FIELD_HEADERS)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "count" in data
+        assert "targets" in data
+        assert data["count"] >= 1
+        t = data["targets"][0]
+        assert "zip" in t
+        assert "hail_events" in t
+        assert "max_hail" in t
+        assert "wind_events" in t
+        assert "max_wind" in t
+        assert "priority_label" in t
+        assert "reasons" in t
+        # Ensure no dollar amounts or financial fields leaked
+        assert "revenue" not in t
+        assert "commission" not in t
+        assert "contract_total" not in t
+        assert "price" not in t

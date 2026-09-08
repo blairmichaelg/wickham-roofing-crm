@@ -380,6 +380,9 @@ The Storm Activity Monitor's ingestion and alerting thresholds are controlled by
 4. `STORM_ALERT_RADIUS_MILES` (default: `30.0`): The radius in miles around the office center within which events must fall to trigger active WebSocket alerts to users.
 5. `STORM_ALERT_MIN_HAIL_INCHES` (default: `1.0`): The minimum hail size (in inches) required to trigger a storm alert.
 6. `STORM_ALERT_MIN_WIND_MPH` (default: `50.0`): The minimum wind speed (in mph) required to trigger a storm alert.
+7. `STORM_FRESH_WINDOW_HOURS` (default: `48`): Time window in hours for fresh storm activity and active radar warnings.
+8. `STORM_CANVASSING_WINDOW_HOURS` (default: `168`): Lookback window in hours (7 days) for canvassing target summaries and neighbor letters.
+9. `STORM_CANVASSING_RADIUS_MILES` (default: `90.0`): Wider operational radius centered on Thomasville, GA (`storm_canvassing_center_city`, `storm_canvassing_center_state`) for sales team target ZIP identification.
 
 ### Verifying Worker Health
 To confirm the worker is running and processing correctly:
@@ -395,16 +398,16 @@ Admin and office users have access to two new widgets directly in the main Offic
 
 ### 1. Canvassing Targets (Storm Radar Monitor)
 - **Ranked Target ZIPs**: Below the recent storm event alerts, the Storm Activity Monitor card displays a ranked list of "Canvassing Targets".
-- **Adjustable Time Window**: Toggles lookback periods (24h, 72h, 168h) dynamically from the admin header select control.
+- **Adjustable Time Window**: Toggles lookback periods (24h, 48h, 72h, 168h) dynamically from the admin header select control.
 - **Explainable Scoring**: Target areas (defined by location and ZIP code) are automatically ranked based on `severity_score` calculated during ingestion. Priority labels (`🔥 High`, `⚡ Medium`, `🟢 Low`) are displayed alongside a detailed description explaining the score (e.g. `1.75″ hail · 60 mph wind · latest Aug 28`).
 - **Tornado/Severe Badges**: High-priority storm targets are highlighted with special badges to help the team focus canvassing efforts where severe damage is most likely.
 
 ### 2. Sales Pipeline Widget
 - **Pipeline Snapshot**: A dedicated collapsible "Sales Pipeline" widget is located below the Storm Activity Monitor.
-- **Stage Breakdown**: Displays live counts of jobs across key pipeline stages.
+- **Stage Breakdown**: Displays live counts of jobs across monitored pipeline stages: `LEAD_CAPTURED`, `CONTINGENCY_SIGNED`, `CLAIM_FILED`, `SUPPLEMENT_APPROVED`, `INSTALL_COMPLETED`, `INVOICED`, `ACV_PAYMENT_RECEIVED`, `PAYMENT_RECEIVED`, `CLOSED`.
 - **Rep Performance**: Displays a breakdown of leads, contingency agreements signed, and contracts secured per sales representative.
-- **Deterministic Speed-to-Lead tracking**: Computes and displays the average time (in hours) it takes for a newly captured lead to advance to its first progression milestone.
+- **Deterministic Avg Time to Contract Tracking**: Computes and displays the average time (in hours) it takes for a newly captured lead to advance to its first signed agreement milestone.
 
 ---
 
-*This guide reflects the Admin workflow as of version `2.4.1`. Includes support for non-blocking 'Naked Lead' field intake (`LEAD_CAPTURED`), pre-contract Evidence Grid pitch generation, unsigned contingency agreement PDF download/email, field-app-based signature resumption flow, NWS-integrated Storm Activity Monitor, ranked Canvassing Targets, the Sales Pipeline dashboard widget, and the read-only core role classification for Alex Wickham.*
+*This guide reflects the Admin workflow as of version `2.8.17`. Includes decoupled payment recording, payment stages in pipeline tracking, expanded 90-mile storm canvassing intelligence, gated review workflows, and the read-only core role classification for Alex Wickham.*

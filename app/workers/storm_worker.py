@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from app.config import get_settings
 from app.core.database import get_connection
+from app.core.utils import normalize_zip
 from app.services.storm_feed import NWSLiveStormFeed, haversine
 
 logger = structlog.get_logger("app.workers.storm_worker")
@@ -101,7 +102,7 @@ async def ingest_storm_events(ctx: dict) -> None:
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 r["id"],
-                closest_zip,
+                normalize_zip(closest_zip),
                 r["event_type"],
                 r["report_time_utc"][:10], # YYYY-MM-DD
                 r["hail_size_inches"],

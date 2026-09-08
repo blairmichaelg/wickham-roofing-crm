@@ -335,7 +335,9 @@
                 const KEY_STAGES = [
                     ['LEAD_CAPTURED', '🎯 Leads'], ['CONTINGENCY_SIGNED', '📝 Contingency'],
                     ['CLAIM_FILED', '📋 Claim Filed'], ['SUPPLEMENT_APPROVED', '✅ Supp Approved'],
-                    ['INSTALL_COMPLETED', '🏠 Installed'], ['INVOICED', '💵 Invoiced'], ['CLOSED', '🔒 Closed']
+                    ['INSTALL_COMPLETED', '🏠 Installed'], ['INVOICED', '💵 Invoiced'],
+                    ['ACV_PAYMENT_RECEIVED', '💳 ACV Paid'], ['PAYMENT_RECEIVED', '💰 Paid in Full'],
+                    ['CLOSED', '🔒 Closed']
                 ];
                 document.getElementById('pipelineStages').innerHTML = KEY_STAGES.map(([k, label]) => `
                     <div class="bg-gray-950/70 border border-gray-800 rounded p-2 text-center">
@@ -369,10 +371,10 @@
                     `;
                 }
 
-                // Speed to lead
+                // Avg Time to Contract
                 const speed = d.avg_speed_to_lead_hours;
                 document.getElementById('pipelineSpeedBlock').textContent =
-                    speed != null ? `⚡ Avg. speed-to-lead: ${speed.toFixed(1)} hrs` : '';
+                    speed != null ? `⚡ Avg. Time to Contract: ${speed.toFixed(1)} hrs` : '';
 
             } catch (e) { console.error('Pipeline load error:', e); }
         }

@@ -15,6 +15,7 @@ import structlog
 from passlib.context import CryptContext
 
 from app.config import get_settings
+from app.core.utils import normalize_zip, now_utc, now_utc_iso
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -573,7 +574,7 @@ def _update_job_status_internal(conn: sqlite3.Connection, job_id: str, new_statu
         comm_cursor = conn.execute("SELECT commission_generated_at FROM jobs WHERE id = ?", (job_id,))
         comm_row = comm_cursor.fetchone()
         if not comm_row or not comm_row["commission_generated_at"]:
-            timestamp_str_comm = __import__('datetime').datetime.now(__import__('datetime').timezone.utc).replace(tzinfo=None).isoformat() + "Z"
+            timestamp_str_comm = now_utc_iso()
             conn.execute(
                 "UPDATE jobs SET commission_ready = 1, commission_generated_at = ? WHERE id = ?",
                 (timestamp_str_comm, job_id)
@@ -585,7 +586,7 @@ def _update_job_status_internal(conn: sqlite3.Connection, job_id: str, new_statu
     # ---------------------------------------------------------
 
     # Update DB with atomic JSON append to prevent race conditions
-    timestamp_str = datetime.now(__import__('datetime').timezone.utc).replace(tzinfo=None).isoformat() + "Z"
+    timestamp_str = now_utc_iso()
     cursor = conn.execute(
         """
         UPDATE jobs 
@@ -635,7 +636,7 @@ def force_override_status(job_id: str, new_status: str, note: str = "") -> None:
     conn = get_connection()
     try:
         conn.execute("BEGIN IMMEDIATE")
-        timestamp_str = __import__('datetime').datetime.now(__import__('datetime').timezone.utc).replace(tzinfo=None).isoformat() + "Z"
+        timestamp_str = now_utc_iso()
         cursor = conn.execute(
             """
             UPDATE jobs 
@@ -1193,65 +1194,7 @@ def transition_material_flags(
         conn.close()
 
 
-def get_qbo_export_batch() -> list[dict]:
-    """
-    Returns all jobs eligible for QBO batch export:
-    status IN (SUPPLEMENT_APPROVED, INVOICED) AND qbo_exported = 0.
-    Joins jobs + financials. Returns empty list if none pending.
-    """
-    conn = get_connection()
-    try:
-        cursor = conn.execute(
-            """
-            SELECT j.id as job_id, j.homeowner_name, j.status,
-                   f.revenue_cents, 
-                   f.carrier_rcv_cents, 
-                   f.material_cost_cents,
-                   f.labor_cost_cents, 
-                   f.overhead_pct,
-                   f.canvasser_commission_pct, 
-                   f.permits_fee_cents
-            FROM jobs j
-            JOIN financials f ON j.id = f.job_id
-            WHERE j.status IN ('SUPPLEMENT_APPROVED', 'INVOICED')
-              AND f.qbo_exported = 0
-            ORDER BY j.created_at ASC
-            """
-        )
-        return [dict(r) for r in cursor.fetchall()]
-    except Exception as e:
-        logger.error("get_qbo_export_batch_failed", error=str(e))
-        return []
-    finally:
-        conn.close()
-
-
-def mark_qbo_exported(job_ids: list[str]) -> None:
-    """
-    Idempotency lock: mark a batch of jobs as QBO-exported.
-    Sets qbo_exported=1 and qbo_exported_at=NOW for each job_id.
-    Safe to call multiple times — subsequent calls are no-ops due
-    to the qbo_exported=0 filter in get_qbo_export_batch().
-    """
-    if not job_ids:
-        return
-    conn = get_connection()
-    try:
-        conn.execute("BEGIN IMMEDIATE")
-        conn.executemany(
-            """UPDATE financials
-               SET qbo_exported = 1,
-                   qbo_exported_at = CURRENT_TIMESTAMP
-               WHERE job_id = ?""",
-            [(jid,) for jid in job_ids],
-        )
-        conn.execute("COMMIT")
-        logger.info("qbo_batch_marked_exported", count=len(job_ids))
-    except Exception as e:
-        logger.error("qbo_mark_exported_failed", error=str(e))
-        raise
-    finally:
-        conn.close()
+# Legacy get_qbo_export_batch and mark_qbo_exported removed in favor of atomic_qbo_export.
 
 def update_job_metadata(job_id: str, inspector_name: str, inspection_date: str, inspection_notes: str) -> None:
     """Update inspection-related metadata for a specific job."""
@@ -1361,110 +1304,175 @@ def mark_supplement_sent(job_id: str) -> None:
     finally:
         conn.close()
 
+def ensure_financials_row(conn: sqlite3.Connection, job_id: str) -> None:
+    """
+    Idempotently ensure a financials row exists for the job.
+    If none exists, inserts a default baseline financials record.
+    """
+    row = conn.execute("SELECT job_id FROM financials WHERE job_id = ?", (job_id,)).fetchone()
+    if not row:
+        conn.execute(
+            """INSERT INTO financials (
+                job_id, revenue_cents, carrier_rcv_cents, material_cost_cents,
+                labor_cost_cents, overhead_pct, canvasser_commission_pct
+            ) VALUES (?, 0, 0, 0, 0, 0.0, 0.0)""",
+            (job_id,)
+        )
+
+
+def apply_payment_ledger_entry(
+    conn: sqlite3.Connection,
+    job_id: str,
+    payment_type: str,
+    amount_cents: int | None = None,
+    date_received: str | None = None,
+    deductible_paid: bool | None = None,
+) -> None:
+    """
+    Writes the payment directly into the financials ledger and updates
+    payment-related fields on the jobs table.
+    """
+    today_iso = date_received or now_utc().date().isoformat()
+    ts_now = now_utc_iso()
+
+    if payment_type == "acv":
+        rec_date = date_received or ts_now
+        conn.execute(
+            "UPDATE financials SET acv_payment_received_at = ? WHERE job_id = ?",
+            (rec_date, job_id)
+        )
+        if amount_cents is not None:
+            conn.execute(
+                """UPDATE jobs 
+                   SET acv_received = 1, acv_received_at = CURRENT_TIMESTAMP, 
+                       acv_check_amount_cents = ?, acv_check_date = ? 
+                   WHERE id = ?""",
+                (amount_cents, today_iso, job_id)
+            )
+
+    elif payment_type == "depreciation":
+        rec_date = date_received or ts_now
+        conn.execute(
+            "UPDATE financials SET depreciation_payment_received_at = ? WHERE job_id = ?",
+            (rec_date, job_id)
+        )
+        if amount_cents is not None:
+            conn.execute(
+                """UPDATE jobs 
+                   SET supplement_received = 1, supplement_received_at = CURRENT_TIMESTAMP, 
+                       supplement_check_amount_cents = ?, supplement_check_date = ? 
+                   WHERE id = ?""",
+                (amount_cents, today_iso, job_id)
+            )
+
+    elif payment_type == "retail":
+        rec_date = date_received or ts_now
+        conn.execute(
+            "UPDATE financials SET retail_payment_received_at = ? WHERE job_id = ?",
+            (rec_date, job_id)
+        )
+
+    elif payment_type == "deductible":
+        dp_val = 1 if deductible_paid else 0
+        if amount_cents is not None:
+            conn.execute(
+                "UPDATE financials SET deductible_paid = ?, deductible_paid_cents = ? WHERE job_id = ?",
+                (dp_val, amount_cents, job_id)
+            )
+        else:
+            conn.execute(
+                "UPDATE financials SET deductible_paid = ? WHERE job_id = ?",
+                (dp_val, job_id)
+            )
+        conn.execute(
+            "UPDATE jobs SET deductible_paid_cents = ? WHERE id = ?",
+            (amount_cents or 0, job_id)
+        )
+
+
+def advance_status_for_payment(
+    conn: sqlite3.Connection,
+    job_id: str,
+    payment_type: str,
+    amount: float | None = None,
+) -> bool:
+    """
+    Attempts to advance the job status based on the payment type.
+    If _update_job_status_internal fails due to an illegal transition
+    (e.g., job is not yet in INVOICED status), logs a warning, leaves status
+    unchanged, and returns False without raising or rolling back the payment.
+    Returns True if the status was successfully transitioned.
+    """
+    status_to_transition = None
+    note = ""
+
+    if payment_type == "acv":
+        status_to_transition = "ACV_PAYMENT_RECEIVED"
+        note = f"ACV payment recorded: ${amount or 0.0:.2f}"
+    elif payment_type == "depreciation":
+        status_to_transition = "DEPRECIATION_PAYMENT_RECEIVED"
+        note = f"Depreciation payment recorded: ${amount or 0.0:.2f}"
+    elif payment_type == "retail":
+        status_to_transition = "RETAIL_PAYMENT_RECEIVED"
+        note = f"Retail payment recorded: ${amount or 0.0:.2f}"
+
+    if payment_type in ("acv", "depreciation"):
+        fin_row = conn.execute(
+            "SELECT acv_payment_received_at, depreciation_payment_received_at FROM financials WHERE job_id = ?",
+            (job_id,)
+        ).fetchone()
+        if fin_row and fin_row["acv_payment_received_at"] and fin_row["depreciation_payment_received_at"]:
+            status_to_transition = "PAYMENT_RECEIVED"
+            note = "Both ACV and Depreciation payments received."
+
+    if not status_to_transition:
+        return False
+
+    try:
+        _update_job_status_internal(conn, job_id, status_to_transition, note)
+        return True
+    except RuntimeError as re:
+        logger.warning(
+            "payment_recorded_status_transition_deferred",
+            job_id=job_id,
+            target_status=status_to_transition,
+            reason=str(re),
+        )
+        return False
+
+
 def record_financial_payment(
     job_id: str,
     payment_type: str,  # 'acv', 'depreciation', 'retail', 'deductible'
     amount: float | None = None,  # in dollars, optional
     date_received: str | None = None,  # date string, optional
     deductible_paid: bool | None = None
-) -> None:
+) -> bool:
     """
     Records granular payments (ACV, Depreciation, Retail) or deductible status
-    on the financials table and triggers the corresponding status transition.
+    on the financials ledger and attempts status progression.
+    Ledger updates succeed and commit even if status advancement cannot occur.
+    Returns True if status advanced, False otherwise.
     """
     conn = get_connection()
     try:
         conn.execute("BEGIN IMMEDIATE")
-        # Ensure financials row exists
-        row = conn.execute("SELECT job_id FROM financials WHERE job_id = ?", (job_id,)).fetchone()
-        if not row:
-            conn.execute("INSERT INTO financials (job_id, revenue_cents, carrier_rcv_cents, material_cost_cents, labor_cost_cents, overhead_pct, canvasser_commission_pct) VALUES (?, 0, 0, 0, 0, 0.0, 0.0)", (job_id,))
-
+        ensure_financials_row(conn, job_id)
         amount_cents = int(round(amount * 100)) if amount is not None else None
-        
-        status_to_transition = None
-        note = ""
-
-        if payment_type == "acv":
-            if date_received:
-                conn.execute(
-                    "UPDATE financials SET acv_payment_received_at = ? WHERE job_id = ?",
-                    (date_received, job_id)
-                )
-            else:
-                conn.execute(
-                    "UPDATE financials SET acv_payment_received_at = CURRENT_TIMESTAMP WHERE job_id = ?",
-                    (job_id,)
-                )
-            if amount_cents is not None:
-                conn.execute(
-                    "UPDATE jobs SET acv_received = 1, acv_received_at = CURRENT_TIMESTAMP, acv_check_amount_cents = ?, acv_check_date = ? WHERE id = ?",
-                    (amount_cents, date_received or __import__('datetime').date.today().isoformat(), job_id)
-                )
-            status_to_transition = "ACV_PAYMENT_RECEIVED"
-            note = f"ACV payment recorded: ${amount or 0.0:.2f}"
-
-        elif payment_type == "depreciation":
-            if date_received:
-                conn.execute(
-                    "UPDATE financials SET depreciation_payment_received_at = ? WHERE job_id = ?",
-                    (date_received, job_id)
-                )
-            else:
-                conn.execute(
-                    "UPDATE financials SET depreciation_payment_received_at = CURRENT_TIMESTAMP WHERE job_id = ?",
-                    (job_id,)
-                )
-            if amount_cents is not None:
-                conn.execute(
-                    "UPDATE jobs SET supplement_received = 1, supplement_received_at = CURRENT_TIMESTAMP, supplement_check_amount_cents = ?, supplement_check_date = ? WHERE id = ?",
-                    (amount_cents, date_received or __import__('datetime').date.today().isoformat(), job_id)
-                )
-            status_to_transition = "DEPRECIATION_PAYMENT_RECEIVED"
-            note = f"Depreciation payment recorded: ${amount or 0.0:.2f}"
-
-        elif payment_type == "retail":
-            if date_received:
-                conn.execute(
-                    "UPDATE financials SET retail_payment_received_at = ? WHERE job_id = ?",
-                    (date_received, job_id)
-                )
-            else:
-                conn.execute(
-                    "UPDATE financials SET retail_payment_received_at = CURRENT_TIMESTAMP WHERE job_id = ?",
-                    (job_id,)
-                )
-            status_to_transition = "RETAIL_PAYMENT_RECEIVED"
-            note = f"Retail payment recorded: ${amount or 0.0:.2f}"
-
-        elif payment_type == "deductible":
-            dp_val = 1 if deductible_paid else 0
-            if amount_cents is not None:
-                conn.execute(
-                    "UPDATE financials SET deductible_paid = ?, deductible_paid_cents = ? WHERE job_id = ?",
-                    (dp_val, amount_cents, job_id)
-                )
-            else:
-                conn.execute(
-                    "UPDATE financials SET deductible_paid = ? WHERE job_id = ?",
-                    (dp_val, job_id)
-                )
-            conn.execute(
-                "UPDATE jobs SET deductible_paid_cents = ? WHERE id = ?",
-                (amount_cents or 0, job_id)
-            )
-
-        if payment_type in ("acv", "depreciation"):
-            fin_row = conn.execute("SELECT acv_payment_received_at, depreciation_payment_received_at FROM financials WHERE job_id = ?", (job_id,)).fetchone()
-            if fin_row and fin_row["acv_payment_received_at"] and fin_row["depreciation_payment_received_at"]:
-                status_to_transition = "PAYMENT_RECEIVED"
-                note = "Both ACV and Depreciation payments received."
-
-        if status_to_transition:
-            _update_job_status_internal(conn, job_id, status_to_transition, note)
-
+        apply_payment_ledger_entry(
+            conn, job_id, payment_type, amount_cents, date_received, deductible_paid
+        )
+        status_advanced = advance_status_for_payment(
+            conn, job_id, payment_type, amount=amount
+        )
         conn.commit()
-        logger.info("recorded_financial_payment", job_id=job_id, payment_type=payment_type)
+        logger.info(
+            "recorded_financial_payment",
+            job_id=job_id,
+            payment_type=payment_type,
+            status_advanced=status_advanced
+        )
+        return status_advanced
     except Exception as e:
         try:
             conn.execute("ROLLBACK")
@@ -1558,7 +1566,7 @@ def generate_invoice_id() -> str:
             "SELECT last_seq FROM invoice_sequence WHERE id = 1"
         ).fetchone()
         seq = row["last_seq"]
-        year_short = _dt.now(__import__('datetime').timezone.utc).strftime("%y")
+        year_short = now_utc().strftime("%y")
         invoice_id = f"WR-{year_short}-{seq:04d}"
         conn.execute("COMMIT")
         logger.info("invoice_id_generated", invoice_id=invoice_id)
@@ -1861,23 +1869,27 @@ def get_completed_jobs() -> list[dict]:
         conn.close()
 
 
-def get_recent_storm_zips_detail(window_hours: int = 72, radius_miles: float = 50.0) -> dict[str, dict]:
+def get_recent_storm_zips_detail(
+    window_hours: int | None = None,
+    radius_miles: float | None = None,
+) -> dict[str, dict]:
     """
-    Returns a dict mapping zipcode -> {
+    Returns a dict mapping normalized zipcode -> {
         "has_recent_hail": bool,
         "has_recent_wind": bool,
         "recent_hail_max_inches": float,
         "recent_wind_max_mph": float
     }
     """
-    from datetime import datetime, timedelta
+    from datetime import timedelta
 
-    from app.config import get_settings
     settings = get_settings()
+    hours = window_hours if window_hours is not None else settings.storm_fresh_window_hours
+    radius = radius_miles if radius_miles is not None else settings.storm_canvassing_radius_miles
     min_hail = settings.storm_alert_min_hail_inches
     min_wind = settings.storm_alert_min_wind_mph
 
-    threshold = (datetime.now(UTC) - timedelta(hours=window_hours)).isoformat()
+    threshold = (now_utc() - timedelta(hours=hours)).isoformat()
     conn = get_connection()
     try:
         cursor = conn.execute("""
@@ -1889,13 +1901,13 @@ def get_recent_storm_zips_detail(window_hours: int = 72, radius_miles: float = 5
                 OR
                 (event_type = 'WIND' AND wind_speed_mph >= ?)
                 OR
-                (event_type NOT IN ('HAIL', 'WIND'))
+                (event_type = 'TORNADO')
               )
             GROUP BY zipcode, event_type
-        """, (threshold, radius_miles, min_hail, min_wind))
+        """, (threshold, radius, min_hail, min_wind))
         res = {}
         for r in cursor.fetchall():
-            zp = str(r["zipcode"] or "").strip()
+            zp = normalize_zip(r["zipcode"])
             if not zp:
                 continue
             etype = str(r["event_type"] or "").upper()
@@ -1922,10 +1934,10 @@ def get_recent_storm_zips_detail(window_hours: int = 72, radius_miles: float = 5
 
 
 def add_storm_flags_to_jobs(jobs: list[dict]) -> list[dict]:
-    """Enriches job records with recent storm attributes based on their ZIP code."""
+    """Enriches job records with recent storm attributes based on their normalized ZIP code."""
     storm_zips = get_recent_storm_zips_detail()
     for job in jobs:
-        job_zip = str(job.get("postal_code") or "").strip()
+        job_zip = normalize_zip(job.get("postal_code"))
         zip_info = storm_zips.get(job_zip, {
             "has_recent_hail": False,
             "has_recent_wind": False,
@@ -1941,10 +1953,11 @@ def add_storm_flags_to_jobs(jobs: list[dict]) -> list[dict]:
 # ============================================================
 
 def get_storm_target_summaries(
-    window_hours: int = 72,
+    window_hours: int | None = None,
     limit: int = 10,
     min_hail: float | None = None,
     min_wind: float | None = None,
+    radius_miles: float | None = None,
 ) -> list[dict]:
     """
     Return the top-N canvassing target areas ranked by max severity score.
@@ -1960,18 +1973,20 @@ def get_storm_target_summaries(
       - last_event_utc (ISO string)
       - event_types (comma-separated list of distinct types)
 
-    Only qualifying events within the configured alert radius and
+    Only qualifying events within the canvassing radius and
     within `window_hours` of now are included.
     """
-    from datetime import datetime, timedelta
+    from datetime import timedelta
 
     settings = get_settings()
+    hours = window_hours if window_hours is not None else settings.storm_fresh_window_hours
+    radius = radius_miles if radius_miles is not None else settings.storm_canvassing_radius_miles
     if min_hail is None:
         min_hail = settings.storm_alert_min_hail_inches
     if min_wind is None:
         min_wind = settings.storm_alert_min_wind_mph
 
-    cutoff = (datetime.now(UTC) - timedelta(hours=window_hours)).isoformat()
+    cutoff = (now_utc() - timedelta(hours=hours)).isoformat()
     conn = get_connection()
     try:
         cursor = conn.execute("""
@@ -2003,7 +2018,7 @@ def get_storm_target_summaries(
             LIMIT ?
         """, (
             cutoff,
-            settings.storm_ingest_radius_miles,
+            radius,
             min_hail,
             min_wind,
             limit,
@@ -2058,7 +2073,7 @@ def get_storm_events_near_job(
     """
     Look up storm events near a job's postal code, respecting alert thresholds.
     """
-    from datetime import datetime, timedelta
+    from datetime import timedelta
 
     settings = get_settings()
     if radius_miles is None:
@@ -2153,7 +2168,6 @@ def get_sales_pipeline_summary() -> dict:
       }
     """
     import json
-    from datetime import datetime
 
     SALES_STAGES = [
         "LEAD_CAPTURED",
@@ -2164,8 +2178,11 @@ def get_sales_pipeline_summary() -> dict:
         "SUPPLEMENT_GENERATED",
         "SUPPLEMENT_APPROVED",
         "SCOPE_APPROVED",
+        "INSTALL_SCHEDULED",
         "INSTALL_COMPLETED",
         "INVOICED",
+        "ACV_PAYMENT_RECEIVED",
+        "PAYMENT_RECEIVED",
         "CLOSED",
     ]
 
@@ -2245,7 +2262,7 @@ def request_review(job_id: str, requested_by: str) -> dict:
         if not row:
             raise ValueError(f"Job {job_id} not found.")
 
-        timestamp_str = datetime.now(UTC).replace(tzinfo=None).isoformat() + "Z"
+        timestamp_str = now_utc_iso()
         conn.execute(
             "UPDATE jobs SET review_requested_at = ?, review_requested_by = ? WHERE id = ?",
             (timestamp_str, requested_by, job_id)

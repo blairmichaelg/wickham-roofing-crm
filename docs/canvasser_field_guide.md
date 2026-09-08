@@ -350,9 +350,9 @@ Contact the office/Tech Admin if:
 The field app contains a live **Storm Activity Monitor** widget located below the intake form.
 
 ### What it displays
-- **Hail Events & Wind Events Counts**: These counts represent the total number of verified hail and wind reports recorded by the National Weather Service (NWS) within a 50-mile radius of the main office in the last 72 hours.
-- **Storm-Target ZIPs**: Displays a list of top storm-impacted ZIP codes. Clicking any of these ZIP codes instantly filters your job list to show only leads within that area.
-- **Recent Alerts List**: Displays the 5 most recent significant storm reports with details (county, magnitude like hail size/wind speed, and time).
+- **Hail Events & Wind Events Counts**: These counts represent the total number of verified hail and wind reports recorded by the National Weather Service (NWS) within a 90-mile canvassing radius centered on Thomasville, GA in the configured storm window.
+- **Storm-Target ZIPs (Hot ZIPs)**: Displays a list of top storm-impacted ZIP codes within the 90-mile service radius. Clicking any of these ZIP codes instantly filters your job list to show only leads within that area.
+- **Recent Alerts List**: Displays significant storm reports with details (county, magnitude like hail size/wind speed, tornado warnings, and time).
 
 ### Actionable Rep Response
 When you see a live, severe in-app banner alert (WebSocket toast) or see high event counts in specific areas on the Storm Activity Monitor card:
@@ -373,8 +373,8 @@ To help close deals faster and streamline nearby jobsite canvassing, the Field A
 - **Credit Conservation**: Generated tools are automatically cached securely in the document vault. Tap it again to retrieve the cached version instantly.
 
 ### 2. 🏘️ Neighbor Outreach Letter PDF
-- **Dynamic Campaign Creation**: Once a job reaches **`INSTALL_COMPLETED`** status, a **Neighbor Letter** button will automatically appear on the job card.
-- **Storm-Grounded Pitch**: Generates a professionally designed, single-page PDF letter featuring our corporate letterhead. The letter references the exact completed job address and highlights NWS storm events that occurred nearby.
+- **Completed Job Social Proof**: Once a job reaches completed installation status (**`INSTALL_COMPLETED`**, **`FINAL_INSPECTION`**, **`FINAL_INSPECTION_COMPLETED`**, **`INVOICED`**, **`PAYMENT_RECEIVED`**, or **`CLOSED`**), a **Neighbor Letter** button will automatically appear on the job card.
+- **Storm-Grounded Pitch**: Generates a professionally designed, single-page PDF letter featuring our corporate letterhead. The letter references the exact completed job address ("We just replaced a roof on your street") and highlights verified NWS storm events that occurred nearby.
 - **Call-to-Action**: Invites neighbors to book a free roofing inspection. You can download and print these to drop at adjacent houses, maximizing lead gen around completed installs.
 
 ## 14. Spoken Field Voice Notes (Voice-to-Text)
@@ -399,6 +399,4 @@ If an offline item fails during automatic replay (for example, if network connec
 
 ---
 
-*This guide reflects the field app as of version `2.5.8`. If the app's
-screens, buttons, or error messages change in a future update, this
-guide should be reviewed and updated to match.*
+*This guide reflects the field app as of version `2.8.17`. If the app's screens, buttons, or error messages change in a future update, this guide should be reviewed and updated to match.*

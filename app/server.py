@@ -18,12 +18,13 @@ Usage:
 from __future__ import annotations
 
 import os
+import time
 from contextlib import asynccontextmanager
 
 import structlog
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -202,6 +203,42 @@ def create_app() -> FastAPI:
             return response
 
     application.add_middleware(NoCacheMiddleware)
+
+    # --- Request timing & access metrics middleware ---
+    @application.middleware("http")
+    async def request_timing_middleware(request: Request, call_next):
+        start_time = time.time()
+        response = await call_next(request)
+        duration_ms = round((time.time() - start_time) * 1000, 2)
+        access_logger = structlog.get_logger("http.access")
+        access_logger.info(
+            "http_request_finished",
+            method=request.method,
+            path=request.url.path,
+            status_code=response.status_code,
+            duration_ms=duration_ms,
+        )
+        return response
+
+    # --- Structured error handling ---
+    @application.exception_handler(HTTPException)
+    async def http_exception_handler(request: Request, exc: HTTPException):
+        if isinstance(exc.detail, dict):
+            error_code = exc.detail.get("error_code", "ERROR")
+            message = exc.detail.get("message") or exc.detail.get("detail", str(exc.detail))
+            content = {
+                "error_code": error_code,
+                "message": message,
+                "detail": message,
+            }
+        else:
+            content = {"detail": exc.detail}
+
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=content,
+            headers=getattr(exc, "headers", None)
+        )
 
     # --- Auth redirect middleware ---
     @application.middleware("http")

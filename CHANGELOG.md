@@ -1,5 +1,36 @@
 # Changelog
 
+## [2.8.17] - 2026-09-08
+### Changed (Production Readiness, Pipeline Decoupling, Storm Canvassing & Observability Overhaul)
+
+- **Financial Payments & Job Status Decoupling (`app/core/database.py`)**:
+  - Decomposed monolithic `record_financial_payment` into 3 discrete helpers:
+    - `ensure_financials_row(conn, job_id)`: Idempotently creates base financials row if missing.
+    - `apply_payment_ledger_entry(conn, job_id, payment_type, amount_cents, ...)`: Updates payment columns and `last_payment_received_at`.
+    - `advance_status_for_payment(conn, job_id, payment_type)`: Safe transition wrapper around `_update_job_status_internal`.
+  - Implemented Option B payment recording: Accounting can record checks/payments at any job status without failing transaction if status advancement is not permitted by the state machine.
+- **Sales & Field Pipeline Visibility Alignment (`app/core/database.py`, `app/api/field_routes.py`, `app/templates/`)**:
+  - Extended Admin `SALES_STAGES` to include `INSTALL_SCHEDULED`, `ACV_PAYMENT_RECEIVED`, and `PAYMENT_RECEIVED`.
+  - Expanded Field `SALES_STAGES` to 9 milestone stages (`LEAD_CAPTURED`, `CONTINGENCY_SIGNED`, `CLAIM_FILED`, `RETAIL_CONTRACT_SIGNED`, `SCOPE_APPROVED`, `INSTALL_SCHEDULED`, `INSTALL_COMPLETED`, `PAYMENT_RECEIVED`, `CLOSED`).
+  - Guaranteed absolute field privacy: zero financial/dollar totals exposed to field representatives.
+  - Relabeled "Speed to Lead" metrics across Admin and Field dashboards to "Avg Time to Contract".
+- **Storm Pipeline & Canvassing Intelligence (`app/config.py`, `app/core/database.py`, `app/api/field_routes.py`)**:
+  - Configured dual storm time windows: `storm_fresh_window_hours: 48` (fresh radar alerts) and `storm_canvassing_window_hours: 168` (7-day canvassing target analysis).
+  - Expanded canvassing radius to 90 miles centered on Thomasville, GA (`storm_canvassing_radius_miles: 90.0`).
+  - Added centralized `normalize_zip()` in `app/core/utils.py` and enforced on lead intake, storm ingestion, and queries.
+  - Standardized storm event filtering to include explicit `TORNADO` event type.
+  - Added field storm targets endpoint `GET /api/field/storms/targets` exposing prioritized weather targets without financial leakage.
+- **Review Requests, Referrals & Neighbor Letters (`app/api/field_routes.py`, `app/api/office_routes.py`, `app/templates/`)**:
+  - Gated review requests strictly to completed installations (`ALLOWED_REVIEW_STATUSES`: `INSTALL_COMPLETED`, `FINAL_INSPECTION`, `FINAL_INSPECTION_COMPLETED`, `INVOICED`, `PAYMENT_RECEIVED`, `CLOSED`).
+  - Restricted neighbor letters strictly to post-completion proof (removed pre-construction `SCOPE_APPROVED`/`SUPPLEMENT_APPROVED`, added post-build payment statuses).
+  - Surfaced review requested indicators on field job cards and review/referral badges in job details.
+- **UTC Standardization & QBO Cleanup (`app/core/utils.py`, `app/core/database.py`)**:
+  - Added central `now_utc()` and `now_utc_iso()` utilities, replacing dynamic `__import__('datetime')` and naive datetimes.
+  - Removed legacy two-step QBO export functions (`get_qbo_export_batch`, `mark_qbo_exported`) in favor of atomic `atomic_qbo_export()`.
+- **Structured Error Responses & Request Timing (`app/core/constants.py`, `app/server.py`)**:
+  - Defined standard `ErrorCode` constants and registered global FastAPI exception normalization.
+  - Added ASGI `http.access` request timing middleware measuring per-request latency via structlog.
+
 ## [2.8.16] - 2026-09-06
 ### Fixed (Close Remaining Low-Contrast Text Instances in Field Portal)
 

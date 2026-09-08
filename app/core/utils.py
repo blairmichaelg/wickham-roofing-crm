@@ -6,7 +6,32 @@ These are thin helpers consumed across the application layer.
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
+
+
+def now_utc() -> datetime:
+    """Return timezone-aware current UTC datetime."""
+    return datetime.now(UTC)
+
+
+def now_utc_iso() -> str:
+    """Return canonical ISO-8601 UTC string with Z suffix and second precision."""
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def normalize_zip(zip_code: str | None) -> str:
+    """
+    Normalize postal/ZIP codes to standard 5-digit zero-padded format.
+    Strips non-digits, extracts up to 5 digits, and left-pads with zeros.
+    Returns empty string if invalid or empty.
+    """
+    if not zip_code:
+        return ""
+    digits = re.sub(r"\D", "", str(zip_code))
+    if not digits:
+        return ""
+    return digits[:5].zfill(5)
 
 
 def days_since(date_str: str) -> int:

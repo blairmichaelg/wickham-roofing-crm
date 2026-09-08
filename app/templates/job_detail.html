@@ -247,6 +247,26 @@
                             </div>
                             {% endif %}
                         </div>
+
+                        <!-- Review & Referral Information -->
+                        <div class="border-t border-gray-700/60 pt-3 space-y-2">
+                            <p class="text-xs text-gray-400 uppercase font-semibold">Review & Referral</p>
+                            <div class="flex flex-wrap gap-2 text-xs">
+                                {% if job.review_requested_at %}
+                                <span class="bg-amber-950/80 text-amber-300 border border-amber-700/80 px-2 py-1 rounded font-medium flex items-center gap-1" title="Review requested by {{ job.review_requested_by or 'Unknown' }} on {{ job.review_requested_at }}">
+                                    ⭐ Review Requested: {{ job.review_requested_at[:10] }} ({{ job.review_requested_by or 'Rep' }})
+                                </span>
+                                {% else %}
+                                <span class="bg-gray-900 text-gray-400 border border-gray-700 px-2 py-1 rounded">⭐ No Review Requested</span>
+                                {% endif %}
+
+                                {% if job.referral_code or job.referral_source %}
+                                <span class="bg-indigo-950/80 text-indigo-300 border border-indigo-700/80 px-2 py-1 rounded font-medium flex items-center gap-1">
+                                    🎁 Referral: {{ job.referral_source or 'Source' }}{% if job.referral_code %} (Code: {{ job.referral_code }}){% endif %}
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
                     </div>
                 </div>
 

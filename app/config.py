@@ -115,6 +115,26 @@ class Settings(BaseSettings):
         default=15,
         description="Interval in minutes at which to run the storm ingestion task."
     )
+    storm_fresh_window_hours: int = Field(
+        default=48,
+        description="Hours look-back window for fresh storm alerts."
+    )
+    storm_canvassing_window_hours: int = Field(
+        default=168,
+        description="Hours look-back window for 7-day storm canvassing."
+    )
+    storm_canvassing_radius_miles: float = Field(
+        default=90.0,
+        description="Radius in miles around the office center for canvassing targeting."
+    )
+    storm_canvassing_center_city: str = Field(
+        default="Thomasville",
+        description="City center for storm canvassing operations."
+    )
+    storm_canvassing_center_state: str = Field(
+        default="GA",
+        description="State center for storm canvassing operations."
+    )
 
     @property
     def get_db_path(self) -> str:

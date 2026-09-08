@@ -33,10 +33,17 @@ from app.api.auth import get_current_claims, get_current_role, verify_field
 from app.config import FIELD_DOCS_DIR
 from app.core.cache import get_cached_analyses_for_job
 from app.core.climate_lookup import is_ice_barrier_required
-from app.core.database import get_connection, insert_job_document, update_job_status
+from app.core.constants import ErrorCode
+from app.core.database import (
+    JobStatus,
+    get_connection,
+    insert_job_document,
+    update_job_status,
+)
 from app.core.inspection_models import InspectionJob, get_stable_photos
 from app.core.notifications import notifier
 from app.core.upload_utils import stream_upload_safely
+from app.core.utils import normalize_zip, now_utc, now_utc_iso
 from app.services.field_access import assert_field_rep_owns_job
 from app.services.inspection_summary import get_inspection_summary
 from app.services.rate_limit import check_rate_limit
@@ -117,10 +124,11 @@ def _sync_create_new_job(job_id: str, inv_id: str, payload: LeadIntakePayload, i
     try:
         initial_history = [{
             "status": "LEAD_CAPTURED",
-            "timestamp": datetime.now(__import__('datetime').timezone.utc).replace(tzinfo=None).isoformat() + "Z",
+            "timestamp": now_utc_iso(),
             "note": "Initial canvasser intake via Wickham Roofing CRM"
         }]
         
+        norm_zip = normalize_zip(payload.postal_code)
         conn.execute('''
             INSERT INTO jobs (
                 id, invoice_id, homeowner_name, address_line1, city, state, postal_code, 
@@ -129,7 +137,7 @@ def _sync_create_new_job(job_id: str, inv_id: str, payload: LeadIntakePayload, i
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             job_id, inv_id, payload.homeowner_name, payload.address_line1, payload.city,
-            payload.state, payload.postal_code, payload.phone, payload.email,
+            payload.state, norm_zip, payload.phone, payload.email,
             payload.claim_number, payload.insurer_name, "LEAD_CAPTURED",
             json.dumps(initial_history), payload.job_type,
             ice_barrier, "2021_IRC", canvasser_name, canvasser_rep_id
@@ -751,7 +759,7 @@ async def contingency_sign(job_id: str, payload: ContingencySignaturePayload, re
             secure_ip = forwarded.split(",")[0].strip()
             
         secure_ua = request.headers.get("User-Agent", "Unknown UA")
-        timestamp_utc = datetime.now(__import__('datetime').timezone.utc).replace(microsecond=0).isoformat() + "Z"
+        timestamp_utc = now_utc_iso()
 
         from app.services.pdf import PDFGenerator
         pdf_gen = PDFGenerator()
@@ -836,7 +844,7 @@ async def sign_retail_contract(job_id: str, payload: RetailContractSignaturePayl
             secure_ip = forwarded.split(",")[0].strip()
             
         secure_ua = request.headers.get("User-Agent", "Unknown UA")
-        timestamp_utc = datetime.now(__import__('datetime').timezone.utc).replace(microsecond=0).isoformat() + "Z"
+        timestamp_utc = now_utc_iso()
 
         from app.services.pdf.documents import DocumentsGenerator
         pdf_gen = DocumentsGenerator()
@@ -910,7 +918,10 @@ async def get_field_pipeline_summary(claims: dict = Depends(get_current_claims))
                 "CONTINGENCY_SIGNED": 0,
                 "CLAIM_FILED": 0,
                 "RETAIL_CONTRACT_SIGNED": 0,
+                "SCOPE_APPROVED": 0,
+                "INSTALL_SCHEDULED": 0,
                 "INSTALL_COMPLETED": 0,
+                "PAYMENT_RECEIVED": 0,
                 "CLOSED": 0,
             },
             "total_active": 0,
@@ -924,7 +935,10 @@ async def get_field_pipeline_summary(claims: dict = Depends(get_current_claims))
             "CONTINGENCY_SIGNED",
             "CLAIM_FILED",
             "RETAIL_CONTRACT_SIGNED",
+            "SCOPE_APPROVED",
+            "INSTALL_SCHEDULED",
             "INSTALL_COMPLETED",
+            "PAYMENT_RECEIVED",
             "CLOSED",
         ]
         
@@ -975,23 +989,67 @@ async def get_field_pipeline_summary(claims: dict = Depends(get_current_claims))
         conn.close()
 
 
+@router.get("/storms/targets")
+async def get_field_storm_targets(
+    limit: int = 15,
+    role: str = Depends(verify_field)
+):
+    """
+    Fetch prioritized storm canvassing target areas for field reps.
+    Exposes only physical weather parameters and canvassing priority metrics (no financials).
+    """
+    from app.config import get_settings
+    from app.core.database import get_storm_target_summaries
+
+    settings = get_settings()
+    raw_targets = await asyncio.to_thread(
+        get_storm_target_summaries,
+        window_hours=settings.storm_canvassing_window_hours,
+        limit=limit,
+        radius_miles=settings.storm_canvassing_radius_miles,
+    )
+    sanitized = []
+    for t in raw_targets:
+        zip_val = t.get("zipcode", "")
+        sanitized.append({
+            "zip": zip_val,
+            "zipcode": zip_val,
+            "location": t.get("location", "Unknown"),
+            "event_count": t.get("event_count", 0),
+            "hail_events": t.get("event_count", 0),  # or hail events count
+            "max_hail": t.get("max_hail_inches", 0.0),
+            "max_hail_inches": t.get("max_hail_inches", 0.0),
+            "wind_events": t.get("event_count", 0),
+            "max_wind": t.get("max_wind_mph", 0.0),
+            "max_wind_mph": t.get("max_wind_mph", 0.0),
+            "priority_label": t.get("priority_label", "Standard"),
+            "reasons": t.get("priority_reason", ""),
+            "priority_reason": t.get("priority_reason", ""),
+            "has_tornado": t.get("has_tornado", False),
+            "latest_event_time_utc": t.get("latest_event_time_utc", ""),
+        })
+    return {"status": "success", "count": len(sanitized), "targets": sanitized}
+
+
 @router.get("/storms/{zipcode}")
 async def get_zip_storms(
     zipcode: str,
-    window_hours: int = 72,
+    window_hours: int | None = None,
     min_hail: float | None = None,
     min_wind: float | None = None,
     role: str = Depends(verify_field)
 ):
     """Fetch recent storm events for a given zip code for field sales reps."""
-    from datetime import UTC, datetime, timedelta
+    from datetime import timedelta
 
     from app.config import get_settings
     settings = get_settings()
+    hours = window_hours if window_hours is not None else settings.storm_fresh_window_hours
     hail_threshold = min_hail if min_hail is not None else settings.storm_alert_min_hail_inches
     wind_threshold = min_wind if min_wind is not None else settings.storm_alert_min_wind_mph
 
-    cutoff = (datetime.now(UTC) - timedelta(hours=window_hours)).isoformat()
+    clean_zip = normalize_zip(zipcode)
+    cutoff = (now_utc() - timedelta(hours=hours)).isoformat()
     conn = get_connection()
     try:
         cursor = conn.execute(
@@ -1005,13 +1063,13 @@ async def get_zip_storms(
                 OR
                 (event_type = 'WIND' AND wind_speed_mph >= ?)
                 OR
-                (event_type NOT IN ('HAIL', 'WIND'))
+                (event_type = 'TORNADO')
               )
             GROUP BY event_date, event_type 
             ORDER BY event_date DESC 
             LIMIT 5
             """,
-            (zipcode.strip(), cutoff, hail_threshold, wind_threshold)
+            (clean_zip, cutoff, hail_threshold, wind_threshold)
         )
         raw_events = [dict(r) for r in cursor.fetchall()]
         formatted_events = []
@@ -1041,7 +1099,7 @@ async def get_zip_storms(
 
         cursor_ref = conn.execute("SELECT MAX(ingested_at) FROM storm_events")
         row_ref = cursor_ref.fetchone()
-        last_refreshed = row_ref[0] if (row_ref and row_ref[0]) else datetime.now(UTC).isoformat()
+        last_refreshed = row_ref[0] if (row_ref and row_ref[0]) else now_utc_iso()
 
         return {"events": formatted_events, "last_refreshed_utc": last_refreshed}
     finally:
@@ -1156,6 +1214,30 @@ async def field_request_review(
 
     assert_field_rep_owns_job(claims, job_id, request.method)
 
+    # Review requests are gated to completed installations
+    conn = get_connection()
+    try:
+        j_row = conn.execute("SELECT status FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        if not j_row:
+            raise HTTPException(status_code=404, detail="Job not found.")
+        current_status = j_row["status"]
+    finally:
+        conn.close()
+
+    ALLOWED_REVIEW_STATUSES = {
+        JobStatus.INSTALL_COMPLETED.value,
+        JobStatus.FINAL_INSPECTION.value,
+        JobStatus.FINAL_INSPECTION_COMPLETED.value,
+        JobStatus.INVOICED.value,
+        JobStatus.PAYMENT_RECEIVED.value,
+        JobStatus.CLOSED.value,
+    }
+    if current_status not in ALLOWED_REVIEW_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail="Reviews can only be requested on completed installations."
+        )
+
     rep_name = claims.get("rep_name") or payload.requested_by or "field_rep"
     from app.core.database import request_review
     try:
@@ -1226,7 +1308,8 @@ async def get_neighbor_letter(job_id: str, request: Request, claims: dict = Depe
 
         VALID_STATUSES = {
             "INSTALL_COMPLETED", "FINAL_INSPECTION", "FINAL_INSPECTION_COMPLETED",
-            "INVOICED", "CLOSED", "SUPPLEMENT_APPROVED", "SCOPE_APPROVED",
+            "INVOICED", "PAYMENT_RECEIVED", "ACV_PAYMENT_RECEIVED",
+            "DEPRECIATION_PAYMENT_RECEIVED", "RETAIL_PAYMENT_RECEIVED", "CLOSED",
         }
         if job.get("status") not in VALID_STATUSES:
             raise HTTPException(

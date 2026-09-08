@@ -345,10 +345,10 @@
                     </div>
                     <div class="p-3 bg-gray-900/60 rounded-lg border border-gray-800">
                         <div class="text-xl font-bold text-orange-400" id="repAvgSpeedToLead">--h</div>
-                        <div class="text-[10px] text-gray-300 uppercase tracking-wider font-bold">Speed-to-Lead</div>
+                        <div class="text-[10px] text-gray-300 uppercase tracking-wider font-bold">Avg Time to Contract</div>
                     </div>
                 </div>
-                <div id="repPipelineStages" class="grid grid-cols-3 gap-2 text-center text-xs">
+                <div id="repPipelineStages" class="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2 text-center text-xs">
                     <div class="p-2 bg-gray-900/40 rounded border border-gray-850">
                         <div class="font-extrabold text-white" id="count_LEAD_CAPTURED">0</div>
                         <div class="text-[9px] text-gray-300 uppercase font-bold mt-1">Leads</div>
@@ -366,8 +366,20 @@
                         <div class="text-[9px] text-gray-300 uppercase font-bold mt-1">Retail Signed</div>
                     </div>
                     <div class="p-2 bg-gray-900/40 rounded border border-gray-850">
+                        <div class="font-extrabold text-white" id="count_SCOPE_APPROVED">0</div>
+                        <div class="text-[9px] text-gray-300 uppercase font-bold mt-1">Scope Approved</div>
+                    </div>
+                    <div class="p-2 bg-gray-900/40 rounded border border-gray-850">
+                        <div class="font-extrabold text-white" id="count_INSTALL_SCHEDULED">0</div>
+                        <div class="text-[9px] text-gray-300 uppercase font-bold mt-1">Scheduled</div>
+                    </div>
+                    <div class="p-2 bg-gray-900/40 rounded border border-gray-850">
                         <div class="font-extrabold text-white" id="count_INSTALL_COMPLETED">0</div>
                         <div class="text-[9px] text-gray-300 uppercase font-bold mt-1">Installs</div>
+                    </div>
+                    <div class="p-2 bg-gray-900/40 rounded border border-gray-850">
+                        <div class="font-extrabold text-white" id="count_PAYMENT_RECEIVED">0</div>
+                        <div class="text-[9px] text-gray-300 uppercase font-bold mt-1">Paid in Full</div>
                     </div>
                     <div class="p-2 bg-gray-900/40 rounded border border-gray-850">
                         <div class="font-extrabold text-white" id="count_CLOSED">0</div>
@@ -648,6 +660,10 @@
                 const hasStorm = job.has_recent_hail || job.has_recent_wind;
                 const nextActionHint = getJobNextActionHint(job.status, hasStorm);
 
+                const reviewBadge = job.review_requested_at
+                    ? `<span class="inline-block text-[10px] bg-amber-950/80 text-amber-300 border border-amber-700/80 px-2 py-0.5 rounded font-bold mr-1" title="Review requested on ${job.review_requested_at}">⭐ Review Requested</span>`
+                    : '';
+
                 const card = document.createElement('div');
                 card.className = `bg-gray-800 border ${isNakedLead ? 'border-amber-600/60' : 'border-gray-700'} p-4 rounded-lg shadow-md space-y-3`;
                 card.innerHTML = `
@@ -656,6 +672,7 @@
                             <div class="flex items-center gap-2 flex-wrap mb-1">
                                 <h3 class="text-white font-bold text-lg">${job.homeowner_name}</h3>
                                 ${stormBadges}
+                                ${reviewBadge}
                             </div>
                             <p class="text-gray-300 text-sm">${job.address_line1} (${job.postal_code || ''})</p>
                             <p class="text-xs text-purple-300 italic mt-1.5 flex items-center gap-1">
@@ -675,7 +692,7 @@
                             <button onclick="loadSalesTools('${job.id}', this)" class="text-purple-300 text-xs font-bold bg-purple-950/80 px-2.5 py-1.5 rounded border border-purple-700/80 flex items-center gap-1 hover:bg-purple-900">
                                 🤖 Sales Tools
                             </button>
-                            ${['INSTALL_COMPLETED','FINAL_INSPECTION','FINAL_INSPECTION_COMPLETED','INVOICED','CLOSED','SUPPLEMENT_APPROVED','SCOPE_APPROVED'].includes(job.status) ? '<a href="/api/field/jobs/' + job.id + '/docs/neighbor-letter" target="_blank" class="text-orange-300 hover:text-white text-xs font-bold bg-orange-950/80 px-2.5 py-1.5 rounded border border-orange-700/80 flex items-center gap-1">🏘️ Neighbor Letter</a>' : ''}
+                            ${['INSTALL_COMPLETED','FINAL_INSPECTION','FINAL_INSPECTION_COMPLETED','INVOICED','CLOSED','PAYMENT_RECEIVED','ACV_PAYMENT_RECEIVED','DEPRECIATION_PAYMENT_RECEIVED','RETAIL_PAYMENT_RECEIVED'].includes(job.status) ? '<a href="/api/field/jobs/' + job.id + '/docs/neighbor-letter" target="_blank" class="text-orange-300 hover:text-white text-xs font-bold bg-orange-950/80 px-2.5 py-1.5 rounded border border-orange-700/80 flex items-center gap-1">🏘️ Neighbor Letter</a>' : ''}
                             ${isNakedLead ? '<a href="/api/field/jobs/' + job.id + '/docs/contingency" target="_blank" class="text-blue-300 hover:text-white text-xs font-bold bg-blue-950/80 px-2.5 py-1.5 rounded border border-blue-700/80 flex items-center gap-1">✉️ Unsigned PDF</a><button onclick="emailUnsignedAgreement(\'' + job.id + '\', \'' + encodeURIComponent(job.homeowner_name) + '\', \'' + encodeURIComponent(job.email || '') + '\')" class="text-amber-300 hover:text-white text-xs font-bold bg-amber-950/80 px-2.5 py-1.5 rounded border border-amber-700/80 flex items-center gap-1">✉️ Email Client</button>' : ''}
                             ${job.status === 'RETAIL_CONTRACT_SIGNED' ? '<button onclick="downloadRetailNoticeOfCancellation(\'' + job.id + '\')" class="text-emerald-300 hover:text-white text-xs font-bold bg-emerald-950/80 px-2.5 py-1.5 rounded border border-emerald-700/80 flex items-center gap-1">📄 NOC PDF</button><button onclick="emailRetailNoticeOfCancellation(\'' + job.id + '\', \'' + encodeURIComponent(job.homeowner_name) + '\', \'' + encodeURIComponent(job.email || '') + '\')" class="text-amber-300 hover:text-white text-xs font-bold bg-amber-950/80 px-2.5 py-1.5 rounded border border-amber-700/80 flex items-center gap-1">✉️ Email NOC</button>' : ''}
                         </div>
@@ -1901,7 +1918,17 @@
                 
                 const summaryData = await StormRadar.fetchStormSummary(72, FIELD_TOKEN);
                 const summary = summaryData.summary || {};
-                const targetZips = summaryData.target_zips || [];
+                let targetZips = [];
+                try {
+                    const targetsResp = await fetch('/api/field/storms/targets', { headers: { 'x-internal-token': FIELD_TOKEN } });
+                    if (targetsResp.ok) {
+                        const targetsData = await targetsResp.json();
+                        targetZips = targetsData.targets || [];
+                    }
+                } catch(e) {}
+                if (targetZips.length === 0) {
+                    targetZips = summaryData.target_zips || [];
+                }
                 
                 let totalHail = 0;
                 let totalWind = 0;
