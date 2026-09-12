@@ -146,6 +146,25 @@ To keep the system organized, certain tools are restricted based on your role.
 
 ---
 
+## 7. Commercial Contracts, Progress Billing & Retainage
+
+Commercial roofing projects operate under multi-stage progress billing rather than the residential insurance ACV/depreciation structure.
+
+### Key Concepts
+- **Job Type (`COMMERCIAL`)**: Distinct from `INSURANCE` and `RETAIL`. Gating commercial-specific invoicing, Schedule of Values (SOV), and progress billing workflows.
+- **Schedule of Values (SOV)**: The approved line-item budget (e.g. Tear-Off, Membrane, Flashing, Coping) establishing the maximum contractual value.
+- **Deterministic 100% Billing Cap**: The accounting engine mathematically prevents billing more than 100% of any SOV line item or the total contract across cumulative billing cycles.
+- **Contract-Negotiated Retainage**: Retainage percentage defaults to the system configuration (10.0%) but is **fully configurable per contract/job**.
+
+> [!IMPORTANT]
+> **Legal Disclaimer — Confirm Terms with Legal Counsel**:
+> State statutory retainage limits (e.g., Georgia private vs. public works under O.C.G.A. § 13-10-80), notice-of-commencement rules, and mechanic's lien deadlines vary widely across jurisdictions and contract types. System defaults are operational thresholds, **not statutory requirements**. Always review specific contract terms and verify legal retainage/lien requirements with legal counsel.
+
+### Exporting Progress Invoices to QuickBooks Online
+Commercial progress billing applications export to QuickBooks Online via `export_progress_billing_to_csv()`, outputting formatted CSV files with unique invoice identifiers (e.g., `PROG-JOBID-APP1`) detailing current-period progress amounts and retainage accounting lines.
+
+---
+
 ## Frequently Asked Questions (FAQ)
 
 **Q: Why does the commission calculate from revenue instead of profit?**

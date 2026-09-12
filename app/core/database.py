@@ -321,8 +321,15 @@ def run_migrations() -> None:
             m25.up(conn)
             conn.execute("UPDATE schema_version SET version = 25, applied_at = CURRENT_TIMESTAMP WHERE id = 1")
 
+        if current_version < 26:
+            import importlib
+            m26 = importlib.import_module("app.core.migrations.0026_add_commercial_progress_billing")
+            m26.up(conn)
+            conn.execute("UPDATE schema_version SET version = 26, applied_at = CURRENT_TIMESTAMP WHERE id = 1")
+
         conn.execute("COMMIT")
-        logger.info("migrations_applied", current_version=current_version, target_version=25)
+        logger.info("migrations_applied", current_version=current_version, target_version=26)
+
         
         # Since seed logic was removed from up(), do it here outside the transaction
         if current_version < 1:

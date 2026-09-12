@@ -204,3 +204,56 @@ def generate_qbo_invoice(job_id: str, bom: MaterialBOM, customer_name: str = "Un
     # when the EagleView PDF upload pipeline generates a reference CSV.
     
     return csv_path
+
+
+def export_progress_billing_to_csv(
+    job_id: str,
+    application_no: int,
+    line_items: list[dict],
+    customer_name: str = "Unknown Customer",
+    invoice_date: str | None = None,
+    due_date: str | None = None,
+) -> str:
+    """Generate a QuickBooks Online CSV export specifically for a Commercial Progress Billing application.
+    
+    Args:
+        job_id: The unique job identifier.
+        application_no: The billing application cycle number.
+        line_items: List of line item dicts containing description, amount (dollars), and optional item code.
+        customer_name: Name of the commercial client/owner.
+        invoice_date: Optional ISO date string.
+        due_date: Optional ISO date string.
+        
+    Returns:
+        str: String path to the generated CSV file.
+    """
+    now_date = datetime.now(__import__('datetime').timezone.utc).strftime("%Y-%m-%d")
+    inv_date = invoice_date or now_date
+    d_date = due_date or now_date
+    
+    lines: list[InvoiceLine] = []
+    for item in line_items:
+        amt = float(item.get("amount", 0.0))
+        if amt <= 0:
+            continue
+        code = item.get("item_code") or item.get("item", "commercial_progress")
+        desc = item.get("description", f"Application #{application_no} Progress")
+        lines.append(
+            InvoiceLine(
+                item=code,
+                description=desc,
+                quantity=1.0,
+                rate=amt,
+                amount=amt,
+            )
+        )
+        
+    export = InvoiceExport(
+        invoice_no=f"PROG-{job_id[:6].upper()}-APP{application_no}",
+        customer=customer_name,
+        invoice_date=inv_date,
+        due_date=d_date,
+        lines=lines,
+    )
+    return export_to_csv(export)
+

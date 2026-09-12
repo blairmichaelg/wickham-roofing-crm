@@ -5,11 +5,19 @@ Shared domain and infrastructure constants.
 from enum import StrEnum
 
 
+class JobType(StrEnum):
+    """Canonical roofing job types gating workflows, legal disclosures, and billing logic."""
+    INSURANCE = "INSURANCE"
+    RETAIL = "RETAIL"
+    COMMERCIAL = "COMMERCIAL"
+
+
 class StormEventType(StrEnum):
     """Canonical storm event types recognized by NOAA storm feeds and canvassing."""
     HAIL = "HAIL"
     WIND = "WIND"
     TORNADO = "TORNADO"
+
 
 
 class ErrorCode(StrEnum):

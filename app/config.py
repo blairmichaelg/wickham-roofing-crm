@@ -136,6 +136,21 @@ class Settings(BaseSettings):
         description="State center for storm canvassing operations."
     )
 
+    # --- Commercial Progress Billing & Statutory Retainage / Lien Tracking ---
+    default_commercial_retainage_percent: float = Field(
+        default=10.0,
+        description="Default retainage percentage (e.g. 10.0 for 10%) for commercial contracts. Configurable per job/contract; actual legal terms must be confirmed with counsel.",
+    )
+    commercial_lien_deadline_days: int = Field(
+        default=90,
+        description="Default days after last labor/materials furnished to track statutory lien deadline. Requires legal counsel confirmation per jurisdiction.",
+    )
+    commercial_lien_warning_days: int = Field(
+        default=15,
+        description="Days prior to commercial lien deadline to dispatch high-priority accounting/admin alerts.",
+    )
+
+
     @property
     def get_db_path(self) -> str:
         """
