@@ -192,3 +192,36 @@ def test_qbo_progress_billing_csv_export(tmp_path, monkeypatch):
     assert "PROG-TEST-J-APP2,Grandview Corporate Center" in content
     assert "Phase 1 Flat Decking,1.00,15000.00,15000.00" in content
     assert "ISO Board Installation,1.00,8500.00,8500.00" in content
+
+
+def test_pydantic_v2_model_dump_and_serialization():
+    """Verify Pydantic V2 model_dump and model_dump_json serialization."""
+    item = SOVItem(
+        id="sov-100",
+        item_code="ROOF-01",
+        description="Structural Deck Replacement",
+        scheduled_value_cents=450000,
+    )
+    dumped = item.model_dump()
+    assert dumped == {
+        "id": "sov-100",
+        "item_code": "ROOF-01",
+        "description": "Structural Deck Replacement",
+        "scheduled_value_cents": 450000,
+    }
+
+    json_str = item.model_dump_json()
+    assert '"scheduled_value_cents":450000' in json_str or '"scheduled_value_cents": 450000' in json_str
+
+    app_res = compute_progress_billing(
+        schedule=[item],
+        line_inputs=[ProgressItemInput(schedule_item_id="sov-100", work_completed_cents=200000, stored_materials_cents=0)],
+        application_no=1,
+        retainage_percent=10.0,
+    )
+    app_dump = app_res.model_dump()
+    assert app_dump["application_no"] == 1
+    assert app_dump["net_payment_due_cents"] == 180000
+    assert len(app_dump["items"]) == 1
+    assert isinstance(app_res.model_dump_json(), str)
+
