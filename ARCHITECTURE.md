@@ -102,6 +102,17 @@ To avoid monolithic API files and enforce clean architectural domain boundaries,
 - **`app/api/office/router.py`**: Composite router registering all domain modules under `/api/office` (`office_ux` tag).
 - **`app/api/office_routes.py`**: Re-export shim maintaining 100% backward compatibility for existing callers, test suites, and dynamic patch targets.
 
+### F. API Architecture & Domain Decomposition (Field Router)
+Similarly, `app/api/field_routes.py` has been decomposed into domain-focused submodules within `app/api/field/`, mounted under the unified `/api/field` prefix (with strict `verify_field` RBAC gate):
+- **`app/api/field/leads.py`**: Field lead intake (`POST /jobs`), rep-scoped job listing (`GET /jobs`), job detail inspection, and status management.
+- **`app/api/field/photos.py`**: Photo and voice note ingestion (`POST /jobs/{id}/photos`, `POST /jobs/{id}/voice`), orientation validation, and metadata extraction.
+- **`app/api/field/signatures.py`**: Customer agreement and contract signature capture (`POST /jobs/{id}/sign-contingency`, `POST /jobs/{id}/sign-retail`), base64 decoding, format sanitization, and state transitions.
+- **`app/api/field/documents.py`**: Field document retrieval, PDF agreement generation on the fly, and download vaults (`GET /jobs/{id}/documents/unsigned-contingency`, etc.).
+- **`app/api/field/sales_tools.py`**: Real-time sales enablement, objection handling, pitch scripts, and Gemini-assisted pitch generation (`POST /door-pitch`, `POST /objection`).
+- **`app/api/field/radar.py`**: Field storm radar, storm activity summaries, and localized target prioritization (`GET /storms/targets`, `GET /storms/{zipcode}`).
+- **`app/api/field/router.py`**: Composite router registering all domain modules under `/api/field` with RBAC verification.
+- **`app/api/field_routes.py`**: Re-export shim maintaining 100% backward compatibility for existing callers and test patch targets.
+
 ---
 
 ## 4. Security & Isolation Boundaries
