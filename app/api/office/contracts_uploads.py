@@ -41,6 +41,7 @@ router = APIRouter()
 
 def _detect_pdf_format(p: Path) -> str:
     import sys
+
     from app.services.hover_extractor import detect_pdf_format as real_detect
     for mod_name in ("app.api.office_routes", "app.api.office.contracts", "app.api.office.contracts_uploads"):
         if mod_name in sys.modules:
@@ -57,6 +58,7 @@ def _detect_pdf_format(p: Path) -> str:
 
 async def _stream_upload_safely(*args, **kwargs):
     import sys
+
     from app.core.upload_utils import stream_upload_safely as real_stream
     for mod_name in ("app.api.office_routes", "app.api.office.contracts", "app.api.office.contracts_uploads"):
         if mod_name in sys.modules:
@@ -79,6 +81,7 @@ async def _stream_upload_safely(*args, **kwargs):
 
 def _get_job_document_by_hash(*args, **kwargs):
     import sys
+
     from app.core.database import get_job_document_by_hash as real_doc
     for mod_name in ("app.api.office_routes", "app.api.office.contracts", "app.api.office.contracts_uploads"):
         if mod_name in sys.modules:
@@ -95,6 +98,7 @@ def _get_job_document_by_hash(*args, **kwargs):
 
 async def _run_full_office_pipeline(*args, **kwargs):
     import sys
+
     from app.core.pipeline import run_full_office_pipeline as real_pipe
     for mod_name in ("app.api.office_routes", "app.api.office.contracts", "app.api.office.contracts_uploads"):
         if mod_name in sys.modules:
@@ -117,6 +121,7 @@ async def _run_full_office_pipeline(*args, **kwargs):
 
 async def _run_supplement_pipeline(*args, **kwargs):
     import sys
+
     from app.core.pipeline import run_supplement_pipeline as real_supp
     for mod_name in ("app.api.office_routes", "app.api.office.contracts", "app.api.office.contracts_uploads"):
         if mod_name in sys.modules:

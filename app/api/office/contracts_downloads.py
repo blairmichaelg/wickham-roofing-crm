@@ -41,6 +41,7 @@ EXPORT_DIR = Path("generated_exports")
 
 async def _get_inspection_summary(*args, **kwargs):
     import sys
+
     from app.services.inspection_summary import get_inspection_summary as real_summary
     for mod_name in ("app.api.office_routes", "app.api.office.contracts", "app.api.office.contracts_downloads"):
         if mod_name in sys.modules:
@@ -63,6 +64,7 @@ async def _get_inspection_summary(*args, **kwargs):
 
 def _get_pdf_generator_cls():
     import sys
+
     from app.services.pdf import PDFGenerator as real_pdf
     for mod_name in ("app.api.office_routes", "app.api.office.contracts", "app.api.office.contracts_downloads"):
         if mod_name in sys.modules:

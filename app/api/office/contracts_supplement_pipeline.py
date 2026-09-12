@@ -40,6 +40,7 @@ router = APIRouter()
 
 async def _run_supplement_pipeline(*args, **kwargs):
     import sys
+
     from app.core.pipeline import run_supplement_pipeline as real_supp
     for mod_name in ("app.api.office_routes", "app.api.office.contracts", "app.api.office.contracts_supplement_pipeline"):
         if mod_name in sys.modules:
