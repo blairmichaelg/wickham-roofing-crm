@@ -269,3 +269,42 @@ def test_photo_processor_abstraction():
             if getattr(node, "attr", "") == "client":
                 if isinstance(node.value, ast.Name) and getattr(node.value, "id", "") == "ai":
                     pytest.fail("Found direct ai.client access!")
+
+
+@patch("app.services.ai_service.get_settings")
+@patch("app.services.ai_service.genai.Client")
+def test_analyze_job_data_math_guardrail_rejection(
+    mock_client_class, mock_get_settings, mock_settings
+):
+    """Test that analyze_job_data flags math guardrail mismatch when stated total does not match line items."""
+    mock_get_settings.return_value = mock_settings
+    mock_client_instance = MagicMock()
+    mock_response = MagicMock()
+
+    # Model returned total_cost of $8,000, but line items only sum to $5,000
+    ai_decision = {
+        "action": "generate_document",
+        "reasoning": "Sufficient info",
+        "document_data": {
+            "materials": ["Shingles"],
+            "total_cost": 8000.0,
+        },
+    }
+    mock_response.text = json.dumps(ai_decision)
+    mock_response.usage_metadata.total_token_count = 100
+    mock_client_instance.models.generate_content.return_value = mock_response
+    mock_client_class.return_value = mock_client_instance
+
+    service = get_ai_client()
+    payload = {
+        "id": "123",
+        "line_items": [
+            {"description": "Item 1", "total_cost": 2000.0},
+            {"description": "Item 2", "total_cost": 3000.0},
+        ],
+    }
+
+    result = asyncio.run(service.analyze_job_data(payload))
+    assert result["action"] == "error"
+    assert "Math guardrail violation" in result["reasoning"]
+

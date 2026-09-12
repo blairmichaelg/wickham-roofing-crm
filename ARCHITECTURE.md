@@ -113,6 +113,17 @@ Similarly, `app/api/field_routes.py` has been decomposed into domain-focused sub
 - **`app/api/field/router.py`**: Composite router registering all domain modules under `/api/field` with RBAC verification.
 - **`app/api/field_routes.py`**: Re-export shim maintaining 100% backward compatibility for existing callers and test patch targets.
 
+### G. Guarded AI Pipeline Architecture (`app/services/ai/`)
+To replace monolithic LLM handlers with an auditable, safety-first cognitive engine, AI services are organized into a modular pipeline under `app/services/ai/`:
+- **`app/services/ai/client.py` (Transport Layer)**: Manages google-genai SDK transport, authentication, file upload/deletion lifecycles, and exponential backoff with jitter for free-tier 429 quota protection. Contains zero business logic.
+- **`app/services/ai/prompts.py` (Versioned Prompt Registry)**: Canonical, static registry of system prompts (`PROMPT_VERSION = "2026.1"`). Strictly prevents unvetted prompt drift and embeds non-negotiable **CRITICAL NO-MATH DIRECTIVES** into all carrier extraction prompts.
+- **`app/services/ai/parsers.py` (Pydantic V2 Structured Parsers)**: Validates and converts raw JSON or multimodal outputs into strongly typed schemas (`Decision`, `DocumentData`, `BatchPhotoAnalysis`, `PhotoAnalysis`, `StatementOfLoss`), rejecting malformed structures at the boundary.
+- **`app/services/ai/guardrails.py` (Deterministic Safety & Math Verification)**: Pure, non-AI deterministic checks executed before AI-generated content can be presented to users or persisted to SQLite:
+  - *Math Reconciliation*: Guarantees that any AI-stated dollar total strictly matches the arithmetic sum of underlying line items (calculated in integer cents to eliminate floating-point drift). Catches and rejects hallucinated numbers.
+  - *Legal Disclaimers*: Enforces mandatory non-obligation and consumer protection disclosures in door-knocking and sales scripts before field rep display.
+  - *Rejection & Flagging*: Output violating guardrail constraints is blocked or flagged (`GuardrailValidationError`) rather than silently passed through.
+- **`app/services/ai_service.py` (Public Facade)**: Coordinates the subpackage components, exposing `AiClient`, `GeminiClient`, and `get_ai_client()` for seamless backward compatibility.
+
 ---
 
 ## 4. Security & Isolation Boundaries

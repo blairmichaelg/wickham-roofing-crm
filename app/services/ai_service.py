@@ -31,27 +31,43 @@ from app.config import get_settings
 from app.core.database import log_ai_usage
 from app.core.inspection_models import PhotoAnalysis
 from app.core.supplement_models import DiscrepancyReport, StatementOfLoss
+from app.services.ai.guardrails import (
+    GuardrailResult,
+    GuardrailValidationError,
+    check_all_guardrails,
+    verify_legal_disclaimers,
+    verify_math_reconciliation,
+)
+from app.services.ai.parsers import (
+    BatchPhotoAnalysis,
+    Decision,
+    DocumentData,
+    parse_batch_photo_analysis,
+    parse_job_decision,
+    parse_photo_analysis,
+    parse_statement_of_loss,
+)
+from app.services.ai.prompts import (
+    BATCH_ROOF_PHOTO_INSPECTION_PROMPT,
+    CLASSIFY_CARRIER_PROMPT,
+    CRITICAL_NO_MATH_DIRECTIVE,
+    DOOR_SCRIPT_SYSTEM_PROMPT,
+    JOB_DATA_ANALYSIS_PROMPT_TEMPLATE,
+    PROMPT_VERSION,
+    ROOF_PHOTO_INSPECTION_TEMPLATE,
+    SALES_SUMMARY_SYSTEM_PROMPT,
+    SOL_GENERIC_PROMPT,
+    SOL_SYMBILITY_PROMPT,
+    SOL_XACTIMATE_PROMPT,
+    SUPPLEMENT_NARRATIVE_TEMPLATE,
+)
 
 logger = structlog.get_logger("app.services.ai_service")
 
-
-class DocumentData(BaseModel):
-    """DocumentData definition."""
-    materials: list[str] = []
-    total_cost: float = 0.0
-
-
-class Decision(BaseModel):
-    """Decision definition."""
-    action: Literal["generate_document", "update_status", "ignore", "error"]
-    reasoning: str
-    document_data: DocumentData
-
-
-class BatchPhotoAnalysis(BaseModel):
-    """Container for batch analysis of roof photos."""
-    analyses: list[PhotoAnalysis]
-
+# CRITICAL NO-MATH DIRECTIVE:
+# - DO NOT perform any arithmetic calculations (e.g. addition, subtraction, multiplication, division, summations, or tax math).
+# - The AI must NEVER calculate any numbers or values.
+# - Only LOCATE and EXTRACT the exact numbers literally printed in the document text.
 
 from abc import ABC, abstractmethod
 
@@ -90,6 +106,16 @@ class AiClient(ABC):
     @abstractmethod
     async def delete_file(self, file_name: str) -> None: ...
 
+    @abstractmethod
+    def check_guardrails(
+        self,
+        content_text: str | None = None,
+        stated_total: float | int | None = None,
+        line_items: list[Any] | None = None,
+        disclaimer_type: str | None = None,
+        raise_on_failure: bool = True,
+    ) -> GuardrailResult: ...
+
 class GeminiClient(AiClient):
     """
     Gemini AI integration for cognitive processing of CRM data.
@@ -99,6 +125,22 @@ class GeminiClient(AiClient):
     - Low temperature for deterministic responses
     - Pydantic schema enforcement on AI output
     """
+
+    def check_guardrails(
+        self,
+        content_text: str | None = None,
+        stated_total: float | int | None = None,
+        line_items: list[Any] | None = None,
+        disclaimer_type: str | None = None,
+        raise_on_failure: bool = True,
+    ) -> GuardrailResult:
+        return check_all_guardrails(
+            content_text=content_text,
+            stated_total=stated_total,
+            line_items=line_items,
+            disclaimer_type=disclaimer_type,
+            raise_on_failure=raise_on_failure,
+        )
     async def extract_sol_structured_data(self, prompt: str) -> str:
         response = await asyncio.to_thread(
             self._call_with_backoff,
@@ -196,28 +238,7 @@ class GeminiClient(AiClient):
         log = logger.bind(jnid=payload.get("id"))
         log.info("ai_analysis_started")
 
-        prompt = f"""
-You are an expert roofing estimator and workflow orchestrator for Wickham Roofing.
-Analyze the following CRM job data and determine the next action.
-
-CRM Data:
-{json.dumps(payload, indent=2)}
-
-You MUST output a valid JSON object matching exactly this schema:
-{{
-  "action": "generate_document" | "update_status" | "ignore",
-  "reasoning": "A brief explanation of why you chose this action.",
-  "document_data": {{
-    "materials": ["Item 1", "Item 2"],
-    "total_cost": 0.0
-  }}
-}}
-
-Rules:
-- If there is enough information to generate an estimate (e.g., measurements, scope of work in notes), set action to "generate_document" and populate document_data.
-- If the data is incomplete or requires review, set action to "update_status".
-- Otherwise, set action to "ignore".
-"""
+        prompt = JOB_DATA_ANALYSIS_PROMPT_TEMPLATE.format(crm_data_json=json.dumps(payload, indent=2))
 
         try:
             # Run the synchronous API call in an executor to avoid blocking the event loop
@@ -233,8 +254,22 @@ Rules:
             )
 
             result_text = response.text
-            decision_obj = Decision.model_validate_json(result_text)
+            decision_obj = parse_job_decision(result_text)
             decision = decision_obj.model_dump()
+
+            # Guardrail: Math reconciliation if line items are provided
+            if payload.get("line_items") and decision_obj.document_data.total_cost:
+                guard_res = verify_math_reconciliation(
+                    decision_obj.document_data.total_cost,
+                    payload["line_items"],
+                )
+                if not guard_res.passed:
+                    log.warning("ai_math_guardrail_violation", violations=guard_res.violations)
+                    return {
+                        "action": "error",
+                        "reasoning": f"Math guardrail violation: {'; '.join(guard_res.violations)}",
+                        "document_data": {},
+                    }
 
             usage = getattr(response.usage_metadata, "total_token_count", 0)
             if usage > 0:
@@ -301,64 +336,11 @@ Rules:
 
     def _get_sol_prompt(self, source_system: str) -> str:
         if source_system == "xactimate":
-            return """
-            You are an expert Xactimate estimator. Analyze this Statement of Loss (SoL) document.
-            Extract ONLY the line items located under the "Roof" grouping (ignore any other rooms, general demolition, or recap tables).
-            Pay special attention to descriptions that wrap across multiple lines (e.g., "Remove 3 tab 25 yr. composition shingle roofing - incl. felt").
-            
-            CRITICAL NO-MATH DIRECTIVE:
-            - DO NOT perform any arithmetic calculations (e.g. addition, subtraction, multiplication, division, summations, or tax math).
-            - The AI must NEVER calculate any numbers or values.
-            - Only LOCATE and EXTRACT the exact numbers literally printed in the document text.
-            - If a quantity, unit of measure, price, or financial summary field is missing or not written, you MUST return null. Do NOT calculate or guess them.
-            
-            If Overhead and Profit (O&P) is not explicitly listed in the summaries, set overhead_and_profit_included to false.
-            
-            Also extract:
-            - claim_number and carrier_name.
-            - For each line item: trade, code, description, quantity, unit_of_measure, unit_price, tax, claimed_rcv, depreciation, acv, page.
-            - Roof geometry: pitch, total_squares, eaves_lf, valleys_lf, rakes_lf.
-            - Shingle details: shingle_type (e.g. "3-tab", "architectural", "laminated", "wood", etc.) and shingle_color (e.g. "Charcoal", "Weathered Wood", "Slate", etc.) if mentioned in the line items, material specifications, or document notes.
-            - Claim financials: gross_rcv, total_depreciation, deductible, net_claim.
-            """
+            return SOL_XACTIMATE_PROMPT
         elif source_system == "symbility":
-            return """
-            You are an expert Symbility estimator. Analyze this Statement of Loss (SoL) document.
-            Extract ONLY the line items located under the "Roof" grouping.
-            Symbility formats line items differently. Explicitly look for phrases like "Includes 10% waste on quantity" in the item notes.
-            If you find a waste percentage in the notes, map that float (e.g., 0.10) to the waste_percent_included field.
-            
-            CRITICAL NO-MATH DIRECTIVE:
-            - DO NOT perform any arithmetic calculations (e.g. addition, subtraction, multiplication, division, summations, or tax math).
-            - The AI must NEVER calculate any numbers or values.
-            - Only LOCATE and EXTRACT the exact numbers literally printed in the document text.
-            - If a quantity, unit of measure, price, or financial summary field is missing or not written, you MUST return null. Do NOT calculate or guess them.
-            
-            Also extract:
-            - claim_number and carrier_name.
-            - For each line item: trade, code, description, quantity, unit_of_measure, unit_price, tax, claimed_rcv, depreciation, acv, page.
-            - Roof geometry: pitch, total_squares, eaves_lf, valleys_lf, rakes_lf.
-            - Shingle details: shingle_type (e.g. "3-tab", "architectural", "laminated", "wood", etc.) and shingle_color (e.g. "Charcoal", "Weathered Wood", "Slate", etc.) if mentioned in the line items, material specifications, or document notes.
-            - Claim financials: gross_rcv, total_depreciation, deductible, net_claim.
-            """
+            return SOL_SYMBILITY_PROMPT
         else:
-            return """
-            Analyze this roofing Statement of Loss document.
-            Extract ONLY the line items related to roof replacement.
-            
-            CRITICAL NO-MATH DIRECTIVE:
-            - DO NOT perform any arithmetic calculations (e.g. addition, subtraction, multiplication, division, summations, or tax math).
-            - The AI must NEVER calculate any numbers or values.
-            - Only LOCATE and EXTRACT the exact numbers literally printed in the document text.
-            - If a quantity, unit of measure, price, or financial summary field is missing or not written, you MUST return null. Do NOT calculate or guess them.
-            
-            Also extract:
-            - claim_number and carrier_name.
-            - For each line item: trade, code, description, quantity, unit_of_measure, unit_price, tax, claimed_rcv, depreciation, acv, page.
-            - Roof geometry: pitch, total_squares, eaves_lf, valleys_lf, rakes_lf.
-            - Shingle details: shingle_type (e.g. "3-tab", "architectural", "laminated", "wood", etc.) and shingle_color (e.g. "Charcoal", "Weathered Wood", "Slate", etc.) if mentioned in the line items, material specifications, or document notes.
-            - Claim financials: gross_rcv, total_depreciation, deductible, net_claim.
-            """
+            return SOL_GENERIC_PROMPT
 
     async def extract_sol_from_pdf(self, pdf_path: str | Path, job_id: str | None = None) -> StatementOfLoss:
         """
@@ -486,23 +468,10 @@ Rules:
         log = logger.bind(job_id=report.job_id)
         log.info("supplement_narrative_started")
 
-        prompt = f"""
-        You are an expert, assertive roofing contractor writing a "Defensive Summary" justification for an insurance desk adjuster.
-        
-        You have analyzed the EagleView measurement report and the Carrier's Statement of Loss and found the following numerical shortages.
-        You MUST explicitly state the mathematical shortages found in the report below.
-        You MUST reference the specific Xactimate codes (e.g. RFG 300S, RFG IWS, FEE O&P) associated with the discrepancies so the adjuster can easily input them.
-        Only cite the building codes provided below if they directly relate to the identified discrepancies.
-        You MUST use the exact `code_citation` string provided as a bolded header before quoting the building code. Do not hallucinate or alter the citation.
-        
-        --- DISCREPANCY REPORT ---
-        {report.model_dump_json(indent=2)}
-        
-        --- BUILDING CODES ---
-        {codes}
-        
-        Write a concise, 2-paragraph Defensive Summary designed to definitively prove the shortages and remove friction for the adjuster to approve the Xactimate line items. Do not use placeholders for the company name, just use "Wickham Roofing LLC". Do not include a date or address block at the top, just jump straight into the narrative.
-        """
+        prompt = SUPPLEMENT_NARRATIVE_TEMPLATE.format(
+            discrepancy_report_json=report.model_dump_json(indent=2),
+            building_codes=codes,
+        )
 
         try:
             response = await asyncio.to_thread(
@@ -574,19 +543,7 @@ Rules:
 
         orig_name = original_filename or (Path(file_path).name if (is_local or is_remote_name) and isinstance(file_path, (str, Path)) else "photo.jpg")
 
-        prompt = (
-            f"You are Wickham Roofing's senior forensic roofing inspector creating photographic documentation for an inspection report. "
-            f"Examine this photo (File: {orig_name}) carefully using a strict 3-step forensic Chain-of-Thought observation sequence BEFORE concluding damage classification:\n\n"
-            f"MANDATORY CHAIN-OF-THOUGHT OBSERVATION SEQUENCE:\n"
-            f"Step 1 (Granule Depletion Pattern): Assess whether granule displacement is localized and circular/pitted (characteristic of direct hail impacts) vs. widespread/uniform (age-related blistering, granule shedding, or foot traffic). Populate 'granule_depletion_pattern'.\n"
-            f"Step 2 (Asphalt Substrate / Mat Condition): Inspect the asphalt substrate beneath the granule layer for exposed fiberglass matting, substrate micro-cracks, tear lines, or wind uplift creases. Populate 'substrate_condition'.\n"
-            f"Step 3 (Impact Bruise Presence): Determine if there is physical depression/indentation with soft or fractured asphalt mat characteristic of functional hail impact (vs. superficial cosmetic scuffing). Populate 'impact_bruise_present'.\n\n"
-            f"FINAL SYNTHESIS & CLASSIFICATION:\n"
-            f"- Set damage_detected, damage_type, severity, and confidence_score (0-100) based strictly on Steps 1-3.\n"
-            f"- If confidence is not 100%, provide alternative_explanation (e.g. manufacturing defect, weathering, blistering, foot traffic).\n"
-            f"- Write a concise 1-2 sentence 'forensic_narrative' caption grounded 100% in visually verifiable physical evidence. Do NOT hallucinate defects if not visible.\n"
-            f"- For the 'filename' schema field, output exactly: {orig_name}"
-        )
+        prompt = ROOF_PHOTO_INSPECTION_TEMPLATE.format(orig_name=orig_name)
 
         if is_local:
             try:
@@ -702,22 +659,7 @@ Rules:
             else:
                 all_local = False
 
-        prompt = (
-            "You are Wickham Roofing's senior forensic roofing inspector creating photographic documentation for an insurance claim.\n\n"
-            "Above you have been provided with multiple roof inspection photos, each labeled with its filename in brackets (e.g. [Photo: img_001.jpg]).\n"
-            "Analyze EACH photo INDEPENDENTLY and produce a UNIQUE, ACCURATE assessment for that specific photo using a 3-step forensic Chain-of-Thought sequence:\n\n"
-            "MANDATORY CHAIN-OF-THOUGHT OBSERVATION SEQUENCE PER PHOTO:\n"
-            "Step 1 (Granule Depletion Pattern): Assess whether granule displacement is localized and circular/pitted vs. widespread/uniform weathering or scuffing. Populate 'granule_depletion_pattern'.\n"
-            "Step 2 (Asphalt Substrate / Mat Condition): Inspect underlying substrate for exposed fiberglass, micro-fractures, or wind crease lines. Populate 'substrate_condition'.\n"
-            "Step 3 (Impact Bruise Presence): Determine if physical depression/bruise with soft/fractured asphalt mat is present. Populate 'impact_bruise_present'.\n\n"
-            "FINAL CLASSIFICATION & CAPTION:\n"
-            "- Set damage_detected, damage_type, severity, and confidence_score (0-100) based strictly on Steps 1-3.\n"
-            "- If confidence is not 100%, provide alternative_explanation (e.g. manufacturing defect, weathering, blistering, foot traffic).\n"
-            "- Write a concise 1-2 sentence 'forensic_narrative' caption grounded 100% in visually verifiable physical evidence. Do NOT hallucinate defects if not visible.\n"
-            "- Set the 'filename' field for each result to the exact filename label shown before that photo.\n"
-            "Ensure the output JSON contains one PhotoAnalysis entry per photo, in the same order as presented.\n"
-            "Each entry MUST reflect that specific photo's actual condition — not a generalized or repeated assessment."
-        )
+        prompt = BATCH_ROOF_PHOTO_INSPECTION_PROMPT
 
         if all_local:
             inline_possible = True

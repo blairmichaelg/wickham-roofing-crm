@@ -73,7 +73,7 @@ async def generate_sales_summary(job: dict, storm_events: list[dict]) -> str:
     Returns:
         Plain-text summary string.
     """
-    from app.services.ai_service import GeminiClient
+    from app.services.ai import GeminiClient, verify_legal_disclaimers
 
     context = _build_context_block(job, storm_events)
     user_prompt = f"Data:\n{context}\n\nWrite the 2-3 sentence sales summary."
@@ -84,7 +84,12 @@ async def generate_sales_summary(job: dict, storm_events: list[dict]) -> str:
             system_prompt=_SUMMARY_SYSTEM_PROMPT,
             user_prompt=user_prompt,
         )
-        return result.strip()
+        text = result.strip()
+        # Enforce legal disclaimers guardrail
+        check = verify_legal_disclaimers(text, disclaimer_type="sales_script")
+        if not check.passed:
+            text += " A free inspection from Wickham Roofing involves no obligation."
+        return text
     except Exception as exc:
         logger.error("sales_summary_generation_failed", error=str(exc))
         # Graceful fallback — do not raise, return a generic message
@@ -107,7 +112,7 @@ async def generate_door_script(job: dict, storm_events: list[dict]) -> str:
     Returns:
         Plain-text door script string.
     """
-    from app.services.ai_service import GeminiClient
+    from app.services.ai import GeminiClient, verify_legal_disclaimers
 
     context = _build_context_block(job, storm_events)
     user_prompt = f"Data:\n{context}\n\nWrite the door-knocking opening script."
@@ -118,7 +123,12 @@ async def generate_door_script(job: dict, storm_events: list[dict]) -> str:
             system_prompt=_DOOR_SCRIPT_SYSTEM_PROMPT,
             user_prompt=user_prompt,
         )
-        return result.strip()
+        text = result.strip()
+        # Enforce legal disclaimers guardrail
+        check = verify_legal_disclaimers(text, disclaimer_type="sales_script")
+        if not check.passed:
+            text += " There's no obligation — we just want to make sure your home is protected."
+        return text
     except Exception as exc:
         logger.error("door_script_generation_failed", error=str(exc))
         addr = job.get("address_line1", "your neighborhood")

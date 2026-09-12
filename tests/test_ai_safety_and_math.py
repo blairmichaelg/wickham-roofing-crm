@@ -266,3 +266,62 @@ def test_photo_analysis_validation_bounds():
             confidence_score=150.0,
             forensic_narrative="Hail damage seen on shingle slope.",
         )
+
+
+def test_guardrail_math_reconciliation_exact():
+    """Verify that consistent AI-stated totals match the sum of line items."""
+    from app.services.ai.guardrails import verify_math_reconciliation
+
+    line_items = [
+        {"description": "Ridge Cap", "total_cost": 500.0},
+        {"description": "Architectural Shingles", "total_cost": 4500.0},
+    ]
+    # Stated total $5000.00
+    res = verify_math_reconciliation(5000.0, line_items)
+    assert res.passed is True
+    assert len(res.violations) == 0
+
+
+def test_guardrail_math_reconciliation_mismatch_detected():
+    """Verify that an AI-stated total differing from line item sums triggers a violation."""
+    from app.services.ai.guardrails import verify_math_reconciliation
+
+    line_items = [
+        {"description": "Ridge Cap", "total_cost": 500.0},
+        {"description": "Architectural Shingles", "total_cost": 4500.0},
+    ]
+    # Stated total $6500.00 (hallucinated extra $1500)
+    res = verify_math_reconciliation(6500.0, line_items)
+    assert res.passed is False
+    assert len(res.violations) == 1
+    assert "does not match the sum of underlying line items" in res.violations[0]
+
+
+def test_guardrail_legal_disclaimers():
+    """Verify that required consumer protection and non-obligation notices are verified."""
+    from app.services.ai.guardrails import verify_legal_disclaimers
+
+    valid_script = (
+        "Hi Mr. Smith, we are offering complimentary roof inspections in your neighborhood with no obligation."
+    )
+    res_valid = verify_legal_disclaimers(valid_script, disclaimer_type="sales_script")
+    assert res_valid.passed is True
+
+    coercive_script = "You must sign this contract today or your insurer will penalize you."
+    res_invalid = verify_legal_disclaimers(coercive_script, disclaimer_type="sales_script")
+    assert res_invalid.passed is False
+    assert "missing required" in res_invalid.violations[0].lower()
+
+
+def test_guardrail_check_all_raises_on_failure():
+    """Verify check_all_guardrails raises GuardrailValidationError when requested."""
+    from app.services.ai.guardrails import GuardrailValidationError, check_all_guardrails
+
+    with pytest.raises(GuardrailValidationError) as exc:
+        check_all_guardrails(
+            stated_total=9999.0,
+            line_items=[{"total_cost": 100.0}],
+            raise_on_failure=True,
+        )
+    assert "Math reconciliation failed" in str(exc.value) or "does not match" in str(exc.value)
+
