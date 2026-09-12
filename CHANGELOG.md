@@ -31,7 +31,7 @@
   - Decomposed `app/api/field_routes.py` into clean modular package `app/api/field/` (`jobs.py`, `inspections.py`, `documents.py`, `storms.py`).
   - Preserved 100% backward-compatible shims for all existing external imports and test suites.
 - **Modular AI Pipeline Decomposition**: Decomposed `app/services/ai_service.py` into `app/services/ai/` package (`client.py`, `prompts.py`, `parsers.py`, `guardrails.py`) with backward-compatible shims.
-- **Pydantic V2 Modernization**: Replaced deprecated Pydantic V1 methods (`dict()`, `parse_obj()`, `from_orm()`) with modern V2 methods (`model_dump()`, `model_validate()`, `model_dump_json()`) across all models.
+- **Pydantic V2 Modernization & Serialization Verification**: Verified domain models conform to Pydantic V2 serialization patterns (`model_dump()`, `model_validate()`, `model_dump_json()`); confirmed zero deprecated V1 serialization patterns (`dict()`, `parse_obj()`, `from_orm()`) remained in the codebase.
 
 ## [2.8.17] - 2026-09-08
 ### Changed (Production Readiness, Pipeline Decoupling, Storm Canvassing & Observability Overhaul)

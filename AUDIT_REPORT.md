@@ -96,7 +96,7 @@ A comprehensive rebrand, architectural refactor, and testing/DevOps hardening pa
 
 ---
 
-## 10. COMMERCIAL PROGRESS BILLING & LIEN MONITORING AUDIT (2026-09-12 Hardening Pass)
+## 11. COMMERCIAL PROGRESS BILLING & LIEN MONITORING AUDIT (2026-09-12 Hardening Pass)
 A commercial-readiness engineering pass was implemented to support multi-stage commercial projects:
 - **Integer Cents Currency Enforcement (Migration 0025)**: Dropped legacy `REAL` default rates in `pricing` table. All financial ledgers, job costing, and rate lookups strictly operate in integer cents. Pydantic models coerce and validate inputs, rejecting negative values on invoices.
 - **Commercial Job Type & Progress Billing Engine (Migration 0026)**:
@@ -110,6 +110,9 @@ A commercial-readiness engineering pass was implemented to support multi-stage c
   - Configurable alert window (`commercial_lien_deadline_days` = 90, `commercial_lien_warning_days` = 15).
   - Dispatches high-priority alerts to `admin` and `accounting` roles for unreconciled invoices approaching deadlines.
   - **Legal Compliance Documentation**: Explicitly documented across `docs/admin_tech_guide.md`, `docs/accounting_guide.md`, and `ARCHITECTURE.md` that statutory lien timelines and retainage caps are contract-dependent software defaults requiring confirmation with legal counsel per contract.
+- **Task 11: Pydantic V2 Serialization Audit (Scope Clarification)**:
+  - An exhaustive repo-wide audit across `app/` confirmed that zero deprecated Pydantic V1 serialization methods (`.dict()`, `.json()`, `parse_obj()`, `from_orm()`, `parse_raw()`, or `json_encoders`) were present in application code at the time of this pass. All domain models and schemas were already conforming to Pydantic V2 standards (`model_dump()`, `model_validate()`, `model_dump_json()`).
+  - The commit message for Task 11 (`8b7442d: chore(pydantic): clean up and verify Pydantic V2 serialization patterns across domain models`) overstated the change scope as a broad refactor; in reality, no deprecated V1 patterns remained to migrate, and the change was limited to verifying model serialization behavior in `tests/test_commercial_billing.py`.
 - **Tests Enforcing Behavior**:
   - `tests/test_currency_precision.py`: 6 tests verifying integer cents schema, boundary amounts ($0.01 to $10M), and Pydantic validators.
   - `tests/test_commercial_billing.py`: 6 tests verifying SOV lifecycle, multi-cycle billing, 100% cap overbill rejection, configurable retainage, and QBO CSV exports.
@@ -121,7 +124,7 @@ A commercial-readiness engineering pass was implemented to support multi-stage c
 - **Test Count**: 539+ Passing (100% Pass Rate)
 - **PDF Engine Document Types Verified**: 10 / 10
 - **CVEs Detected**: 0
-- **System Health**: Hardened, Modular, Local-First, Production-Grade (v2.8.17)
+- **System Health**: Hardened, Modular, Local-First, Production-Grade (v2.9.0)
 
 
 
