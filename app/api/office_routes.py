@@ -90,7 +90,7 @@ def _fetch_homeowner_name_sync(job_id: str) -> str:
 
 
 class FinancialsPayload(BaseModel):
-    """FinancialsPayload definition."""
+    """FinancialsPayload definition with strict currency coercion and cents calculation."""
     revenue: float
     carrier_rcv: float
     materials: float
@@ -101,6 +101,65 @@ class FinancialsPayload(BaseModel):
     overhead_pct: float = 0.25
     commission_pct: float = 0.10
     permits_fee: float = 0.0
+
+    @field_validator(
+        "revenue",
+        "carrier_rcv",
+        "materials",
+        "labor",
+        "deductible",
+        "acv_payment",
+        "recoverable_depreciation",
+        "permits_fee",
+        mode="before",
+    )
+    @classmethod
+    def coerce_currency_amount(cls, v: Any) -> float:
+        """Coerce and validate string/float/int input to rounded dollar cents."""
+        if v is None:
+            return 0.0
+        if isinstance(v, str):
+            v = v.replace("$", "").replace(",", "").strip()
+        try:
+            val = float(v)
+        except (ValueError, TypeError):
+            raise ValueError(f"Invalid currency value: {v}")
+        if val < 0:
+            raise ValueError(f"Currency amount cannot be negative: {val}")
+        return round(val, 2)
+
+    @property
+    def revenue_cents(self) -> int:
+        return int(round(self.revenue * 100))
+
+    @property
+    def carrier_rcv_cents(self) -> int:
+        return int(round(self.carrier_rcv * 100))
+
+    @property
+    def materials_cents(self) -> int:
+        return int(round(self.materials * 100))
+
+    @property
+    def labor_cents(self) -> int:
+        return int(round(self.labor * 100))
+
+    @property
+    def deductible_cents(self) -> int:
+        return int(round(self.deductible * 100))
+
+    @property
+    def acv_payment_cents(self) -> int:
+        return int(round(self.acv_payment * 100))
+
+    @property
+    def recoverable_depreciation_cents(self) -> int:
+        return int(round(self.recoverable_depreciation * 100))
+
+    @property
+    def permits_fee_cents(self) -> int:
+        return int(round(self.permits_fee * 100))
+
 
 class ProductionPayload(BaseModel):
     """ProductionPayload definition."""

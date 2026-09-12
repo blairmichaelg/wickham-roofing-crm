@@ -11,9 +11,9 @@ Key design decisions:
 - DiscrepancyReport is the pure-Python math engine's output contract
 """
 
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class MaterialBOM(BaseModel):
@@ -169,6 +169,27 @@ class InvoiceLine(BaseModel):
     rate: float
     amount: float
 
+    @field_validator("rate", "amount", mode="before")
+    @classmethod
+    def coerce_currency(cls, v: Any) -> float:
+        """Coerce and round currency values to clean dollar cents."""
+        if isinstance(v, str):
+            v = v.replace("$", "").replace(",", "").strip()
+        try:
+            val = float(v)
+        except (ValueError, TypeError):
+            raise ValueError(f"Invalid currency value: {v}")
+        return round(val, 2)
+
+
+    @property
+    def amount_cents(self) -> int:
+        return int(round(self.amount * 100))
+
+    @property
+    def rate_cents(self) -> int:
+        return int(round(self.rate * 100))
+
 
 class InvoiceExport(BaseModel):
     """
@@ -179,3 +200,4 @@ class InvoiceExport(BaseModel):
     invoice_date: str
     due_date: str
     lines: list[InvoiceLine]
+

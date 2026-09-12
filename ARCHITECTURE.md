@@ -123,6 +123,12 @@ Running multi-role web servers over standard SQLite files historically risked da
 - **Hot Snapshots**: The internal scheduling worker periodically executes non-locking SQLite `VACUUM INTO` operations to generate consistency-verified point-in-time database backups inside `data/backups/`.
 - **Anti-Bloat Cleanup Engine**: To prevent disk space starvation on office laptops, the backup routine automatically unlinks historical database archives beyond a strict 10-snapshot maximum threshold.
 
+### C. Integer Cents Currency & Financial Precision
+- **Zero-Float Accounting Guarantee**: All monetary values across `financials`, `jobs`, `pricing`, and progress billing ledgers are stored strictly as `INTEGER` cents (e.g., `revenue_cents`, `carrier_rcv_cents`, `default_rate_cents`). Legacy SQLite `REAL` currency columns are completely eliminated.
+- **Pydantic Validation & Coercion**: Ingestion models and API payloads utilize `@field_validator(mode="before")` to cleanly parse currency strings (`$1,250.00`), numbers, and boundary amounts, rejecting negative values and computing integer cents deterministically.
+- **Presentation & QBO Export Formatting**: User-facing templates, ReportLab PDF generators, and QuickBooks Online CSV exports format integer cents into exact two-decimal string representations (`f"{cents / 100.0:.2f}"`) at the presentation boundary without intermediate floating-point state drift.
+
+
 ---
 
 ## 6. Authoritative Repository Directory Tree

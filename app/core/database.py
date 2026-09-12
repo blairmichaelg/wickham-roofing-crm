@@ -315,8 +315,14 @@ def run_migrations() -> None:
             m24.up(conn)
             conn.execute("UPDATE schema_version SET version = 24, applied_at = CURRENT_TIMESTAMP WHERE id = 1")
 
+        if current_version < 25:
+            import importlib
+            m25 = importlib.import_module("app.core.migrations.0025_drop_pricing_default_rate_real")
+            m25.up(conn)
+            conn.execute("UPDATE schema_version SET version = 25, applied_at = CURRENT_TIMESTAMP WHERE id = 1")
+
         conn.execute("COMMIT")
-        logger.info("migrations_applied", current_version=current_version, target_version=24)
+        logger.info("migrations_applied", current_version=current_version, target_version=25)
         
         # Since seed logic was removed from up(), do it here outside the transaction
         if current_version < 1:
@@ -333,12 +339,12 @@ def run_migrations() -> None:
 def seed_default_pricing() -> None:
     """Seed the pricing table with baseline material/labor rates.
     
-    Inserts default Wickham Roofing pricing values if they do not already exist.
+    Inserts default Wickham Roofing pricing values in integer cents if they do not already exist.
     """
     conn = get_connection()
     try:
         conn.execute("BEGIN IMMEDIATE")
-        # Default Wickham Roofing baselines
+        # Default Wickham Roofing baselines (in dollars, mapped to integer cents)
         baseline_pricing = [
             ("field_shingle_bundles", 105.0),
             ("starter_bundles", 45.0),
@@ -366,9 +372,9 @@ def seed_default_pricing() -> None:
             ("rfg_waste_adjustment_per_sq", 105.0),
         ]
         conn.executemany('''
-            INSERT OR IGNORE INTO pricing (item_key, default_rate, default_rate_cents)
-            VALUES (?, ?, ?)
-        ''', [(row[0], row[1], int(round(row[1] * 100))) for row in baseline_pricing])
+            INSERT OR IGNORE INTO pricing (item_key, default_rate_cents)
+            VALUES (?, ?)
+        ''', [(row[0], int(round(row[1] * 100))) for row in baseline_pricing])
         conn.execute("COMMIT")
     except Exception as e:
         logger.error("pricing_seed_failed", error=str(e))
@@ -468,10 +474,10 @@ def seed_core_team_reps(config_path: Path | str | None = None) -> None:
         conn.close()
 
 def get_pricing_ledger() -> dict[str, float]:
-    """Fetch all default rates from the pricing table.
+    """Fetch all default rates from the pricing table in dollars.
     
     Returns:
-        dict[str, float]: A dictionary mapping item keys to their default rates.
+        dict[str, float]: A dictionary mapping item keys to their default rates in dollars.
     """
     conn = get_connection()
     try:
@@ -482,6 +488,23 @@ def get_pricing_ledger() -> dict[str, float]:
         return {}
     finally:
         conn.close()
+
+def get_pricing_ledger_cents() -> dict[str, int]:
+    """Fetch all default rates from the pricing table directly in integer cents.
+    
+    Returns:
+        dict[str, int]: A dictionary mapping item keys to their default rates in integer cents.
+    """
+    conn = get_connection()
+    try:
+        cursor = conn.execute("SELECT item_key, default_rate_cents FROM pricing")
+        return {row["item_key"]: row["default_rate_cents"] for row in cursor}
+    except Exception as e:
+        logger.error("failed_to_fetch_pricing_cents", error=str(e))
+        return {}
+    finally:
+        conn.close()
+
 
 def _update_job_status_internal(conn: sqlite3.Connection, job_id: str, new_status: str, note: str = "") -> None:
     """Internal method to update job status inside an existing transaction."""
