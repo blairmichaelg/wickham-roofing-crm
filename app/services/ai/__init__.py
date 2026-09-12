@@ -8,6 +8,8 @@ Modular architecture:
 - guardrails: Deterministic, non-AI safety and arithmetic validation.
 """
 
+from typing import Any
+
 from app.services.ai.client import GeminiTransportClient
 from app.services.ai.guardrails import (
     GuardrailResult,
@@ -38,9 +40,6 @@ from app.services.ai.prompts import (
     SOL_XACTIMATE_PROMPT,
     SUPPLEMENT_NARRATIVE_TEMPLATE,
 )
-
-
-from typing import Any
 
 
 def get_ai_client() -> Any:

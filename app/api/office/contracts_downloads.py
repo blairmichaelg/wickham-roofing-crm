@@ -6,8 +6,8 @@ Part of decomposed Office Control Center contracts module.
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
 import uuid
+from pathlib import Path
 
 import structlog
 from fastapi import (
