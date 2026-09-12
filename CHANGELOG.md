@@ -28,6 +28,7 @@
 - **SQLite WAL Concurrency Tuning (`app/core/database.py`, `app/worker.py`)**: Set `busy_timeout = 30000` (30s) across all SQLite connections, added periodic WAL checkpoint truncate hook in the background worker, and verified pragma enforcement on startup.
 - **Modular Route Decomposition**:
   - Decomposed `app/api/office_routes.py` into clean modular package `app/api/office/` (`jobs.py`, `financials.py`, `production.py`, `analytics.py`, `admin.py`).
+  - Decomposed `app/api/office/contracts.py` into targeted domain submodules (`contracts_uploads.py`, `contracts_downloads.py`, `contracts_supplement_pipeline.py`) with backward-compatible re-export and mock-dispatch shim.
   - Decomposed `app/api/field_routes.py` into clean modular package `app/api/field/` (`jobs.py`, `inspections.py`, `documents.py`, `storms.py`).
   - Preserved 100% backward-compatible shims for all existing external imports and test suites.
 - **Modular AI Pipeline Decomposition**: Decomposed `app/services/ai_service.py` into `app/services/ai/` package (`client.py`, `prompts.py`, `parsers.py`, `guardrails.py`) with backward-compatible shims.
