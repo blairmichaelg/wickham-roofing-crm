@@ -41,12 +41,14 @@ router = APIRouter()
 
 def _detect_pdf_format(p: Path) -> str:
     import sys
-    if "app.api.office.contracts" in sys.modules:
-        mod = sys.modules["app.api.office.contracts"]
-        if hasattr(mod, "detect_pdf_format"):
-            from app.services.hover_extractor import detect_pdf_format as real_detect
-            if mod.detect_pdf_format is not real_detect:
-                return mod.detect_pdf_format(p)
+    from app.services.hover_extractor import detect_pdf_format as real_detect
+    for mod_name in ("app.api.office_routes", "app.api.office.contracts", "app.api.office.contracts_uploads"):
+        if mod_name in sys.modules:
+            mod = sys.modules[mod_name]
+            if hasattr(mod, "detect_pdf_format"):
+                val = getattr(mod, "detect_pdf_format")
+                if val is not real_detect:
+                    return val(p)
     import unittest.mock
     if isinstance(detect_pdf_format, (unittest.mock.Mock, unittest.mock.AsyncMock)):
         return detect_pdf_format(p)
@@ -55,15 +57,17 @@ def _detect_pdf_format(p: Path) -> str:
 
 async def _stream_upload_safely(*args, **kwargs):
     import sys
-    if "app.api.office.contracts" in sys.modules:
-        mod = sys.modules["app.api.office.contracts"]
-        if hasattr(mod, "stream_upload_safely"):
-            from app.core.upload_utils import stream_upload_safely as real_stream
-            if mod.stream_upload_safely is not real_stream:
-                res = mod.stream_upload_safely(*args, **kwargs)
-                if asyncio.iscoroutine(res):
-                    return await res
-                return res
+    from app.core.upload_utils import stream_upload_safely as real_stream
+    for mod_name in ("app.api.office_routes", "app.api.office.contracts", "app.api.office.contracts_uploads"):
+        if mod_name in sys.modules:
+            mod = sys.modules[mod_name]
+            if hasattr(mod, "stream_upload_safely"):
+                val = getattr(mod, "stream_upload_safely")
+                if val is not real_stream:
+                    res = val(*args, **kwargs)
+                    if asyncio.iscoroutine(res):
+                        return await res
+                    return res
     import unittest.mock
     if isinstance(stream_upload_safely, (unittest.mock.Mock, unittest.mock.AsyncMock)):
         res = stream_upload_safely(*args, **kwargs)
@@ -75,12 +79,14 @@ async def _stream_upload_safely(*args, **kwargs):
 
 def _get_job_document_by_hash(*args, **kwargs):
     import sys
-    if "app.api.office.contracts" in sys.modules:
-        mod = sys.modules["app.api.office.contracts"]
-        if hasattr(mod, "get_job_document_by_hash"):
-            from app.core.database import get_job_document_by_hash as real_doc
-            if mod.get_job_document_by_hash is not real_doc:
-                return mod.get_job_document_by_hash(*args, **kwargs)
+    from app.core.database import get_job_document_by_hash as real_doc
+    for mod_name in ("app.api.office_routes", "app.api.office.contracts", "app.api.office.contracts_uploads"):
+        if mod_name in sys.modules:
+            mod = sys.modules[mod_name]
+            if hasattr(mod, "get_job_document_by_hash"):
+                val = getattr(mod, "get_job_document_by_hash")
+                if val is not real_doc:
+                    return val(*args, **kwargs)
     import unittest.mock
     if isinstance(get_job_document_by_hash, (unittest.mock.Mock, unittest.mock.AsyncMock)):
         return get_job_document_by_hash(*args, **kwargs)
@@ -89,15 +95,17 @@ def _get_job_document_by_hash(*args, **kwargs):
 
 async def _run_full_office_pipeline(*args, **kwargs):
     import sys
-    if "app.api.office.contracts" in sys.modules:
-        mod = sys.modules["app.api.office.contracts"]
-        if hasattr(mod, "run_full_office_pipeline"):
-            from app.core.pipeline import run_full_office_pipeline as real_pipe
-            if mod.run_full_office_pipeline is not real_pipe:
-                res = mod.run_full_office_pipeline(*args, **kwargs)
-                if asyncio.iscoroutine(res):
-                    return await res
-                return res
+    from app.core.pipeline import run_full_office_pipeline as real_pipe
+    for mod_name in ("app.api.office_routes", "app.api.office.contracts", "app.api.office.contracts_uploads"):
+        if mod_name in sys.modules:
+            mod = sys.modules[mod_name]
+            if hasattr(mod, "run_full_office_pipeline"):
+                val = getattr(mod, "run_full_office_pipeline")
+                if val is not real_pipe:
+                    res = val(*args, **kwargs)
+                    if asyncio.iscoroutine(res):
+                        return await res
+                    return res
     import unittest.mock
     if isinstance(run_full_office_pipeline, (unittest.mock.Mock, unittest.mock.AsyncMock)):
         res = run_full_office_pipeline(*args, **kwargs)
@@ -109,15 +117,17 @@ async def _run_full_office_pipeline(*args, **kwargs):
 
 async def _run_supplement_pipeline(*args, **kwargs):
     import sys
-    if "app.api.office.contracts" in sys.modules:
-        mod = sys.modules["app.api.office.contracts"]
-        if hasattr(mod, "run_supplement_pipeline"):
-            from app.core.pipeline import run_supplement_pipeline as real_supp
-            if mod.run_supplement_pipeline is not real_supp:
-                res = mod.run_supplement_pipeline(*args, **kwargs)
-                if asyncio.iscoroutine(res):
-                    return await res
-                return res
+    from app.core.pipeline import run_supplement_pipeline as real_supp
+    for mod_name in ("app.api.office_routes", "app.api.office.contracts", "app.api.office.contracts_uploads"):
+        if mod_name in sys.modules:
+            mod = sys.modules[mod_name]
+            if hasattr(mod, "run_supplement_pipeline"):
+                val = getattr(mod, "run_supplement_pipeline")
+                if val is not real_supp:
+                    res = val(*args, **kwargs)
+                    if asyncio.iscoroutine(res):
+                        return await res
+                    return res
     import unittest.mock
     if isinstance(run_supplement_pipeline, (unittest.mock.Mock, unittest.mock.AsyncMock)):
         res = run_supplement_pipeline(*args, **kwargs)

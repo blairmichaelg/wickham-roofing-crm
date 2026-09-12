@@ -40,15 +40,17 @@ router = APIRouter()
 
 async def _run_supplement_pipeline(*args, **kwargs):
     import sys
-    if "app.api.office.contracts" in sys.modules:
-        mod = sys.modules["app.api.office.contracts"]
-        if hasattr(mod, "run_supplement_pipeline"):
-            from app.core.pipeline import run_supplement_pipeline as real_supp
-            if mod.run_supplement_pipeline is not real_supp:
-                res = mod.run_supplement_pipeline(*args, **kwargs)
-                if asyncio.iscoroutine(res):
-                    return await res
-                return res
+    from app.core.pipeline import run_supplement_pipeline as real_supp
+    for mod_name in ("app.api.office_routes", "app.api.office.contracts", "app.api.office.contracts_supplement_pipeline"):
+        if mod_name in sys.modules:
+            mod = sys.modules[mod_name]
+            if hasattr(mod, "run_supplement_pipeline"):
+                val = getattr(mod, "run_supplement_pipeline")
+                if val is not real_supp:
+                    res = val(*args, **kwargs)
+                    if asyncio.iscoroutine(res):
+                        return await res
+                    return res
     import unittest.mock
     if isinstance(run_supplement_pipeline, (unittest.mock.Mock, unittest.mock.AsyncMock)):
         res = run_supplement_pipeline(*args, **kwargs)

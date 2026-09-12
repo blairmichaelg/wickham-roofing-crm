@@ -41,15 +41,17 @@ EXPORT_DIR = Path("generated_exports")
 
 async def _get_inspection_summary(*args, **kwargs):
     import sys
-    if "app.api.office.contracts" in sys.modules:
-        mod = sys.modules["app.api.office.contracts"]
-        if hasattr(mod, "get_inspection_summary"):
-            from app.services.inspection_summary import get_inspection_summary as real_summary
-            if mod.get_inspection_summary is not real_summary:
-                res = mod.get_inspection_summary(*args, **kwargs)
-                if asyncio.iscoroutine(res):
-                    return await res
-                return res
+    from app.services.inspection_summary import get_inspection_summary as real_summary
+    for mod_name in ("app.api.office_routes", "app.api.office.contracts", "app.api.office.contracts_downloads"):
+        if mod_name in sys.modules:
+            mod = sys.modules[mod_name]
+            if hasattr(mod, "get_inspection_summary"):
+                val = getattr(mod, "get_inspection_summary")
+                if val is not real_summary:
+                    res = val(*args, **kwargs)
+                    if asyncio.iscoroutine(res):
+                        return await res
+                    return res
     import unittest.mock
     if isinstance(get_inspection_summary, (unittest.mock.Mock, unittest.mock.AsyncMock)):
         res = get_inspection_summary(*args, **kwargs)
@@ -61,12 +63,14 @@ async def _get_inspection_summary(*args, **kwargs):
 
 def _get_pdf_generator_cls():
     import sys
-    if "app.api.office.contracts" in sys.modules:
-        mod = sys.modules["app.api.office.contracts"]
-        if hasattr(mod, "PDFGenerator"):
-            from app.services.pdf import PDFGenerator as real_pdf
-            if mod.PDFGenerator is not real_pdf:
-                return mod.PDFGenerator
+    from app.services.pdf import PDFGenerator as real_pdf
+    for mod_name in ("app.api.office_routes", "app.api.office.contracts", "app.api.office.contracts_downloads"):
+        if mod_name in sys.modules:
+            mod = sys.modules[mod_name]
+            if hasattr(mod, "PDFGenerator"):
+                val = getattr(mod, "PDFGenerator")
+                if val is not real_pdf:
+                    return val
     return PDFGenerator
 
 
