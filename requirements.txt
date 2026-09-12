@@ -24,7 +24,9 @@ pdfplumber>=0.11.0
 
 # === Security & Authentication ===
 PyJWT>=2.8.0
-bcrypt>=3.2.0,<4.0.0
+# bcrypt is strictly pinned to 3.2.2: bcrypt >= 5.0.0 raises ValueError on passwords > 72 bytes
+# instead of silently truncating, which causes cascading 500 errors across passlib authentication.
+bcrypt==3.2.2
 passlib>=1.7.4
 
 # === Configuration & Validation ===

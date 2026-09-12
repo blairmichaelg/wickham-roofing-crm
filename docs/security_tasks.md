@@ -31,6 +31,8 @@ This document summarizes the authorization boundaries and security enforcements 
 - **5-Day Post-Denial Invoicing Lock**: Enforced server-side in `create_invoice_route`. Prevents invoice generation on insurance jobs until 5 full business days have elapsed since a `CLAIM_DENIED` status event. Emergency services (tarping) are exempt.
 - **Assignment of Benefits (AOB) Prohibition**: Under Georgia SB 201 (O.C.G.A. § 33-24-59.28), post-disaster residential roofing contracts cannot assign insurance proceeds or rights to contractors. Scanned and rejected deterministically via `app/services/compliance.py`.
 - **Statutory Cancellation Formatting**: Mandatory boldface ≥ 10-point font disclosures on insurance contracts and detachable duplicate Notice of Cancellation forms.
-- **7-Year Statutory Document Retention**: Schema migration 0021 adds `deleted_at` soft deletes to `jobs`, `job_documents`, and `job_agreements` to prevent hard record deletion.
+## Dependency Security & Cryptographic Stability
+- **bcrypt Version Pin (`bcrypt==3.2.2`)**: Strictly pinned to `3.2.2` in `requirements.txt`. `bcrypt >= 5.0.0` changed behavior from silently truncating passwords over 72 bytes to raising `ValueError`. Under `passlib` (which expects the legacy truncation behavior during salt generation / hashing), upgrading to `>= 5.0.0` causes unhandled 500 exceptions across all authentication routes. This pin must not be removed or upgraded without an explicit migration away from `passlib`.
 
 _End of document._
+
