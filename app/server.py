@@ -32,6 +32,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api.admin_jobs_routes import router as admin_jobs_router
 from app.api.admin_reps_routes import router as admin_reps_router
+from app.api.admin_auth_routes import router as admin_auth_router
 from app.api.auth_routes import router as auth_router
 from app.api.field_routes import router as field_router
 from app.api.frontend_routes import router as frontend_router
@@ -233,6 +234,36 @@ def create_app() -> FastAPI:
 
     application.add_middleware(NoCacheMiddleware)
 
+    # --- JWT Revocation Middleware ---
+    class JWTRevocationMiddleware(BaseHTTPMiddleware):
+        async def dispatch(self, request: Request, call_next):
+            auth_header = request.headers.get("Authorization") or request.headers.get("x-internal-token")
+            token = None
+            if auth_header:
+                parts = auth_header.split(" ", 1)
+                token = parts[1].strip() if len(parts) == 2 and parts[0].lower() == "bearer" else auth_header.strip()
+            elif "auth_token" in request.cookies:
+                token = request.cookies.get("auth_token")
+
+            if token:
+                try:
+                    import jwt
+                    payload = jwt.decode(token, options={"verify_signature": False})
+                    jti = payload.get("jti")
+                    if jti:
+                        from app.core.database import is_token_revoked
+                        if is_token_revoked(jti):
+                            return JSONResponse(
+                                status_code=401,
+                                content={"detail": "Token has been revoked"}
+                            )
+                except Exception:
+                    pass
+
+            return await call_next(request)
+
+    application.add_middleware(JWTRevocationMiddleware)
+
     # --- Request timing & access metrics middleware ---
     @application.middleware("http")
     async def request_timing_middleware(request: Request, call_next):
@@ -310,6 +341,7 @@ def create_app() -> FastAPI:
     application.include_router(operations_router)
     application.include_router(auth_router)
     application.include_router(admin_reps_router)
+    application.include_router(admin_auth_router)
     application.include_router(admin_jobs_router)
     application.include_router(system_router)
     application.include_router(websockets_router)

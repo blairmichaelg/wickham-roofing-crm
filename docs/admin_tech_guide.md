@@ -427,5 +427,23 @@ Commercial jobs operate under multi-stage progress billing schedules (Schedule o
 
 ---
 
-*This guide reflects the Admin workflow as of version `2.8.17`. Includes commercial progress billing, automated lien monitoring, decoupled payment recording, expanded 90-mile storm canvassing intelligence, gated review workflows, and the read-only core role classification for Alex Wickham.*
+## 12. Rep Session Revocation & Device Offboarding
+
+When a field rep's device is lost or stolen, or when offboarding personnel, administrators can immediately invalidate their active authenticated sessions without waiting for the 12-hour JWT expiration window.
+
+### Immediate Session Invalidation API
+- **Endpoint**: `POST /api/admin/auth/revoke`
+- **Authorization**: Requires `admin` role or full-access core team credentials.
+- **Payload Options**:
+  - By token ID: `{"jti": "<unique-uuid>"}`
+  - By raw token: `{"token": "<jwt-token-string>"}`
+- **Behavior**:
+  - The unique token ID (`jti`) is persisted to the `revoked_tokens` database table.
+  - Subsequent requests with this token are intercepted at both the `JWTRevocationMiddleware` and dependency injection levels, returning an immediate `401 Unauthorized` ("Token has been revoked").
+- **Zero-PIN Impact Guarantee**:
+  - Session revocation acts exclusively upon cryptographic token metadata (`jti`), completely detached from user/rep PIN values, PIN hashes, or PIN verification flows.
+
+---
+
+*This guide reflects the Admin workflow as of version `2.8.17`. Includes commercial progress billing, automated lien monitoring, JWT session revocation, decoupled payment recording, expanded 90-mile storm canvassing intelligence, gated review workflows, and the read-only core role classification for Alex Wickham.*
 

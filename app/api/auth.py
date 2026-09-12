@@ -1,9 +1,11 @@
 import datetime
+import uuid
 
 import jwt
 from fastapi import Cookie, Depends, Header, HTTPException, Request
 
 from app.config import get_settings
+from app.core.database import is_token_revoked
 
 ALGORITHM = "HS256"
 
@@ -11,6 +13,7 @@ def create_access_token(
     role: str,
     rep_name: str | None = None,
     rep_id: str | None = None,
+    jti: str | None = None,
 ) -> str:
     """
     Create Access Token functionality.
@@ -19,13 +22,15 @@ def create_access_token(
             role (str): role parameter.
             rep_name (str | None): rep_name parameter.
             rep_id (str | None): rep_id parameter.
+            jti (str | None): unique token id (generated automatically if None).
     
     Returns:
         str: The resulting output.
     """
     settings = get_settings()
     expire = datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=12)
-    to_encode: dict = {"sub": role, "role": role, "exp": expire}
+    token_jti = jti or str(uuid.uuid4())
+    to_encode: dict = {"sub": role, "role": role, "exp": expire, "jti": token_jti}
     if rep_name:
         to_encode["rep_name"] = rep_name
     if rep_id:
@@ -36,9 +41,9 @@ def create_access_token(
 def decode_token(token: str) -> dict:
     """
     Decode a JWT and return the full payload dict.
-    Raises HTTPException 401 on invalid/expired token.
+    Raises HTTPException 401 on invalid/expired/revoked token.
     Returns at minimum: {"role": str}
-    May also contain: {"rep_name": str, "rep_id": str}
+    May also contain: {"rep_name": str, "rep_id": str, "jti": str}
     """
     settings = get_settings()
     try:
@@ -48,6 +53,12 @@ def decode_token(token: str) -> dict:
         if role is None:
             raise HTTPException(status_code=401, detail="Invalid authentication credentials")
         payload["role"] = role
+
+        # Check token blacklist (revoked jti)
+        jti = payload.get("jti")
+        if jti and is_token_revoked(jti):
+            raise HTTPException(status_code=401, detail="Token has been revoked")
+
         return payload
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Invalid authentication credentials")

@@ -349,8 +349,14 @@ def run_migrations() -> None:
             m26.up(conn)
             conn.execute("UPDATE schema_version SET version = 26, applied_at = CURRENT_TIMESTAMP WHERE id = 1")
 
+        if current_version < 27:
+            import importlib
+            m27 = importlib.import_module("app.core.migrations.0027_add_revoked_tokens")
+            m27.up(conn)
+            conn.execute("UPDATE schema_version SET version = 27, applied_at = CURRENT_TIMESTAMP WHERE id = 1")
+
         conn.execute("COMMIT")
-        logger.info("migrations_applied", current_version=current_version, target_version=26)
+        logger.info("migrations_applied", current_version=current_version, target_version=27)
 
         
         # Since seed logic was removed from up(), do it here outside the transaction
@@ -2438,3 +2444,37 @@ def add_referral(job_id: str, referral_code: str, source: str = "") -> dict:
         raise
     finally:
         conn.close()
+
+
+def revoke_token(jti: str, expires_at: str | None = None) -> None:
+    """Revoke a JWT token by storing its unique identifier (jti)."""
+    conn = get_connection()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO revoked_tokens (jti, revoked_at, expires_at)
+            VALUES (?, CURRENT_TIMESTAMP, ?)
+            """,
+            (jti, expires_at)
+        )
+        conn.execute("COMMIT")
+        logger.info("jwt_token_revoked", jti=jti)
+    except Exception:
+        conn.execute("ROLLBACK")
+        raise
+    finally:
+        conn.close()
+
+
+def is_token_revoked(jti: str) -> bool:
+    """Check if a JWT token identifier (jti) has been revoked."""
+    if not jti:
+        return False
+    conn = get_connection()
+    try:
+        cursor = conn.execute("SELECT 1 FROM revoked_tokens WHERE jti = ?", (jti,))
+        return cursor.fetchone() is not None
+    finally:
+        conn.close()
+

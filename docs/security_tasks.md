@@ -34,5 +34,12 @@ This document summarizes the authorization boundaries and security enforcements 
 ## Dependency Security & Cryptographic Stability
 - **bcrypt Version Pin (`bcrypt==3.2.2`)**: Strictly pinned to `3.2.2` in `requirements.txt`. `bcrypt >= 5.0.0` changed behavior from silently truncating passwords over 72 bytes to raising `ValueError`. Under `passlib` (which expects the legacy truncation behavior during salt generation / hashing), upgrading to `>= 5.0.0` causes unhandled 500 exceptions across all authentication routes. This pin must not be removed or upgraded without an explicit migration away from `passlib`.
 
+## JWT Revocation & Active Session Blacklist
+- **Revocation Table (`revoked_tokens`)**: Stores revoked JWT unique IDs (`jti`), revocation timestamps, and optional expiry timestamps.
+- **Edge Middleware & Dependency Inspection**: Both `JWTRevocationMiddleware` and `decode_token` check incoming token `jti` claims against the `revoked_tokens` table. Any request bearing a revoked token is immediately rejected with HTTP 401 ("Token has been revoked") without waiting for the 12-hour expiration window.
+- **Admin Session Revocation API**: Administrators can revoke an active session via `POST /api/admin/auth/revoke` passing either `{"jti": "<uuid>"}` or `{"token": "<jwt_string>"}`.
+- **PIN Isolation Guarantee**: Session revocation operates exclusively on issued JWT metadata (`jti`), completely isolated from field rep PINs, PIN hashing algorithms, and PIN verification logic.
+
 _End of document._
+
 
