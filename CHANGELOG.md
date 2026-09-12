@@ -23,7 +23,7 @@
   - Added full integration test executing all 10 phases of a commercial contract from lead intake, proposal, SOV setup, Platypus contract PDF generation, multi-stage progress billing cycles, retainage release, materials gating, QBO export, and financial reconciliation.
 
 ### Changed
-- **Bcrypt Version Pinning (`requirements.txt`)**: Pinned `bcrypt==3.2.2` with architecture safety comments to avoid C-extension compilation and 72-byte truncation issues while strictly preserving all field rep PIN hashes and storage.
+- **Bcrypt Range Pinning (`requirements.txt`)**: Pinned `bcrypt>=3.2.2,<4.0.0` with architecture safety comments to allow patch updates within 3.x while strictly preventing passlib breakage from 4.0.0+ / 5.0.0+, with zero modifications to existing field rep PIN hashes or storage.
 - **Integer Cents Precision Migration (`Migration 0025`, `app/core/database.py`)**: Completely eliminated floating-point currency representation across all database tables, models, and serializers, dropping legacy `default_rate` on `pricing`.
 - **SQLite WAL Concurrency Tuning (`app/core/database.py`, `app/worker.py`)**: Set `busy_timeout = 30000` (30s) across all SQLite connections, added periodic WAL checkpoint truncate hook in the background worker, and verified pragma enforcement on startup.
 - **Modular Route Decomposition**:
