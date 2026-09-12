@@ -46,7 +46,17 @@ Run the full validation matrix — all three must pass with zero errors:
 
 # 3. Linter
 .\venv\Scripts\python.exe -m ruff check app/
+
+# 4. OpenAPI API Contract & Breaking Change Enforcement
+python scripts/check_openapi_diff.py
 ```
+
+> [!IMPORTANT]
+> **OpenAPI Contract Enforcement**: CI validates that no endpoints, operations, or schema fields are removed or made unexpectedly required without updating the contract baseline. If an intentional breaking API change is made, update the baseline snapshot in the same commit:
+> ```powershell
+> python scripts/check_openapi_diff.py --update
+> git add docs/openapi_snapshot.json
+> ```
 
 > [!NOTE]
 > **Badge Update Requirement**: If your changes introduce new test cases or modify the version number in `pyproject.toml`, you MUST update the corresponding badges in `README.md` (the version badge and the test count badge) and update the test module/assertion counts in `docs/testing.md` and `CONTRIBUTING.md` to ensure they stay in perfect sync.

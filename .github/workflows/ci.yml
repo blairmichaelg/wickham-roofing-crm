@@ -54,6 +54,9 @@ jobs:
       - name: Mypy type-check (core + services)
         run: mypy app/core app/services
 
+      - name: Enforce OpenAPI API contract (zero breaking changes)
+        run: python scripts/check_openapi_diff.py
+
       - name: Run test suite with coverage
         run: |
           pytest tests/ -v \
