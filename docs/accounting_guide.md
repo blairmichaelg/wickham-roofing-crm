@@ -163,6 +163,13 @@ Commercial roofing projects operate under multi-stage progress billing rather th
 ### Exporting Progress Invoices to QuickBooks Online
 Commercial progress billing applications export to QuickBooks Online via `export_progress_billing_to_csv()`, outputting formatted CSV files with unique invoice identifiers (e.g., `PROG-JOBID-APP1`) detailing current-period progress amounts and retainage accounting lines.
 
+### Commercial Document & Invoicing PDF Architecture
+Commercial contracts and AIA G702/G703 style progress billing applications are generated using ReportLab's Platypus flowable engine (`CommercialPDFGenerator` in `app/services/pdf/commercial.py`):
+- **NumberedCanvas**: Implements a two-pass canvas renderer to dynamically output accurate `Page X of Y` footers across multi-page contract documents and continuation sheets.
+- **KeepInFrame Protection**: Dynamic engineering specifications and AI-generated scopes of work are wrapped in `KeepInFrame` flowables, preventing layout crashes or frame boundary overflows.
+- **AIA G702/G703 Continuation Sheets**: Cleanly breaks between Page 1 (Application and Certificate for Payment with contractor certification) and Page 2+ (Schedule of Values Continuation Sheet).
+- **Exact Integer Cents Formatting**: All stored integer cents are rendered as formatted dollar amounts (`$X,XXX.XX`).
+
 ---
 
 ## Frequently Asked Questions (FAQ)

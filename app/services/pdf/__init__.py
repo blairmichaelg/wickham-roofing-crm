@@ -1,3 +1,4 @@
+from app.services.pdf.commercial import CommercialPDFGenerator
 from app.services.pdf.commission import CommissionGenerator
 from app.services.pdf.documents import DocumentsGenerator
 from app.services.pdf.inspection_report import (
@@ -7,7 +8,13 @@ from app.services.pdf.invoice import InvoiceGenerator
 from app.services.pdf.supplement import SupplementGenerator
 
 
-class PDFGenerator(InvoiceGenerator, SupplementGenerator, CommissionGenerator, DocumentsGenerator):
+class PDFGenerator(
+    InvoiceGenerator,
+    SupplementGenerator,
+    CommissionGenerator,
+    DocumentsGenerator,
+    CommercialPDFGenerator,
+):
     """
     Composite PDF generator for all office/field documents that operate on job dicts.
     InspectionReportGenerator is intentionally excluded — it operates on InspectionJob

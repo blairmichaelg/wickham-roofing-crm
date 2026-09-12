@@ -265,4 +265,14 @@ The diagram below maps how requests from authenticated personas flow through rou
 │  │   - BEGIN IMMEDIATE    │  │     - Task coordination │  │ photos) │  │
 │  └────────────────────────┘  └─────────────────────────┘  └─────────┘  │
 └────────────────────────────────────────────────────────────────────────┘
-```
+```
+
+---
+
+## 8. Commercial PDF Generation Architecture (ReportLab Platypus)
+
+For commercial roofing contracts, Schedules of Values (SOV), and AIA G702/G703 style progress billing applications, the system utilizes `CommercialPDFGenerator` (`app/services/pdf/commercial.py`):
+- **NumberedCanvas Two-Pass Footers**: Subclasses `canvas.Canvas` to defer page footer rendering until the document build completes, ensuring deterministic `Page X of Y` footers across dynamic multi-page commercial contracts and continuation sheets.
+- **KeepInFrame Dynamic Scope Protection**: Unbounded dynamic engineering specifications and AI-generated scopes of work are wrapped in `KeepInFrame` flowables to prevent layout engine crashes and page boundary clipping.
+- **AIA G702/G703 Structured Separation**: Enforces a strict two-part flow: Page 1 contains the Application and Certificate for Payment (summary financials and contractor certification), followed by a page break to Page 2+ containing the detailed Schedule of Values Continuation Sheet.
+- **Integer Cents Precision**: All financial amounts stored in the database as integer cents are formatted strictly at render time into localized currency strings.
