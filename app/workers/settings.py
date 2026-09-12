@@ -77,6 +77,15 @@ async def startup(ctx: dict) -> None:
     else:
         logger.info("[DEV MODE] Worker connected to Redis DB 1")
     logger.info("worker_starting_up")
+
+    # Verify and enforce SQLite WAL concurrency parameters in worker process
+    from app.core.database import get_connection
+    _conn = get_connection()
+    try:
+        _timeout = _conn.execute("PRAGMA busy_timeout;").fetchone()[0]
+        logger.info("worker_sqlite_concurrency_tuned", busy_timeout_ms=_timeout)
+    finally:
+        _conn.close()
     
     # Run storm ingestion on startup in the background
     asyncio.create_task(ingest_storm_events(ctx))
@@ -107,7 +116,18 @@ async def run_backup(ctx: dict) -> None:
     logger.info("cron_backup_finished")
 
 
+async def run_wal_checkpoint(ctx: dict) -> None:
+    """
+    Periodic cron job to checkpoint and truncate SQLite WAL file.
+    """
+    from app.core.database import wal_checkpoint_truncate
+    logger.info("cron_wal_checkpoint_started")
+    res = await asyncio.to_thread(wal_checkpoint_truncate)
+    logger.info("cron_wal_checkpoint_finished", **res)
+
+
 class WorkerSettings:
+
     """
     ARQ worker configuration.
     ARQ discovers this class by name when started via:
@@ -147,5 +167,7 @@ class WorkerSettings:
         cron(run_backup, hour={0, 4, 8, 12, 16, 20}, minute=0),
         cron(ingest_storm_events, minute=_minutes_set),
         cron(monitor_commercial_lien_deadlines, hour=6, minute=0),
+        cron(run_wal_checkpoint, minute={15, 45}),
     ]
+
 

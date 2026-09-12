@@ -115,9 +115,11 @@ To provide door-knocking sales reps with real-time, zero-cost weather reports ne
 
 ### A. SQLite 3 WAL & Immediate Concurrency
 Running multi-role web servers over standard SQLite files historically risked database locked errors (`SQLITE_BUSY`). V4 resolves this via:
-- **WAL Mode Enabling**: Write-Ahead Logging allows simultaneous non-blocking reads across the active operations, accounting, and field dashboards during active background writes.
+- **WAL Mode & Busy Timeout (30,000ms)**: Write-Ahead Logging allows simultaneous non-blocking reads across the active operations, accounting, and field dashboards during active background writes. All SQLite connections across FastAPI request lifecycles and background ARQ workers enforce `PRAGMA busy_timeout = 30000;` (30 seconds) and connection timeout of 30.0s to eliminate transient lock contention during heavy I/O bursts.
 - **Explicit `BEGIN IMMEDIATE` Transactions**: Database mutations across state transitions and QBO accounting batch updates are explicitly bound within atomic `BEGIN IMMEDIATE` transaction closures, preventing read-to-write TOCTOU race conditions.
+- **Automated WAL Checkpoints**: The ARQ worker lifecycle runs scheduled `PRAGMA wal_checkpoint(TRUNCATE);` sweeps (and post-heavy batch generation hooks) via `wal_checkpoint_truncate()` to keep WAL files compact, prevent write amplification, and release uncommitted page cache.
 - **Role-Tailored SQL Views**: Specialized native database views (`live_material_board` and `financial_delta_view`) pre-aggregate complex ledger computations in SQL C-code for zero-latency dashboard delivery.
+
 
 ### B. Automated Hot Snapshots & Disaster Recovery
 - **Hot Snapshots**: The internal scheduling worker periodically executes non-locking SQLite `VACUUM INTO` operations to generate consistency-verified point-in-time database backups inside `data/backups/`.

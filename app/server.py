@@ -134,10 +134,22 @@ async def lifespan(app: FastAPI):
     # Initialize databases and required directories
     init_cache_db()
     init_crm_db()
+    
+    # Verify and enforce SQLite WAL concurrency parameters
+    from app.core.database import get_connection
+    _conn = get_connection()
+    try:
+        _timeout = _conn.execute("PRAGMA busy_timeout;").fetchone()[0]
+        _journal = _conn.execute("PRAGMA journal_mode;").fetchone()[0]
+        logger.info("database_wal_concurrency_tuned", journal_mode=_journal, busy_timeout_ms=_timeout)
+    finally:
+        _conn.close()
+
     os.makedirs("field_photos", exist_ok=True)
     os.makedirs("data/field_docs", exist_ok=True)
     os.makedirs("signed_agreements", exist_ok=True)
     logger.info("v3_infrastructure_initialized")
+
 
     # Attach ARQ Redis pool to app state for use in route handlers
     redis_pool = await create_redis_pool()

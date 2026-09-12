@@ -111,15 +111,37 @@ def _configure_connection(conn: sqlite3.Connection) -> None:
     conn.execute("PRAGMA synchronous=NORMAL;")
     conn.execute("PRAGMA temp_store=MEMORY;")
     conn.execute("PRAGMA mmap_size=268435456;")
-    conn.execute("PRAGMA busy_timeout=15000;")
+    conn.execute("PRAGMA busy_timeout=30000;")
 
 def get_connection() -> sqlite3.Connection:
     """Get a SQLite connection with WAL mode enabled for concurrency."""
-    conn = sqlite3.connect(get_db_path(), check_same_thread=False, timeout=15.0)
+    conn = sqlite3.connect(get_db_path(), check_same_thread=False, timeout=30.0)
     conn.row_factory = sqlite3.Row
     conn.isolation_level = None  # Explicit transaction control
     _configure_connection(conn)
     return conn
+
+def wal_checkpoint_truncate() -> dict[str, int]:
+    """Execute PRAGMA wal_checkpoint(TRUNCATE) to safely checkpoint and truncate the WAL file.
+    
+    Returns:
+        dict[str, int]: Result containing busy, log, and checkpointed page counts.
+    """
+    conn = get_connection()
+    try:
+        cursor = conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+        row = cursor.fetchone()
+        return {
+            "busy": row[0] if row else 0,
+            "log": row[1] if row else 0,
+            "checkpointed": row[2] if row else 0,
+        }
+    except Exception as e:
+        logger.error("wal_checkpoint_truncate_failed", error=str(e))
+        return {"busy": -1, "log": -1, "checkpointed": -1}
+    finally:
+        conn.close()
+
 
 def _fetch_job_sync(job_id: str) -> dict | None:
     """
