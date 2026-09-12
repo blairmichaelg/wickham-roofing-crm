@@ -18,6 +18,7 @@ from arq.cron import cron
 from app.config import get_settings
 from app.core.backup import backup_database
 from app.core.cleanup import cleanup_orphaned_artifacts
+from app.workers.commercial_worker import monitor_commercial_lien_deadlines
 from app.workers.commission_processor import process_commission
 from app.workers.escalation_processor import process_escalation
 from app.workers.inspection_processor import process_inspection
@@ -125,6 +126,7 @@ class WorkerSettings:
         process_escalation,
         process_photo_damage,
         ingest_storm_events,
+        monitor_commercial_lien_deadlines,
     ]
 
     redis_settings = get_redis_settings()
@@ -144,4 +146,6 @@ class WorkerSettings:
         cron(run_cleanup, hour=2, minute=0),
         cron(run_backup, hour={0, 4, 8, 12, 16, 20}, minute=0),
         cron(ingest_storm_events, minute=_minutes_set),
+        cron(monitor_commercial_lien_deadlines, hour=6, minute=0),
     ]
+

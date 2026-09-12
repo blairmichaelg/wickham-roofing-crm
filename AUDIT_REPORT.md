@@ -96,10 +96,32 @@ A comprehensive rebrand, architectural refactor, and testing/DevOps hardening pa
 
 ---
 
+## 10. COMMERCIAL PROGRESS BILLING & LIEN MONITORING AUDIT (2026-09-12 Hardening Pass)
+A commercial-readiness engineering pass was implemented to support multi-stage commercial projects:
+- **Integer Cents Currency Enforcement (Migration 0025)**: Dropped legacy `REAL` default rates in `pricing` table. All financial ledgers, job costing, and rate lookups strictly operate in integer cents. Pydantic models coerce and validate inputs, rejecting negative values on invoices.
+- **Commercial Job Type & Progress Billing Engine (Migration 0026)**:
+  - Added canonical `JobType.COMMERCIAL` to gate commercial workflows.
+  - Added `progress_billing_schedules`, `progress_billing_applications`, and `progress_billing_items` tables.
+  - Created pure Python deterministic service `app/services/progress_billing_engine.py` calculating billing cycles, retainage holdbacks, retainage releases, and enforcing a strict 100% cap on Schedule of Values.
+  - Updated `app/services/qbo_export.py` with `export_progress_billing_to_csv` for QuickBooks Online commercial exports.
+- **Automated ARQ Lien & Payment Deadline Monitoring**:
+  - Added `last_work_date` tracking to `jobs`.
+  - Created ARQ worker task `monitor_commercial_lien_deadlines` (running daily at 06:00 UTC and on-demand).
+  - Configurable alert window (`commercial_lien_deadline_days` = 90, `commercial_lien_warning_days` = 15).
+  - Dispatches high-priority alerts to `admin` and `accounting` roles for unreconciled invoices approaching deadlines.
+  - **Legal Compliance Documentation**: Explicitly documented across `docs/admin_tech_guide.md`, `docs/accounting_guide.md`, and `ARCHITECTURE.md` that statutory lien timelines and retainage caps are contract-dependent software defaults requiring confirmation with legal counsel per contract.
+- **Tests Enforcing Behavior**:
+  - `tests/test_currency_precision.py`: 6 tests verifying integer cents schema, boundary amounts ($0.01 to $10M), and Pydantic validators.
+  - `tests/test_commercial_billing.py`: 6 tests verifying SOV lifecycle, multi-cycle billing, 100% cap overbill rejection, configurable retainage, and QBO CSV exports.
+  - `tests/test_commercial_lien_monitor.py`: 2 async tests verifying ARQ task scheduling, deadline calculations, and alert triggering.
+
+---
+
 ### Final Summary & Metrics
-- **Test Count**: 527+ Passing (100% Pass Rate)
+- **Test Count**: 539+ Passing (100% Pass Rate)
 - **PDF Engine Document Types Verified**: 10 / 10
 - **CVEs Detected**: 0
 - **System Health**: Hardened, Modular, Local-First, Production-Grade (v2.8.17)
+
 
 

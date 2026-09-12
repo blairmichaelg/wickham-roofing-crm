@@ -46,6 +46,7 @@ def up(conn: sqlite3.Connection) -> None:
             total_billed_cents INTEGER NOT NULL DEFAULT 0,
             retainage_withheld_cents INTEGER NOT NULL DEFAULT 0,
             retainage_released_cents INTEGER NOT NULL DEFAULT 0,
+            total_retainage_held_cents INTEGER NOT NULL DEFAULT 0,
             net_payment_due_cents INTEGER NOT NULL DEFAULT 0,
             status TEXT NOT NULL DEFAULT 'DRAFT' CHECK(status IN ('DRAFT', 'SUBMITTED', 'PAID', 'VOID')),
             reconciled_at TIMESTAMP,
@@ -53,7 +54,16 @@ def up(conn: sqlite3.Connection) -> None:
             UNIQUE(job_id, application_no)
         )
     """)
+    cursor = conn.execute("PRAGMA table_info(progress_billing_applications)")
+    pb_app_cols = {row[1] for row in cursor.fetchall()}
+    if "total_billed_cents" not in pb_app_cols:
+        conn.execute("ALTER TABLE progress_billing_applications ADD COLUMN total_billed_cents INTEGER NOT NULL DEFAULT 0")
+    if "total_retainage_held_cents" not in pb_app_cols:
+        conn.execute("ALTER TABLE progress_billing_applications ADD COLUMN total_retainage_held_cents INTEGER NOT NULL DEFAULT 0")
+
+
     conn.execute("CREATE INDEX IF NOT EXISTS idx_pb_apps_job_id ON progress_billing_applications(job_id)")
+
 
     # 3. Progress Billing Line Items (per application, tracking SOV line progress)
     conn.execute("""

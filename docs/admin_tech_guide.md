@@ -410,4 +410,22 @@ Admin and office users have access to two new widgets directly in the main Offic
 
 ---
 
-*This guide reflects the Admin workflow as of version `2.8.17`. Includes decoupled payment recording, payment stages in pipeline tracking, expanded 90-mile storm canvassing intelligence, gated review workflows, and the read-only core role classification for Alex Wickham.*
+## 11. Commercial Progress Billing & Statutory Lien Deadline Monitoring
+
+Commercial jobs operate under multi-stage progress billing schedules (Schedule of Values) and require active monitoring of mechanic's lien deadlines based on the date labor/materials were last furnished (`last_work_date`).
+
+### Automated ARQ Deadline Monitor
+- **Worker Task**: `app.workers.commercial_worker.monitor_commercial_lien_deadlines` executes daily at 06:00 UTC via ARQ cron, and can be triggered on-demand per job.
+- **Configurable Settings**:
+  - `commercial_lien_deadline_days` (default: `90`): Configurable statutory lookback window following last work.
+  - `commercial_lien_warning_days` (default: `15`): Threshold before deadline when high-priority alerts are dispatched.
+- **Alert Dispatch**: Dispatches `COMMERCIAL_LIEN_WARNING` WebSocket alerts and logs high-priority warnings to the `admin` and `accounting` roles whenever an unreconciled commercial invoice or retainage balance enters the warning window.
+
+> [!IMPORTANT]
+> **Legal Notice Regarding Statutory Deadlines**:
+> Day thresholds (`90` days deadline, `15` days warning) are operational software defaults. Statutory mechanic's lien perfection timelines (such as Georgia O.C.G.A. § 44-14-361.1, preliminary 30-day notices, and 90-day claim of lien filings) depend on project type (private vs. public), contractual notice provisions, and whether a valid Notice of Commencement was filed. **All statutory deadlines must be confirmed with licensed legal counsel for each specific contract.**
+
+---
+
+*This guide reflects the Admin workflow as of version `2.8.17`. Includes commercial progress billing, automated lien monitoring, decoupled payment recording, expanded 90-mile storm canvassing intelligence, gated review workflows, and the read-only core role classification for Alex Wickham.*
+
