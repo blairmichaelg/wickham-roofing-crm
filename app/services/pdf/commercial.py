@@ -93,7 +93,7 @@ class CommercialPDFGenerator(PDFEngine):
         styles = get_audience_styles("homeowner")
 
         def build_pdf() -> None:
-            doc = SimpleDocTemplate(
+            doc: Any = SimpleDocTemplate(
                 filepath,
                 pagesize=letter,
                 leftMargin=50,
@@ -104,7 +104,7 @@ class CommercialPDFGenerator(PDFEngine):
             doc.job_id = job_id
             doc.doc_type = "COMMERCIAL_CONTRACT"
 
-            story = []
+            story: list[Any] = []
 
             # --- Page 1: Header & Letterhead ---
             story.extend(create_header("COMMERCIAL ROOFING CONTRACT & AGREEMENT", "homeowner"))
@@ -249,9 +249,9 @@ class CommercialPDFGenerator(PDFEngine):
             story.append(Paragraph(warranty_text, styles["BodyText"]))
             story.append(Spacer(1, 20))
 
-            sig_table_data = [
+            sig_table_data: list[list[Any]] = [
                 [
-                    Paragraph("<b>OWNER / AUTHORIZED AGENT</b>", styles["BodyText"]),
+                    Paragraph("<b>CLIENT ACCEPTANCE</b>", styles["BodyText"]),
                     Paragraph("<b>WICKHAM ROOFING LLC</b>", styles["BodyText"]),
                 ],
                 [
@@ -313,7 +313,7 @@ class CommercialPDFGenerator(PDFEngine):
         styles = get_audience_styles("internal")
 
         def build_pdf() -> None:
-            doc = SimpleDocTemplate(
+            doc: Any = SimpleDocTemplate(
                 filepath,
                 pagesize=letter,
                 leftMargin=40,
@@ -324,7 +324,7 @@ class CommercialPDFGenerator(PDFEngine):
             doc.job_id = job_id
             doc.doc_type = "PROGRESS_BILLING"
 
-            story = []
+            story: list[Any] = []
 
             # Document Title
             story.append(Paragraph(f"<b>APPLICATION AND CERTIFICATE FOR PAYMENT</b> (App #{app_no})", styles["Title"]))
@@ -345,7 +345,7 @@ class CommercialPDFGenerator(PDFEngine):
                     Paragraph(f"<b>APPLICATION NO:</b> #{app_no}", styles["BodyText"]),
                 ],
                 [
-                    Paragraph(f"<b>CONTRACT FOR:</b> Commercial Roofing", styles["BodyText"]),
+                    Paragraph("<b>CONTRACT FOR:</b> Commercial Roofing", styles["BodyText"]),
                     Paragraph(f"<b>PERIOD TO:</b> {billing_date}", styles["BodyText"]),
                 ],
             ]

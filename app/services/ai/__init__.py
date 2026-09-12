@@ -40,12 +40,15 @@ from app.services.ai.prompts import (
 )
 
 
-def get_ai_client():
+from typing import Any
+
+
+def get_ai_client() -> Any:
     from app.services.ai_service import get_ai_client as _get
     return _get()
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     if name in ("AiClient", "GeminiClient"):
         from app.services.ai_service import AiClient, GeminiClient
         return {"AiClient": AiClient, "GeminiClient": GeminiClient}[name]

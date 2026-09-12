@@ -33,10 +33,12 @@ from app.core.database import (
     _fetch_job_sync,
     add_referral,
     get_connection,
+    get_financials,
     get_sales_pipeline_summary,
     request_review,
     update_job_status,
 )
+from app.core.job_costing import compute_job_profitability
 from app.core.templates import templates
 from app.core.utils import now_utc
 from app.services.rate_limit import check_rate_limit
@@ -605,7 +607,6 @@ async def get_pipeline_summary():
       - avg_speed_to_lead_hours: average hours from lead capture to first advancement
       - total_active: total non-closed jobs
     """
-    from app.core.database import get_sales_pipeline_summary
     try:
         summary = await asyncio.to_thread(get_sales_pipeline_summary)
         return summary
@@ -647,7 +648,6 @@ async def office_request_review(job_id: str, payload: ReviewRequestPayload):
             detail="Reviews can only be requested on completed installations."
         )
 
-    from app.core.database import request_review
     try:
         result = await asyncio.to_thread(request_review, job_id, payload.requested_by)
         return result
@@ -673,7 +673,6 @@ async def office_add_referral(job_id: str, payload: ReferralPayload):
         job_id = str(uuid.UUID(job_id))
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid job_id format.")
-    from app.core.database import add_referral
     try:
         result = await asyncio.to_thread(add_referral, job_id, payload.referral_code, payload.source)
         return result

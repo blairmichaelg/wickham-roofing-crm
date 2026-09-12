@@ -7,7 +7,7 @@ requiring legal verification per contract and jurisdiction.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Any
 
 import structlog
@@ -33,7 +33,7 @@ async def monitor_commercial_lien_deadlines(ctx: dict, job_id: str | None = None
     deadline_days = settings.commercial_lien_deadline_days
     warning_days = settings.commercial_lien_warning_days
 
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(UTC).date()
     alerts_dispatched = []
 
     conn = get_connection()
@@ -99,7 +99,7 @@ async def monitor_commercial_lien_deadlines(ctx: dict, job_id: str | None = None
                         f"days until statutory lien perfection deadline ({last_work_date} + {deadline_days} days). "
                         "Confirm requirements with legal counsel immediately."
                     ),
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                     "target_roles": ["admin", "accounting"],
                 }
 

@@ -12,6 +12,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.api.auth import verify_admin, verify_office_role
+from app.core.backup import backup_database
 from app.core.database import (
     JobStatus,
     get_connection,

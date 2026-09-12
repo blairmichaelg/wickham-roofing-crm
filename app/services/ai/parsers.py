@@ -3,6 +3,7 @@ Pydantic V2 models and validation parsers for Gemini AI structured responses.
 """
 
 from typing import Any, Literal
+
 from pydantic import BaseModel, Field, ValidationError
 
 from app.core.inspection_models import PhotoAnalysis

@@ -82,7 +82,6 @@ async def download_unsigned_contingency(job_id: str, request: Request, claims: d
     if not job_dict:
         raise HTTPException(status_code=404, detail="Job not found.")
 
-    from app.services.pdf import PDFGenerator
     pdf_gen = PDFGenerator()
     pdf_path = await pdf_gen.generate_contingency_agreement(job_dict)
 

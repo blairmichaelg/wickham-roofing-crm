@@ -36,6 +36,7 @@ from app.core.database import (
 from app.core.job_costing import compute_job_profitability
 from app.core.utils import now_utc
 from app.services.pdf import PDFGenerator
+from app.services.qbo_export import EXPORT_DIR
 
 logger = structlog.get_logger("app.api.office.billing")
 router = APIRouter()

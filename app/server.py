@@ -30,9 +30,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from app.api.admin_auth_routes import router as admin_auth_router
 from app.api.admin_jobs_routes import router as admin_jobs_router
 from app.api.admin_reps_routes import router as admin_reps_router
-from app.api.admin_auth_routes import router as admin_auth_router
 from app.api.auth_routes import router as auth_router
 from app.api.field_routes import router as field_router
 from app.api.frontend_routes import router as frontend_router

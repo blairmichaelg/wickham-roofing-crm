@@ -38,6 +38,7 @@ from app.api.auth import (
 )
 from app.config import FIELD_DOCS_DIR
 from app.core.database import (
+    JobStatus,
     _fetch_job_sync,
     get_connection,
     get_job_document_by_hash,

@@ -7,7 +7,7 @@ import hashlib
 import io
 import json
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Any
 

@@ -8,6 +8,7 @@ Does NOT modify or touch rep PINs, PIN formats, or PIN verification logic.
 from __future__ import annotations
 
 import sqlite3
+
 import structlog
 
 logger = structlog.get_logger("app.core.migrations.0027_add_revoked_tokens")

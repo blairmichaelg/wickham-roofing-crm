@@ -112,7 +112,6 @@ def compute_progress_billing(
     if retainage_release_cents < 0:
         raise ValueError(f"Retainage release cannot be negative (received: {retainage_release_cents})")
 
-    sov_map = {item.id: item for item in schedule}
     input_map = {inp.schedule_item_id: inp for inp in line_inputs}
 
     # Track historical completion per SOV item

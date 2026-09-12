@@ -1,6 +1,6 @@
 # Testing Guide — Wickham Roofing CRM
 
-This guide documents the **73 test modules** (508 assertions) comprising the Wickham Roofing CRM test suite, mapping each module to the business guarantee it protects, documenting how to run the suite with coverage, and specifying the enforced threshold targets.
+This guide documents the **77 test modules** (564 passing tests) comprising the Wickham Roofing CRM test suite, mapping each module to the business guarantee it protects, documenting how to run the suite with coverage, and specifying the enforced threshold targets.
 
 ---
 
@@ -35,7 +35,7 @@ The automated test suite (`tests/conftest.py`) automatically provisions an isola
 | `app/core/` | ≥ 90% |
 | `app/services/` | ≥ 90% |
 | Rest of `app/` | ≥ 75% |
-| Overall | ≥ 75% (enforced via `fail_under = 75` in `pyproject.toml`; current: **78.25%**) |
+| Overall | ≥ 75% (enforced via `fail_under = 75` in `pyproject.toml`; current: **79.28%**) |
 
 ---
 
@@ -108,6 +108,10 @@ The automated test suite (`tests/conftest.py`) automatically provisions an isola
 | `test_database_integration.py` | Integration-level tests for core database helpers including financial writeback and job context fetch |
 | `test_ai_service_additional.py` | Additional Gemini AI client branches: batch photo analysis, SOL extraction, and error handling |
 | `test_retail_contracts_backend.py` | Retail contract API endpoints: creation, PDF generation, status transitions, and validation |
+| `test_commercial_billing.py` | Commercial progress billing engine, retainage holdback calculations, Schedule of Values (SOV) multi-cycle applications, and QBO progress billing export |
+| `test_commercial_pdf.py` | Commercial-grade Platypus PDF generation, NumberedCanvas two-pass "Page X of Y" pagination, and KeepInFrame dynamic layout scaling |
+| `test_openapi_contract.py` | OpenAPI REST schema freeze and contract drift regression test against canonical snapshot |
+| `domain/test_commercial_lifecycle.py` | End-to-end commercial job lifecycle integration: lead intake, SOV architecture, contract execution, multi-cycle progress billing, overbilling/retainage guardrails, materials gating, QBO export, and financial reconciliation |
 
 ---
 

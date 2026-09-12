@@ -84,12 +84,12 @@ async def generate_sales_summary(job: dict, storm_events: list[dict]) -> str:
             system_prompt=_SUMMARY_SYSTEM_PROMPT,
             user_prompt=user_prompt,
         )
-        text = result.strip()
+        text = str(result).strip()
         # Enforce legal disclaimers guardrail
         check = verify_legal_disclaimers(text, disclaimer_type="sales_script")
         if not check.passed:
             text += " A free inspection from Wickham Roofing involves no obligation."
-        return text
+        return str(text)
     except Exception as exc:
         logger.error("sales_summary_generation_failed", error=str(exc))
         # Graceful fallback — do not raise, return a generic message
@@ -123,12 +123,12 @@ async def generate_door_script(job: dict, storm_events: list[dict]) -> str:
             system_prompt=_DOOR_SCRIPT_SYSTEM_PROMPT,
             user_prompt=user_prompt,
         )
-        text = result.strip()
+        text = str(result).strip()
         # Enforce legal disclaimers guardrail
         check = verify_legal_disclaimers(text, disclaimer_type="sales_script")
         if not check.passed:
             text += " There's no obligation — we just want to make sure your home is protected."
-        return text
+        return str(text)
     except Exception as exc:
         logger.error("door_script_generation_failed", error=str(exc))
         addr = job.get("address_line1", "your neighborhood")

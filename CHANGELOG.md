@@ -1,5 +1,38 @@
 # Changelog
 
+## [2.9.0] - 2026-09-12
+### Added (Hardening, Modular Decomposition & Commercial Readiness Pass)
+
+- **Commercial Roofing & AIA-Style Progress Billing (`JobType.COMMERCIAL`, `app/services/progress_billing_engine.py`, `Migration 0026`)**:
+  - Added `JobType.COMMERCIAL` distinct from `INSURANCE` and `RETAIL`.
+  - Migration 0026 adds `progress_billing_schedules` (Schedule of Values line items), `progress_billing_applications` (AIA G702/G703 billing cycles), and `progress_billing_items`.
+  - Built pure Python `progress_billing_engine.py` with configurable retainage withholding (e.g. 5%, 10%), cumulative tracking, strict overbill prevention (>100% of SOV line item), and premature retainage release prevention.
+  - Added QuickBooks Online commercial progress billing CSV export (`export_progress_billing_to_csv`) with itemized line items and credit retainage holdbacks.
+- **Commercial Statutory Lien Deadline Monitoring (`app/workers/commercial_lien_worker.py`)**:
+  - Added automated background job monitoring commercial accounts receivable against Georgia 90-day statutory materialman lien deadlines (O.C.G.A. § 44-14-361.1) from `last_work_date`.
+  - Configurable alert thresholds (60d warning, 75d urgent, 90d critical) with explicit non-legal advice disclaimers.
+- **Commercial Platypus PDF Generation (`app/services/pdf/commercial.py`)**:
+  - Created `CommercialPDFGenerator` leveraging ReportLab Platypus flowable elements, two-pass `NumberedCanvas` "Page X of Y" dynamic pagination, and `KeepInFrame` scope protection.
+- **JWT Revocation & Blacklist Middleware (`Migration 0027`, `app/server.py`, `app/api/auth.py`)**:
+  - Implemented `revoked_tokens` table to allow immediate invalidation of compromised credentials without touching or resetting field rep PINs.
+  - Added admin token revocation endpoint `POST /api/admin/auth/revoke-token`.
+- **OpenAPI REST Contract Freeze & CI Hardening (`scripts/check_openapi_diff.py`, `docs/openapi_snapshot.json`)**:
+  - Created deterministic OpenAPI schema validator and snapshot baseline to detect unintentional route or model schema drift in CI.
+  - Added automated contract regression test `tests/test_openapi_contract.py` and GitHub Actions workflow job.
+- **End-to-End Commercial Domain Lifecycle Test (`tests/domain/test_commercial_lifecycle.py`)**:
+  - Added full integration test executing all 10 phases of a commercial contract from lead intake, proposal, SOV setup, Platypus contract PDF generation, multi-stage progress billing cycles, retainage release, materials gating, QBO export, and financial reconciliation.
+
+### Changed
+- **Bcrypt Version Pinning (`requirements.txt`)**: Pinned `bcrypt==3.2.2` with architecture safety comments to avoid C-extension compilation and 72-byte truncation issues while strictly preserving all field rep PIN hashes and storage.
+- **Integer Cents Precision Migration (`Migration 0025`, `app/core/database.py`)**: Completely eliminated floating-point currency representation across all database tables, models, and serializers, dropping legacy `default_rate` on `pricing`.
+- **SQLite WAL Concurrency Tuning (`app/core/database.py`, `app/worker.py`)**: Set `busy_timeout = 30000` (30s) across all SQLite connections, added periodic WAL checkpoint truncate hook in the background worker, and verified pragma enforcement on startup.
+- **Modular Route Decomposition**:
+  - Decomposed `app/api/office_routes.py` into clean modular package `app/api/office/` (`jobs.py`, `financials.py`, `production.py`, `analytics.py`, `admin.py`).
+  - Decomposed `app/api/field_routes.py` into clean modular package `app/api/field/` (`jobs.py`, `inspections.py`, `documents.py`, `storms.py`).
+  - Preserved 100% backward-compatible shims for all existing external imports and test suites.
+- **Modular AI Pipeline Decomposition**: Decomposed `app/services/ai_service.py` into `app/services/ai/` package (`client.py`, `prompts.py`, `parsers.py`, `guardrails.py`) with backward-compatible shims.
+- **Pydantic V2 Modernization**: Replaced deprecated Pydantic V1 methods (`dict()`, `parse_obj()`, `from_orm()`) with modern V2 methods (`model_dump()`, `model_validate()`, `model_dump_json()`) across all models.
+
 ## [2.8.17] - 2026-09-08
 ### Changed (Production Readiness, Pipeline Decoupling, Storm Canvassing & Observability Overhaul)
 
