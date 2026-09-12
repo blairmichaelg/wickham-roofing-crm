@@ -93,6 +93,15 @@ To provide door-knocking sales reps with real-time, zero-cost weather reports ne
    - Intake form calls `/api/field/storms/{zip}` on ZIP entry to present pre-computed, compliant sales pitch talking points.
    - Target ZIP cards feature one-click filtering for instant territory job isolation with active filter badges.
 
+### E. API Architecture & Domain Decomposition (Office Router)
+To avoid monolithic API files and enforce clean architectural domain boundaries, `app/api/office_routes.py` has been decomposed into dedicated domain submodules within `app/api/office/`, mounted under the unified `/api/office` prefix:
+- **`app/api/office/billing.py`**: Handles job financial calculations, QBO export triggers, commission payouts, contractor invoice generation, and progress billing schedules.
+- **`app/api/office/scheduling.py`**: Manages installation crew schedules, supplier material order synthesis, manual flashing requirements, operations brief generation, and storm target intelligence.
+- **`app/api/office/contracts.py`**: Manages measurement report and Statement of Loss ingestion (EagleView/Hover), evidence grid rendering, supplement PDF pipelines, inspection letters, and document delivery vaults.
+- **`app/api/office/jobs.py`**: Manages core job CRUD, triage resolution, shingle/claim info metadata patches, canvasser reassignments, pipeline summaries, and review/referral intake.
+- **`app/api/office/router.py`**: Composite router registering all domain modules under `/api/office` (`office_ux` tag).
+- **`app/api/office_routes.py`**: Re-export shim maintaining 100% backward compatibility for existing callers, test suites, and dynamic patch targets.
+
 ---
 
 ## 4. Security & Isolation Boundaries

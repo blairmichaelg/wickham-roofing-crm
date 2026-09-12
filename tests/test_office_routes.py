@@ -21,7 +21,8 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def mock_pdf_detector():
-    with patch("app.api.office_routes.detect_pdf_format", return_value="EAGLEVIEW"), \
+    with patch("app.api.office.contracts.detect_pdf_format", return_value="EAGLEVIEW"), \
+         patch("app.api.office_routes.detect_pdf_format", return_value="EAGLEVIEW"), \
          patch("app.core.pipeline.detect_pdf_format", return_value="EAGLEVIEW"):
         yield
 
@@ -37,7 +38,7 @@ class TestOfficeJobsRoute:
         response = client.get("/api/office/jobs", cookies={"auth_token": field_token})
         assert response.status_code == 403
 
-    @patch("app.api.office_routes.get_connection")
+    @patch("app.api.office.jobs.get_connection")
     def test_get_jobs_success(self, mock_get_connection):
         """Should return jobs properly parsed from SQLite."""
         
@@ -82,7 +83,7 @@ class TestOfficeJobsRoute:
         
         mock_conn.close.assert_called_once()
 
-    @patch("app.api.office_routes.get_connection")
+    @patch("app.api.office.jobs.get_connection")
     def test_get_jobs_db_error(self, mock_get_connection):
         """Should return 500 if database query fails."""
         mock_conn = MagicMock()
@@ -98,9 +99,9 @@ class TestOfficeJobsRoute:
 
 
 class TestOfficeFinancialsRoute:
-    @patch("app.api.office_routes.compute_job_profitability")
-    @patch("app.api.office_routes.upsert_financials")
-    @patch("app.api.office_routes.backup_database")
+    @patch("app.api.office.billing.compute_job_profitability")
+    @patch("app.api.office.billing.upsert_financials")
+    @patch("app.api.office.billing.backup_database")
     def test_update_financials_background_backup(self, mock_backup, mock_upsert, mock_compute):
         """Verifies that backup_database is delegated to BackgroundTasks and executed."""
         mock_compute.return_value = {
@@ -132,9 +133,9 @@ class TestOfficeFinancialsRoute:
         mock_backup.assert_called_once()
 
 class TestUploadIdempotency:
-    @patch("app.api.office_routes.stream_upload_safely")
-    @patch("app.api.office_routes.get_job_document_by_hash")
-    @patch("app.api.office_routes.run_full_office_pipeline")
+    @patch("app.api.office.contracts.stream_upload_safely")
+    @patch("app.api.office.contracts.get_job_document_by_hash")
+    @patch("app.api.office.contracts.run_full_office_pipeline")
     def test_upload_eagleview_idempotency(self, mock_run_pipeline, mock_get_doc, mock_stream):
         """Test that identical file uploads are short-circuited."""
         # 1. Simulate upload returning a specific hash
@@ -196,7 +197,7 @@ class TestSupplementUploadRoute:
             conn.commit()
             conn.close()
 
-    @patch("app.api.office_routes.run_supplement_pipeline", new_callable=AsyncMock)
+    @patch("app.api.office.contracts.run_supplement_pipeline", new_callable=AsyncMock)
     def test_supplement_upload_runs_inline_without_redis(self, mock_pipeline):
         import uuid
         job_id = str(uuid.uuid4())
@@ -237,8 +238,8 @@ class TestSupplementUploadRoute:
 
 
 class TestEvidenceGridRoute:
-    @patch("app.api.office_routes.PDFGenerator")
-    @patch("app.api.office_routes.get_inspection_summary", new_callable=AsyncMock)
+    @patch("app.api.office.contracts.PDFGenerator")
+    @patch("app.api.office.contracts.get_inspection_summary", new_callable=AsyncMock)
     def test_evidence_grid_regenerates_when_ai_analysis_exists(self, mock_summary, mock_pdf_generator, tmp_path):
         import uuid
         from types import SimpleNamespace

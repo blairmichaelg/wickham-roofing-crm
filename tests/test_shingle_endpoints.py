@@ -47,7 +47,7 @@ def test_update_claim_info_route_success():
     }
 
     # Patch the backup_database function since background tasks run on client response
-    with patch("app.api.office_routes.backup_database") as mock_backup:
+    with patch("app.api.office.jobs.backup_database") as mock_backup:
         response = client.patch(
             f"/api/office/jobs/{job_id}/claim-info",
             json=payload,
@@ -104,7 +104,7 @@ def test_update_shingle_info_route_success():
         "shingle_type": "Architectural Asphalt"
     }
 
-    with patch("app.api.office_routes.backup_database") as mock_backup:
+    with patch("app.api.office.jobs.backup_database") as mock_backup:
         response = client.patch(
             f"/api/office/jobs/{job_id}/shingle-info",
             json=payload,
@@ -180,7 +180,7 @@ def test_accounting_brief_and_invoice():
     assert job_row["qbo_exported"] is False
 
     # 2. Transition job to INVOICED
-    with patch("app.api.office_routes.backup_database") as mock_backup:
+    with patch("app.api.office.billing.backup_database") as mock_backup:
         response = client.post(
             f"/api/office/accounting/jobs/{job_id}/invoice",
             cookies={"auth_token": token}
@@ -229,7 +229,7 @@ def test_accounting_brief_and_invoice():
     assert job_row["status"] == "PAYMENT_RECEIVED"
 
     # 6. Mark commission paid, which transitions job to CLOSED
-    with patch("app.api.office_routes.backup_database") as mock_backup:
+    with patch("app.api.office.billing.backup_database") as mock_backup:
         response = client.patch(
             f"/api/office/accounting/jobs/{job_id}/commission/paid",
             cookies={"auth_token": token}
@@ -299,7 +299,7 @@ def test_final_inspection_completed_transitions():
     finally:
         conn.close()
 
-    with patch("app.api.office_routes.backup_database") as mock_backup:
+    with patch("app.api.office.billing.backup_database") as mock_backup:
         response = client.post(
             f"/api/office/accounting/jobs/{job_id}/invoice",
             cookies={"auth_token": accounting_token}
