@@ -133,6 +133,7 @@ A comprehensive security, authorization, and operational hardening pass was impl
   - Zip Slip & Path Traversal Protections: Archive member filenames are normalized and verified via `os.path.commonpath` against the destination root.
   - XXE & Injection Defenses: XML streams are pre-scanned before parsing; documents containing `<!DOCTYPE` or `<!ENTITY` declarations are rejected with `ValueError` and logged to audit telemetry.
   - UniversalClaimAST Conversion: Integer cents precision is strictly enforced on line items, ACV, and RCV totals. Discrepancies between line item sums and header totals are surfaced as flags rather than silently accepted.
+  - Validation Status: Validated against synthetic multi-line-item fixture; NOT YET validated against a real carrier-issued .esx file. Recommend manual validation with a real file before removing the experimental flag.
 - **AI Grounding, Provenance & Prohibited Sales Promise Defense**:
   - `app/services/ai/guardrails.py` implements regex word-stem matching (`verify_prohibited_sales_promises`) against illegal deductible absorption (O.C.G.A. § 33-23-43(c)(4)) and unverified insurance coverage guarantees (`waiv*`, `absorb*`, `pay* deductible`, `guarantee* approv*`). Violations immediately raise `SalesPromiseViolationError`.
   - Grounded AI provenance models (`build_sales_provenance`) attach explicit verified NWS event dates, hail/wind observations, and statutory building code references. Ungrounded models return neutral manual-review fallbacks without hallucinations.

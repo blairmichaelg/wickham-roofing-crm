@@ -23,12 +23,24 @@ def test_guardrail_blocks_deductible_waiving():
     """Verify negative guardrail blocks prohibited deductible absorption / waiving promises."""
     prohibited_text_1 = "Sign with us today and we will waive your deductible completely!"
     prohibited_text_2 = "Don't worry about the $1,000 deductible, our rebate covers your deductible in full."
+    prohibited_text_3 = "Sign up with Wickham and we'll take care of your deductible!"
+    prohibited_text_4 = "Our company will handle your deductible so you pay nothing."
+    prohibited_text_5 = "Your deductible will be taken care of through our promotional credit."
 
-    with pytest.raises(SalesPromiseViolationError, match="deductible"):
-        verify_prohibited_sales_promises(prohibited_text_1, raise_on_failure=True)
+    for txt in [prohibited_text_1, prohibited_text_2, prohibited_text_3, prohibited_text_4, prohibited_text_5]:
+        with pytest.raises(SalesPromiseViolationError, match="deductible"):
+            verify_prohibited_sales_promises(txt, raise_on_failure=True)
 
-    with pytest.raises(SalesPromiseViolationError, match="deductible"):
-        verify_prohibited_sales_promises(prohibited_text_2, raise_on_failure=True)
+
+def test_guardrail_blocks_free_roof_and_public_adjuster_claims():
+    """Verify negative guardrail blocks 'free roof' and public adjuster assertion language."""
+    free_roof_text = "Call now to claim your 100% free roof under the new storm program!"
+    with pytest.raises(SalesPromiseViolationError, match="free roof"):
+        verify_prohibited_sales_promises(free_roof_text, raise_on_failure=True)
+
+    pa_claim_text = "The insurance owes you a full roof replacement under Georgia law."
+    with pytest.raises(SalesPromiseViolationError, match="public adjuster"):
+        verify_prohibited_sales_promises(pa_claim_text, raise_on_failure=True)
 
 
 def test_guardrail_blocks_coverage_guarantees():

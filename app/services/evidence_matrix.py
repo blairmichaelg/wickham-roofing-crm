@@ -11,7 +11,16 @@ import sqlite3
 import uuid
 from typing import Any
 
-from app.core.database import get_db_connection
+from app.core.database import get_db_connection, get_db_path
+
+
+def _resolve_db_path(db_path: str | None = None) -> str:
+    if db_path:
+        return db_path
+    import app.core.database
+    return str(app.core.database.get_db_path())
+
+
 
 CATEGORY_MAP = {
     "decking": "decking_sheathing",
@@ -56,7 +65,7 @@ def create_evidence_exhibit(
     author_rep_id: str | None = None,
     source_type: str = "FIELD_REP_OBSERVATION",
     status: str = "draft",
-    db_path: str = "data/wickham_crm.db",
+    db_path: str | None = None,
 ) -> dict[str, Any]:
     """
     Create a new evidence exhibit for a job.
@@ -69,7 +78,7 @@ def create_evidence_exhibit(
     exhibit_id = f"ex_{uuid.uuid4().hex[:12]}"
     now = datetime.datetime.now(datetime.UTC).isoformat()
 
-    with get_db_connection(db_path) as conn:
+    with get_db_connection(_resolve_db_path(db_path)) as conn:
         cursor = conn.cursor()
         cursor.execute(
             "SELECT COALESCE(MAX(exhibit_number), 0) FROM evidence_exhibits WHERE job_id = ?",
@@ -136,12 +145,12 @@ def get_job_evidence_exhibits(
     job_id: str,
     status: str | None = None,
     included_only: bool = False,
-    db_path: str = "data/wickham_crm.db",
+    db_path: str | None = None,
 ) -> list[dict[str, Any]]:
     """
     Retrieve all evidence exhibits for a job ordered by exhibit_number.
     """
-    with get_db_connection(db_path) as conn:
+    with get_db_connection(_resolve_db_path(db_path)) as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
@@ -198,7 +207,7 @@ def update_evidence_exhibit(
     proposed_claim_line_ref: str | None = None,
     status: str | None = None,
     requires_office_review: bool | None = None,
-    db_path: str = "data/wickham_crm.db",
+    db_path: str | None = None,
 ) -> dict[str, Any] | None:
     """
     Update an exhibit record (e.g. office review approval or field note correction).
@@ -234,7 +243,7 @@ def update_evidence_exhibit(
     params.append(now)
     params.append(exhibit_id)
 
-    with get_db_connection(db_path) as conn:
+    with get_db_connection(_resolve_db_path(db_path)) as conn:
         cursor = conn.cursor()
         cursor.execute(
             f"UPDATE evidence_exhibits SET {', '.join(fields)} WHERE id = ?",
@@ -263,13 +272,13 @@ def update_evidence_exhibit(
 def reorder_evidence_exhibits(
     job_id: str,
     exhibit_ids_in_order: list[str],
-    db_path: str = "data/wickham_crm.db",
+    db_path: str | None = None,
 ) -> bool:
     """
     Update exhibit_number based on given ID order.
     """
     now = datetime.datetime.now(datetime.UTC).isoformat()
-    with get_db_connection(db_path) as conn:
+    with get_db_connection(_resolve_db_path(db_path)) as conn:
         cursor = conn.cursor()
         for idx, ex_id in enumerate(exhibit_ids_in_order, start=1):
             cursor.execute(

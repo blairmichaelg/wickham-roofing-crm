@@ -33,6 +33,20 @@
   - Applied linear migration 0028 creating `storm_opportunities`, `evidence_exhibits`, and `contact_attempts`.
   - Updated OpenAPI contract snapshot to 115 endpoints with zero breaking changes.
 
+### Hardened & Verified (v2.10.0 Verification Pass)
+- **Code Coverage & Target Modules Hardening**:
+  - Full suite coverage verified at 79.68% (590 passing tests, 0 failures), exceeding the CI 75% gate.
+  - All 9 v2.10.0 modules hardened to 87.5%–100% coverage (including full API error, RBAC, and boundary branches).
+- **Storm Opportunities Dedup Key Reconciliation**:
+  - Verified and aligned schema constraint `UNIQUE(job_id, storm_event_id)` across code and `ARCHITECTURE.md`.
+  - Proved idempotency of re-run matching and capability for multiple independent storm events hitting a single property over time.
+- **Realistic ESX Parser Validation**:
+  - Constructed synthetic multi-line-item `.esx` fixtures (`realistic_contractor_8d.esx`, `realistic_carrier_5l.esx`, `mismatched_totals.esx`).
+  - Added header vs. line-item sum validation in cents, profile extraction (8D vs 5L), and explicit documentation of experimental validation status.
+- **Negative Sales Guardrails Hardening**:
+  - Expanded regex pattern coverage in `app/services/ai/guardrails.py` to intercept paraphrased deductible absorption promises (e.g., "take care of your deductible", "cover your deductible with a credit").
+
+
 ## [2.9.0] - 2026-09-12
 ### Added (Hardening, Modular Decomposition & Commercial Readiness Pass)
 

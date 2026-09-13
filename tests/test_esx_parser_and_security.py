@@ -15,6 +15,7 @@ from __future__ import annotations
 import io
 import zipfile
 from decimal import Decimal
+from pathlib import Path
 import pytest
 
 from app.config import Settings
@@ -158,3 +159,103 @@ def test_esx_feature_flag_default():
     """Verify enable_esx_import flag defaults to False in application settings."""
     settings = Settings()
     assert settings.enable_esx_import is False
+
+
+def test_realistic_contractor_8d_fixture():
+    """Verify end-to-end parsing of a realistic multi-line-item 8D contractor fixture."""
+    fixture_path = Path("tests/fixtures/esx/realistic_contractor_8d.esx")
+    assert fixture_path.exists(), "Realistic 8D fixture must exist"
+    file_bytes = fixture_path.read_bytes()
+
+    ast = parse_esx_to_ast(file_bytes, source_doc_id="doc_8d_test")
+
+    # Verify claim identity & metadata
+    assert ast.claim_number.value == "ESX-SYNTH-8D-2026"
+    assert "Georgia Farm" in ast.insurer_name.value
+    assert "Profile: 8D" in ast.financials.gross_rcv.evidence[0].raw_text
+
+    # Verify roof geometry
+    assert ast.roof_geometry.total_squares.value == Decimal("32.00")
+    assert ast.roof_geometry.eaves_lf.value == Decimal("140.00")
+    assert ast.roof_geometry.valleys_lf.value == Decimal("35.00")
+    assert ast.roof_geometry.rakes_lf.value == Decimal("85.00")
+
+    # Verify line items extraction
+    assert len(ast.line_items) == 4
+    tear_off = ast.line_items[0]
+    assert tear_off.category_code == "RFG"
+    assert "Tear off comp shingles" in tear_off.description
+    assert tear_off.quantity.value == Decimal("32.00")
+    assert tear_off.unit_price.value == Decimal("55.00")
+    assert tear_off.claimed_rcv.value == Decimal("1760.00")
+    assert tear_off.depreciation.value == Decimal("0.00")
+    assert tear_off.acv.value == Decimal("1760.00")
+
+    shingle = ast.line_items[1]
+    assert "Laminated shingle" in shingle.description
+    assert shingle.quantity.value == Decimal("35.00")
+    assert shingle.unit_price.value == Decimal("225.00")
+    assert shingle.claimed_rcv.value == Decimal("7875.00")
+    assert shingle.depreciation.value == Decimal("787.50")
+    assert shingle.acv.value == Decimal("7087.50")
+
+    # Financials reconciliation to the penny
+    assert ast.financials.gross_rcv.value == Decimal("10596.00")
+    assert ast.financials.total_depreciation.value == Decimal("883.60")
+    assert ast.financials.deductible.value == Decimal("1000.00")
+    assert ast.financials.net_claim.value == Decimal("8712.40")
+
+    # Header matches line items sum exactly
+    assert ast.financials.gross_rcv.verified is True
+    assert ast.financials.net_claim.verified is True
+
+
+def test_realistic_carrier_5l_fixture():
+    """Verify parsing of realistic carrier 5L profile fixture."""
+    fixture_path = Path("tests/fixtures/esx/realistic_carrier_5l.esx")
+    assert fixture_path.exists(), "Realistic 5L fixture must exist"
+    file_bytes = fixture_path.read_bytes()
+
+    ast = parse_esx_to_ast(file_bytes, source_doc_id="doc_5l_test")
+
+    assert ast.claim_number.value == "ESX-SYNTH-5L-2026"
+    assert "Profile: 5L" in ast.financials.gross_rcv.evidence[0].raw_text
+    assert len(ast.line_items) == 4
+    assert ast.financials.gross_rcv.value == Decimal("10596.00")
+    assert ast.financials.gross_rcv.verified is True
+
+
+def test_mismatched_totals_fixture_flags_discrepancy():
+    """Verify that when header gross RCV does not match line item sum, gross_rcv.verified is flagged False."""
+    fixture_path = Path("tests/fixtures/esx/mismatched_totals.esx")
+    assert fixture_path.exists(), "Mismatched fixture must exist"
+    file_bytes = fixture_path.read_bytes()
+
+    ast = parse_esx_to_ast(file_bytes, source_doc_id="doc_mismatch_test")
+
+    # Line items sum to $10,596.00, but header claimed $14,000.00
+    assert ast.financials.gross_rcv.value == Decimal("14000.00")
+    # Discrepancy correctly flagged as not verified
+    assert ast.financials.gross_rcv.verified is False
+    # Overall equation gross - dep - ded == net still matches header numbers
+    assert ast.financials.net_claim.verified is True
+
+
+def test_esx_parser_edge_cases():
+    """Verify edge cases: sanitize decimal invalid format, no line items, compressed size limit."""
+    from app.services.esx_parser import _sanitize_decimal, MAX_COMPRESSED_BYTES
+
+    # Invalid decimal raises ESXParseError
+    with pytest.raises(ESXParseError, match="Invalid monetary"):
+        _sanitize_decimal("not-a-number")
+
+    # Empty XML / no line items raises ESXParseError
+    empty_xml = "<XactimateEstimate><PROJECT_INFO><CLAIM_NUMBER>123</CLAIM_NUMBER></PROJECT_INFO></XactimateEstimate>"
+    empty_esx = _create_synthetic_esx(empty_xml)
+    with pytest.raises(ESXParseError, match="no recognizable line items"):
+        parse_esx_to_ast(empty_esx)
+
+    # Compressed size limit raises ESXSecurityError
+    with pytest.raises(ESXSecurityError, match="compressed size"):
+        validate_and_extract_xml(b"0" * (MAX_COMPRESSED_BYTES + 10))
+

@@ -161,7 +161,9 @@ def verify_legal_disclaimers(
 
 
 PROHIBITED_PATTERNS = [
-    (re.compile(r"\b(?:waiv|absorb|cover|pay)\w*\b[^\.\n]*\bdeductible\b", re.IGNORECASE), "Prohibited deductible waiving or absorption offer"),
+    (re.compile(r"\b(?:waiv|absorb|cover|pay|rebate|handle|zero)\w*\b[^\.\n]*\bdeductible\b", re.IGNORECASE), "Prohibited deductible waiving or absorption offer"),
+    (re.compile(r"\b(?:take\s+care\s+of|care\s+of)\b[^\.\n]*\bdeductible\b", re.IGNORECASE), "Prohibited deductible waiving or absorption offer"),
+    (re.compile(r"\bdeductible\b[^\.\n]*\b(?:waiv|absorb|cover|free|paid|taken\s+care\s+of|handled|rebate)\w*\b", re.IGNORECASE), "Prohibited deductible waiving or absorption offer"),
     (re.compile(r"\bfree roof\b", re.IGNORECASE), "Prohibited 'free roof' deceptive advertising claim"),
     (re.compile(r"\b(?:guarantee|promise|certif)\w*\b[^\.\n]*\b(?:cover|approv|pay)\w*\b", re.IGNORECASE), "Prohibited insurance coverage or carrier approval guarantee"),
     (re.compile(r"\binsurance\b[^\.\n]*\b(?:guaranteed to pay|must pay|will 100% pay|will pay)\b", re.IGNORECASE), "Prohibited carrier payment assertion"),

@@ -119,6 +119,8 @@ class UniversalClaimAST(BaseModel):
         total_rcv = sum((item.claimed_rcv.value for item in self.line_items), Decimal("0.00"))
         if abs(total_rcv - self.financials.gross_rcv.value) <= Decimal("0.05"):
             self.financials.gross_rcv.verified = True
+        else:
+            self.financials.gross_rcv.verified = False
         
         # 2. Enforce strict overall claim financials math: gross_rcv - total_depreciation - deductible == net_claim
         gross = self.financials.gross_rcv.value

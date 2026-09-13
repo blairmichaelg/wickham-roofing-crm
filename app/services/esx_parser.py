@@ -248,6 +248,10 @@ def parse_esx_to_ast(
     if not parsed_items:
         raise ESXParseError("ESX archive contained no recognizable line items")
 
+    # Extract Profile (8D vs 5L) and Price List info
+    profile_code = find_str(["profile", "PROFILE", "profile_code", "PROFILE_CODE", "estimate_profile"], default="8D").upper()
+    price_list_code = find_str(["price_list", "PRICE_LIST", "embedded_pl", "EMBEDDED_PL", "pl_code"], default="GAAT8X_DEFAULT")
+
     # 4. Extract or Reconcile Financials
     sum_rcv = sum((item.claimed_rcv.value for item in parsed_items), Decimal("0.00"))
     sum_dep = sum((item.depreciation.value for item in parsed_items), Decimal("0.00"))
@@ -259,15 +263,25 @@ def parse_esx_to_ast(
     expected_net = gross_rcv_extracted - total_dep_extracted - deductible
     net_claim_extracted = find_dec(["net_claim", "NET_CLAIM", "net", "NET"], default=expected_net)
 
+    rcv_verified = abs(sum_rcv - gross_rcv_extracted) <= Decimal("0.05")
+    if not rcv_verified:
+        logger.warning(
+            "esx_line_items_total_mismatch",
+            sum_line_items_rcv=str(sum_rcv),
+            header_gross_rcv=str(gross_rcv_extracted),
+            difference=str(abs(sum_rcv - gross_rcv_extracted)),
+            profile=profile_code,
+        )
+
     ev_fin = [EvidenceRef(
         doc_id=source_doc_id,
         page=1,
-        raw_text="Financials Summary",
+        raw_text=f"Financials Summary (Profile: {profile_code}, PriceList: {price_list_code}, LineItemsSum: {sum_rcv}, HeaderGrossRCV: {gross_rcv_extracted})",
         extraction_method="esx_xml_parser",
     )]
 
     claim_financials = ClaimFinancials(
-        gross_rcv=SourcedValue(value=gross_rcv_extracted, evidence=ev_fin, verified=True),
+        gross_rcv=SourcedValue(value=gross_rcv_extracted, evidence=ev_fin, verified=rcv_verified),
         total_depreciation=SourcedValue(value=total_dep_extracted, evidence=ev_fin, verified=True),
         deductible=SourcedValue(value=deductible, evidence=ev_fin, verified=True),
         net_claim=SourcedValue(value=net_claim_extracted, evidence=ev_fin, verified=True),
@@ -276,7 +290,7 @@ def parse_esx_to_ast(
     ev_meta = [EvidenceRef(
         doc_id=source_doc_id,
         page=1,
-        raw_text=xml_name,
+        raw_text=f"{xml_name} (Profile: {profile_code})",
         extraction_method="esx_xml_parser",
     )]
 

@@ -55,9 +55,17 @@ from app.services.pdf.engine import PDFEngine, register_brand_fonts
 logger = structlog.get_logger("app.services.pdf.evidence_packet")
 
 
+def _resolve_db_path(db_path: str | None = None) -> str:
+    if db_path:
+        return db_path
+    import app.core.database
+    return str(app.core.database.get_db_path())
+
+
 class EvidencePacketGenerator(PDFEngine):
     """
-    Builds the Supplement Evidence Packet v1 PDF.
+    Synthesizes versioned Evidence Matrix Exhibits and Claim Discrepancies
+    into a formal Supplement Evidence Packet PDF.
     """
 
     def generate_packet_sync(
@@ -65,11 +73,12 @@ class EvidencePacketGenerator(PDFEngine):
         job_id: str,
         version: int = 1,
         included_only: bool = False,
-        db_path: str = "data/wickham_crm.db",
+        db_path: str | None = None,
     ) -> str:
         """
         Synchronous generator for the evidence packet PDF.
         """
+        resolved_db = _resolve_db_path(db_path)
         register_brand_fonts()
 
         out_dir = Path(FIELD_DOCS_DIR) / job_id
@@ -79,7 +88,7 @@ class EvidencePacketGenerator(PDFEngine):
 
         # 1. Fetch Job Metadata
         job_info: dict[str, Any] = {}
-        with get_db_connection(db_path) as conn:
+        with get_db_connection(resolved_db) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -120,12 +129,12 @@ class EvidencePacketGenerator(PDFEngine):
         exhibits = get_job_evidence_exhibits(
             job_id,
             included_only=included_only,
-            db_path=db_path,
+            db_path=resolved_db,
         )
 
         # 3. Fetch Discrepancies if available
         discrepancies: list[dict[str, Any]] = []
-        with get_db_connection(db_path) as conn:
+        with get_db_connection(resolved_db) as conn:
             c = conn.cursor()
             try:
                 c.execute(
@@ -399,7 +408,7 @@ class EvidencePacketGenerator(PDFEngine):
         doc.build(story)
 
         # Register in job_documents
-        with get_db_connection(db_path) as conn:
+        with get_db_connection(resolved_db) as conn:
             doc_id = f"doc_{uuid.uuid4().hex[:12]}"
             conn.execute(
                 """

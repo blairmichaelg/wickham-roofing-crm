@@ -286,7 +286,7 @@ For commercial roofing contracts, Schedules of Values (SOV), and AIA G702/G703 s
 
 ### A. Storm Targets Canvassing Decision Engine (`app/services/storm_matching.py`, `app/workers/storm_worker.py`)
 - **Qualification Rule**: Severe weather events are ingested from the National Weather Service (NWS) and filtered strictly to actionable damage criteria: hail $\ge 1.00"$ or wind gusts $\ge 50$ mph within a configured service radius (default 50 miles of office coordinates). Zero or unknown magnitude records are defensively discarded.
-- **Idempotent Opportunity Matching**: A background matching process evaluates eligible active and historical customer properties within a 168-hour (7-day) lookback window. When a qualifying event overlaps a customer ZIP or coordinate radius, a record is created in `storm_opportunities` with unique deduplication key `opp_{job_id}_{storm_event_id}_{window_bucket}`. Re-running ingest is 100% idempotent.
+- **Idempotent Opportunity Matching**: A background matching process evaluates eligible active and historical customer properties within a 168-hour (7-day) lookback window. When a qualifying event overlaps a customer ZIP or coordinate radius, a record is created in `storm_opportunities` enforced by a SQLite `UNIQUE(job_id, storm_event_id)` database constraint. Re-running ingest against existing storm events is 100% idempotent, while subsequent distinct storm events create new actionable opportunities.
 - **Role-Appropriate Access**: Field reps view only storm opportunities assigned to them or unassigned leads in their territory. Admin and office managers access full opportunity triage for rep assignment, status management (`new`, `surfaced`, `contacted`, `inspection_scheduled`, `dismissed`), and local attribution metrics.
 - **Direct Intake Pre-fill**: Target ZIP cards provide a 1-tap action that pre-fills lead intake with verified storm dates and NWS talking points.
 
@@ -311,6 +311,7 @@ For commercial roofing contracts, Schedules of Values (SOV), and AIA G702/G703 s
   - XML XXE / DOCTYPE / ENTITY injection defenses.
 - **Integer-Cent Reconciliation**: Parses line items, extracts unit prices, RCV, depreciation, and ACV, converts them to integer cents, and validates line item sums against carrier summary totals. Automatically converts valid estimates into `UniversalClaimAST`.
 - **Feature Flag Gate**: Controlled by `enable_esx_import: bool = False` in `app/config.py` (labeled "Experimental ESX import").
+- **Validation Status**: Validated against synthetic multi-line-item fixture; NOT YET validated against a real carrier-issued .esx file. Recommend manual validation with a real file before removing the experimental flag.
 
 ### E. Grounded AI Provenance & Negative Guardrails (`app/services/ai/guardrails.py`, `app/services/sales_narrative.py`)
 - **Negative Sales Guardrail**: Intercepts AI-generated sales text and blocks unlawful promises:
