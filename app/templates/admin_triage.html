@@ -4,9 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Operator Triage — Wickham Roofing</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/output.css') }}">
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen font-sans">
+    {% include '_nav_office.html' %}
     <div class="p-6 border-b border-gray-800 flex justify-between
                 items-center bg-gray-900">
         <h1 class="text-2xl font-bold text-yellow-400 tracking-wide">

@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#1e3a8a">
     <link rel="manifest" href="/static/manifest.json">
     <link rel="apple-touch-icon" href="/static/icon-192.png">
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/output.css') }}">
     <script src="/static/js/storm_radar.js"></script>
     {% if settings %}
     <script>

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Field Rep Management — Wickham Roofing</title>
     <meta name="description" content="Manage canvasser identities and PINs for Wickham Roofing field representatives.">
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/output.css') }}">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
         * { font-family: 'Inter', sans-serif; }
@@ -74,6 +74,7 @@
     </style>
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen">
+    {% include '_nav_office.html' %}
 
     <!-- ─── HEADER ─────────────────────────────────────────────── -->
     <header class="bg-gray-900 border-b border-gray-800 px-6 py-4 flex items-center justify-between">

@@ -76,6 +76,7 @@ async def patch_material_flags(job_id: str, body: MaterialFlagUpdate):
 
 @router.get(
     "/board",
+    name="operations_board",
     response_class=HTMLResponse,
     dependencies=[Depends(verify_office_role)]
 )

@@ -345,7 +345,7 @@ def _sync_update_job_claim_info(job_id: str, payload: JobClaimInfoPayload):
         conn.close()
 
 
-@router.get("/admin/triage", response_class=HTMLResponse, dependencies=[Depends(verify_admin)])
+@router.get("/admin/triage", name="admin_triage", response_class=HTMLResponse, dependencies=[Depends(verify_admin)])
 async def admin_triage_view(request: Request):
     """
     Admin Triage View functionality.

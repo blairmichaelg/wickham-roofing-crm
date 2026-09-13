@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manage Job - {{ job.invoice_id or job.id[:8] }}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/output.css') }}">
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans">
     <script>
@@ -13,44 +13,7 @@
     </script>
 
     <!-- Top Navigation Switcher -->
-    <nav class="bg-gray-900 border-b border-gray-800 px-6 py-3 flex flex-wrap justify-between items-center z-30">
-        <div class="flex items-center space-x-3">
-            <img src="/static/logo.png" alt="Wickham Roofing Logo" class="w-9 h-9 rounded shadow">
-            <span class="text-white font-bold tracking-wide text-lg hidden sm:inline">Wickham Roofing</span>
-        </div>
-
-        <!-- Dashboard Switcher -->
-        <div class="flex items-center space-x-2 bg-gray-950 p-1.5 rounded-lg border border-gray-800 my-1 sm:my-0">
-            {% if is_core %}
-            <a href="/admin" class="px-3.5 py-1.5 rounded-md font-bold text-xs tracking-wider transition-all flex items-center gap-1.5 text-gray-400 hover:text-white hover:bg-gray-800">
-                <span>👑</span>
-                <span>Admin Board</span>
-            </a>
-            <a href="/accounting" class="px-3.5 py-1.5 rounded-md font-bold text-xs tracking-wider transition-all flex items-center gap-1.5 text-gray-400 hover:text-white hover:bg-gray-800">
-                <span>📊</span>
-                <span>Accounting</span>
-            </a>
-            <a href="/api/operations/board" class="px-3.5 py-1.5 rounded-md font-bold text-xs tracking-wider transition-all flex items-center gap-1.5 text-gray-400 hover:text-white hover:bg-gray-800">
-                <span>🏗️</span>
-                <span>Production</span>
-            </a>
-            {% endif %}
-            <a href="/field" class="px-3.5 py-1.5 rounded-md font-bold text-xs tracking-wider transition-all flex items-center gap-1.5 text-gray-400 hover:text-white hover:bg-gray-800">
-                <span>📱</span>
-                <span>Field Intake</span>
-            </a>
-        </div>
-
-        <!-- Utility Links -->
-        <div class="flex items-center space-x-2">
-            {% if is_core %}
-                <a href="/admin/reps" class="text-purple-400 hover:text-white px-3 py-1.5 border border-purple-800 hover:border-purple-600 rounded text-xs font-bold transition-all">👥 Reps</a>
-                <a href="/api/office/admin/triage" class="text-yellow-400 hover:text-white px-3 py-1.5 border border-yellow-800 hover:border-yellow-600 rounded text-xs font-bold transition-all">⚠️ Triage</a>
-            {% endif %}
-            <a href="/help" class="text-blue-400 hover:text-white px-3 py-1.5 border border-blue-800 hover:border-blue-600 rounded text-xs font-bold transition-all">❓ Help</a>
-            <a href="/auth/logout" class="text-gray-400 hover:text-white px-3 py-1.5 border border-gray-800 hover:border-gray-600 rounded text-xs transition-all">Logout</a>
-        </div>
-    </nav>
+    {% include '_nav_office.html' %}
 
     <!-- Toast Container -->
     <div id="toastContainer" class="fixed top-4 right-4 z-50 flex flex-col space-y-2 pointer-events-none"></div>

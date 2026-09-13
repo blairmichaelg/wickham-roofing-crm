@@ -4,22 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Canvassing Targets</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/output.css') }}">
 </head>
-<body class="bg-gray-900 text-gray-100 h-screen flex overflow-hidden">
-    <!-- Sidebar -->
-    <div class="w-64 bg-gray-800 h-full flex flex-col border-r border-gray-700">
-        <div class="p-6 text-2xl font-bold text-white border-b border-gray-700">
-            Wickham Roofing CRM
-        </div>
-        <nav class="flex-1 p-4 space-y-2">
-            <a href="/office" class="block py-2 px-4 rounded hover:bg-gray-700 text-gray-400 hover:text-white">Dashboard</a>
-            <a href="/office/canvassing" class="block py-2 px-4 rounded bg-gray-700 text-white font-bold">Canvassing Targets</a>
-        </nav>
-    </div>
+<body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col font-sans">
+    {% include '_nav_office.html' %}
 
     <!-- Main Content -->
-    <div class="flex-1 p-8 overflow-y-auto">
+    <div class="flex-1 p-6 md:p-8 overflow-y-auto">
         <div class="flex justify-between items-center mb-6">
             <h1 class="text-3xl font-bold">Target Zipcodes</h1>
         </div>

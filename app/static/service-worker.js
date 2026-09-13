@@ -8,7 +8,7 @@
  * - All other API calls: Network-first with silent failure fallback.
  */
 
-const CACHE_NAME = 'field-app-shell-v3';
+const CACHE_NAME = 'field-app-shell-v4';
 const SYNC_TAG = 'field-lead-sync';
 const IDB_NAME = 'wickham-field-queue';
 const IDB_STORE = 'pending-submissions';
@@ -16,7 +16,7 @@ const IDB_STORE = 'pending-submissions';
 const APP_SHELL = [
     '/field',
     '/static/manifest.json',
-    'https://cdn.tailwindcss.com',
+    '/static/css/output.css',
 ];
 
 // ── Install: cache app shell ────────────────────────────────────────────

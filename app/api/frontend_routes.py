@@ -37,7 +37,7 @@ router = APIRouter(tags=["frontend"])
 logger = structlog.get_logger("app.api.frontend_routes")
 
 
-@router.get("/login", tags=["frontend"])
+@router.get("/login", name="login", tags=["frontend"])
 async def serve_login(request: Request, redirect_url: str = "/"):
     """Serve the universal login page with optional post-auth redirect target."""
     templates = request.app.state.templates
@@ -193,7 +193,7 @@ async def route_office_dashboard(role: str = Depends(get_current_role)):
     return RedirectResponse(url="/admin", status_code=303)
 
 
-@router.get("/help", tags=["frontend"])
+@router.get("/help", name="help_page", tags=["frontend"])
 async def help_page(request: Request, role: str = Depends(get_current_role)):
     templates = request.app.state.templates
     token = request.cookies.get("auth_token", "")
@@ -209,7 +209,7 @@ async def help_page(request: Request, role: str = Depends(get_current_role)):
     )
 
 
-@router.get("/field", tags=["frontend"])
+@router.get("/field", name="field_app", tags=["frontend"])
 async def serve_field_app(request: Request, role: str = Depends(verify_field)):
     """Serve the Wickham Roofing Field App."""
     templates = request.app.state.templates
@@ -262,7 +262,7 @@ def _fetch_active_jobs_sync() -> list[dict]:
         conn.close()
 
 
-@router.get("/admin", tags=["frontend"])
+@router.get("/admin", name="admin_dashboard", tags=["frontend"])
 async def serve_admin_dashboard(
     request: Request, role: str = Depends(verify_office_role)
 ):
@@ -284,7 +284,7 @@ async def serve_admin_dashboard(
     )
 
 
-@router.get("/admin/reps", tags=["frontend"])
+@router.get("/admin/reps", name="admin_reps", tags=["frontend"])
 async def admin_reps_page(
     request: Request, role: str = Depends(verify_office_role)
 ):
@@ -295,6 +295,7 @@ async def admin_reps_page(
         request,
         "admin_reps.html",
         {
+            "request": request,
             "reps": reps,
             "role": role,
             "active_page": "admin",
@@ -302,7 +303,7 @@ async def admin_reps_page(
     )
 
 
-@router.get("/accounting", tags=["frontend"])
+@router.get("/accounting", name="accounting_dashboard", tags=["frontend"])
 async def serve_accounting_dashboard(
     request: Request, role: str = Depends(verify_office_role)
 ):
@@ -319,7 +320,8 @@ async def serve_accounting_dashboard(
     )
 
 
-@router.get("/office/canvassing", tags=["frontend"])
+@router.get("/office/canvassing", name="admin_canvassing", tags=["frontend"])
+@router.get("/admin/canvassing", include_in_schema=False)
 async def serve_canvassing(
     request: Request, role: str = Depends(verify_office_role)
 ):
@@ -359,7 +361,7 @@ async def serve_canvassing(
     )
 
 
-@router.get("/office/completed-jobs", tags=["frontend"])
+@router.get("/office/completed-jobs", name="completed_jobs", tags=["frontend"])
 async def serve_completed_jobs(
     request: Request, role: str = Depends(verify_office_role)
 ):
