@@ -6,7 +6,7 @@
     <title>Wickham Roofing CRM — Help & User Guides</title>
     <link rel="stylesheet" href="{{ url_for('static', path='css/output.css') }}">
 </head>
-<body class="bg-gray-900 text-gray-100 h-screen flex flex-col overflow-y-auto font-sans">
+<body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col overflow-y-auto font-sans">
     <div class="p-6 border-b border-gray-800 flex flex-col md:flex-row justify-between items-center bg-gray-900 gap-4">
         <div class="flex items-center gap-4">
             <h1 class="text-2xl font-bold text-white tracking-wide">Help & User Guides</h1>
@@ -14,12 +14,12 @@
         <!-- Tab Bar -->
         <div class="flex flex-wrap gap-2" id="tab-container">
             {% if role in ['admin', 'accounting', 'operations'] or is_core %}
-                <button onclick="switchTab('admin')" id="tab-btn-admin" class="px-3 py-1.5 rounded text-sm font-semibold transition-all border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500">Admin Guide</button>
-                <button onclick="switchTab('accounting')" id="tab-btn-accounting" class="px-3 py-1.5 rounded text-sm font-semibold transition-all border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500">Accounting Guide</button>
-                <button onclick="switchTab('operations')" id="tab-btn-operations" class="px-3 py-1.5 rounded text-sm font-semibold transition-all border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500">Operations Guide</button>
+                <button onclick="switchTab('admin')" id="tab-btn-admin" class="px-3.5 py-2.5 min-h-[44px] rounded-lg text-sm font-semibold transition-all border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 inline-flex items-center justify-center">Admin Guide</button>
+                <button onclick="switchTab('accounting')" id="tab-btn-accounting" class="px-3.5 py-2.5 min-h-[44px] rounded-lg text-sm font-semibold transition-all border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 inline-flex items-center justify-center">Accounting Guide</button>
+                <button onclick="switchTab('operations')" id="tab-btn-operations" class="px-3.5 py-2.5 min-h-[44px] rounded-lg text-sm font-semibold transition-all border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 inline-flex items-center justify-center">Operations Guide</button>
             {% endif %}
-            <button onclick="switchTab('field')" id="tab-btn-field" class="px-3 py-1.5 rounded text-sm font-semibold transition-all border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500">Field Guide</button>
-            <button onclick="switchTab('runbook')" id="tab-btn-runbook" class="px-3 py-1.5 rounded text-sm font-semibold transition-all border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500">Field Runbook</button>
+            <button onclick="switchTab('field')" id="tab-btn-field" class="px-3.5 py-2.5 min-h-[44px] rounded-lg text-sm font-semibold transition-all border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 inline-flex items-center justify-center">Field Guide</button>
+            <button onclick="switchTab('runbook')" id="tab-btn-runbook" class="px-3.5 py-2.5 min-h-[44px] rounded-lg text-sm font-semibold transition-all border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 inline-flex items-center justify-center">Field Runbook</button>
         </div>
         <div class="flex items-center gap-4">
             {% if role == 'admin' %}
