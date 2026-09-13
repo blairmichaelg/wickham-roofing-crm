@@ -115,55 +115,57 @@
             </div>
             {% endif %}
 
-            <div class="grid grid-cols-2 gap-4 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <div>
                     <p class="text-xs text-gray-500 mb-1">
                         Current DB Values (may be None/missing)
                     </p>
-                    <table class="text-sm w-full">
-                        <tr>
-                            <td class="text-gray-400 pr-4">Total Area (SF)</td>
-                            <td class="text-white font-mono">
-                                {{ job.ev_total_area_sf or '—' }}
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="text-gray-400 pr-4">Pitch</td>
-                            <td class="text-white font-mono">
-                                {{ job.ev_predominant_pitch or '—' }}
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="text-gray-400 pr-4">Ridge LF</td>
-                            <td class="text-white font-mono">
-                                {{ job.ev_ridge_lf or '—' }}
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="text-gray-400 pr-4">Hip LF</td>
-                            <td class="text-white font-mono">
-                                {{ job.ev_hip_lf or '—' }}
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="text-gray-400 pr-4">Valley LF</td>
-                            <td class="text-white font-mono">
-                                {{ job.ev_valley_lf or '—' }}
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="text-gray-400 pr-4">Eaves LF</td>
-                            <td class="text-white font-mono">
-                                {{ job.ev_eaves_lf or '—' }}
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="text-gray-400 pr-4">Rakes LF</td>
-                            <td class="text-white font-mono">
-                                {{ job.ev_rakes_lf or '—' }}
-                            </td>
-                        </tr>
-                    </table>
+                    <div class="w-full overflow-x-auto">
+                        <table class="text-sm w-full">
+                            <tr>
+                                <td class="text-gray-400 pr-4 whitespace-nowrap">Total Area (SF)</td>
+                                <td class="text-white font-mono whitespace-nowrap">
+                                    {{ job.ev_total_area_sf or '—' }}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="text-gray-400 pr-4 whitespace-nowrap">Pitch</td>
+                                <td class="text-white font-mono whitespace-nowrap">
+                                    {{ job.ev_predominant_pitch or '—' }}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="text-gray-400 pr-4 whitespace-nowrap">Ridge LF</td>
+                                <td class="text-white font-mono whitespace-nowrap">
+                                    {{ job.ev_ridge_lf or '—' }}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="text-gray-400 pr-4 whitespace-nowrap">Hip LF</td>
+                                <td class="text-white font-mono whitespace-nowrap">
+                                    {{ job.ev_hip_lf or '—' }}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="text-gray-400 pr-4 whitespace-nowrap">Valley LF</td>
+                                <td class="text-white font-mono whitespace-nowrap">
+                                    {{ job.ev_valley_lf or '—' }}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="text-gray-400 pr-4 whitespace-nowrap">Eaves LF</td>
+                                <td class="text-white font-mono whitespace-nowrap">
+                                    {{ job.ev_eaves_lf or '—' }}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="text-gray-400 pr-4 whitespace-nowrap">Rakes LF</td>
+                                <td class="text-white font-mono whitespace-nowrap">
+                                    {{ job.ev_rakes_lf or '—' }}
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
                 </div>
 
                 <div>

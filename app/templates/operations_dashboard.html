@@ -23,14 +23,14 @@
         }
     </style>
 </head>
-<body class="bg-black text-gray-100 h-screen flex flex-col font-sans overflow-hidden">
+<body class="bg-black text-gray-100 min-h-screen md:h-screen flex flex-col font-sans md:overflow-hidden">
     {% include '_nav_office.html' %}
 
     <!-- Kanban Columns Wrapper -->
-    <div class="flex-1 flex overflow-x-auto p-6 gap-6 items-stretch">
+    <div class="flex-1 flex flex-col md:flex-row overflow-y-auto md:overflow-x-auto p-4 md:p-6 gap-6 items-stretch">
         
         <!-- Column 1: Alert: Materials Needed -->
-        <div class="w-80 min-w-[340px] bg-gray-900 border border-gray-800 rounded-lg flex flex-col shadow-2xl">
+        <div class="w-full md:w-80 md:min-w-[340px] bg-gray-900 border border-gray-800 rounded-lg flex flex-col shadow-2xl flex-shrink-0">
             <div class="p-4 border-b border-gray-800 bg-red-950/40 rounded-t-lg">
                 <h2 class="text-md font-bold text-red-400 uppercase tracking-wider flex items-center gap-2">
                     <span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping"></span>
@@ -73,7 +73,7 @@
         </div>
 
         <!-- Column 1.5: Awaiting Delivery -->
-        <div class="w-80 min-w-[340px] bg-gray-900 border border-gray-800 rounded-lg flex flex-col shadow-2xl">
+        <div class="w-full md:w-80 md:min-w-[340px] bg-gray-900 border border-gray-800 rounded-lg flex flex-col shadow-2xl flex-shrink-0">
             <div class="p-4 border-b border-gray-800 bg-yellow-950/40 rounded-t-lg">
                 <h2 class="text-md font-bold text-yellow-400 uppercase tracking-wider flex items-center gap-2">
                     <span class="w-2.5 h-2.5 rounded-full bg-yellow-500"></span>
@@ -112,7 +112,7 @@
         </div>
 
         <!-- Column 2: Ready to Build -->
-        <div class="w-80 min-w-[340px] bg-gray-900 border border-gray-800 rounded-lg flex flex-col shadow-2xl">
+        <div class="w-full md:w-80 md:min-w-[340px] bg-gray-900 border border-gray-800 rounded-lg flex flex-col shadow-2xl flex-shrink-0">
             <div class="p-4 border-b border-gray-800 bg-green-950/40 rounded-t-lg">
                 <h2 class="text-md font-bold text-green-400 uppercase tracking-wider flex items-center gap-2">
                     <span class="w-2.5 h-2.5 rounded-full bg-green-500"></span>
@@ -161,7 +161,7 @@
         </div>
 
         <!-- Column 3: Active Builds -->
-        <div class="w-80 min-w-[340px] bg-gray-900 border border-gray-800 rounded-lg flex flex-col shadow-2xl">
+        <div class="w-full md:w-80 md:min-w-[340px] bg-gray-900 border border-gray-800 rounded-lg flex flex-col shadow-2xl flex-shrink-0">
             <div class="p-4 border-b border-gray-800 bg-sky-950/40 rounded-t-lg">
                 <h2 class="text-md font-bold text-sky-400 uppercase tracking-wider flex items-center gap-2">
                     <span class="w-2.5 h-2.5 rounded-full bg-sky-500 animate-pulse"></span>
@@ -206,7 +206,7 @@
         </div>
 
         <!-- Column 4: Inspections & Closeout -->
-        <div class="w-80 min-w-[340px] bg-gray-900 border border-gray-800 rounded-lg flex flex-col shadow-2xl">
+        <div class="w-full md:w-80 md:min-w-[340px] bg-gray-900 border border-gray-800 rounded-lg flex flex-col shadow-2xl flex-shrink-0">
             <div class="p-4 border-b border-gray-800 bg-purple-950/40 rounded-t-lg">
                 <h2 class="text-md font-bold text-purple-400 uppercase tracking-wider flex items-center gap-2">
                     <span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span>

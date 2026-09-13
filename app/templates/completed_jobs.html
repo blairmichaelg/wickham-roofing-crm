@@ -20,30 +20,30 @@
             <p class="text-gray-400 text-lg">No completed jobs found yet.</p>
         </div>
         {% else %}
-        <div class="overflow-x-auto">
+        <div class="w-full overflow-x-auto shadow-2xl rounded-xl border border-gray-700">
             <table class="w-full text-left">
                 <thead class="bg-gray-800 border-b border-gray-700">
                     <tr>
-                        <th class="px-4 py-3 text-xs font-bold uppercase text-gray-400">Job #</th>
+                        <th class="px-4 py-3 text-xs font-bold uppercase text-gray-400 whitespace-nowrap">Job #</th>
                         <th class="px-4 py-3 text-xs font-bold uppercase text-gray-400">Homeowner</th>
                         <th class="px-4 py-3 text-xs font-bold uppercase text-gray-400">Address</th>
-                        <th class="px-4 py-3 text-xs font-bold uppercase text-gray-400">Status</th>
-                        <th class="px-4 py-3 text-xs font-bold uppercase text-gray-400">Closed Date</th>
-                        <th class="px-4 py-3 text-xs font-bold uppercase text-gray-400">Actions</th>
+                        <th class="px-4 py-3 text-xs font-bold uppercase text-gray-400 whitespace-nowrap">Status</th>
+                        <th class="px-4 py-3 text-xs font-bold uppercase text-gray-400 whitespace-nowrap">Closed Date</th>
+                        <th class="px-4 py-3 text-xs font-bold uppercase text-gray-400 whitespace-nowrap text-right">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-800">
                     {% for job in jobs %}
                     <tr class="hover:bg-gray-800/50 transition-colors">
-                        <td class="px-4 py-3 font-mono text-sm text-gray-400">{{ job.invoice_id or job.id[:8] }}</td>
+                        <td class="px-4 py-3 font-mono text-sm text-gray-400 whitespace-nowrap">{{ job.invoice_id or job.id[:8] }}</td>
                         <td class="px-4 py-3 font-semibold text-white">{{ job.homeowner_name }}</td>
-                        <td class="px-4 py-3 text-sm text-gray-400">{{ job.address_line1 }}</td>
-                        <td class="px-4 py-3">
+                        <td class="px-4 py-3 text-sm text-gray-400 min-w-[180px]">{{ job.address_line1 }}</td>
+                        <td class="px-4 py-3 whitespace-nowrap">
                             <span class="bg-emerald-900/30 text-emerald-300 px-2 py-1 rounded text-xs font-bold">CLOSED</span>
                         </td>
-                        <td class="px-4 py-3 text-sm text-gray-400">{{ job.updated_at or job.created_at }}</td>
-                        <td class="px-4 py-3">
-                            <a href="/office/jobs/{{ job.id }}" class="text-blue-400 hover:text-white text-xs font-semibold">View Details →</a>
+                        <td class="px-4 py-3 text-sm text-gray-400 whitespace-nowrap">{{ job.updated_at or job.created_at }}</td>
+                        <td class="px-4 py-3 whitespace-nowrap text-right">
+                            <a href="/office/jobs/{{ job.id }}" class="text-blue-400 hover:text-white text-xs font-semibold py-1.5 px-3 rounded hover:bg-gray-700 transition-colors inline-block">View Details →</a>
                         </td>
                     </tr>
                     {% endfor %}

@@ -17,7 +17,7 @@
         
         <div class="bg-gray-800 rounded-lg shadow-md border border-gray-700 overflow-hidden">
             <table class="w-full text-left border-collapse">
-                <thead>
+                <thead class="hidden md:table-header-group">
                     <tr class="bg-gray-700 text-gray-300 text-sm uppercase">
                         <th class="p-4 border-b border-gray-600">Zipcode</th>
                         <th class="p-4 border-b border-gray-600">Recent Events</th>
@@ -26,18 +26,33 @@
                         <th class="p-4 border-b border-gray-600">Our Leads</th>
                     </tr>
                 </thead>
-                <tbody class="text-sm">
+                <tbody class="text-sm divide-y divide-gray-700/50 md:divide-none">
                     {% for target in targets %}
-                    <tr class="hover:bg-gray-700 transition border-b border-gray-700">
-                        <td class="p-4 font-bold text-white">{{ target.zipcode }}</td>
-                        <td class="p-4">{{ target.event_count }}</td>
-                        <td class="p-4 text-yellow-400 font-bold">{% if target.max_hail %}{{ target.max_hail }}"{% else %}-{% endif %}</td>
-                        <td class="p-4 text-gray-400">{{ target.last_event_date[:10] if target.last_event_date else 'Unknown' }}</td>
-                        <td class="p-4">{{ target.total_leads }} ({{ target.active_leads }} active)</td>
+                    <tr class="block md:table-row hover:bg-gray-700/50 transition border-b border-gray-700 p-4 md:p-0">
+                        <td class="flex justify-between items-center px-4 py-2 md:table-cell md:p-4 font-bold text-white">
+                            <span class="md:hidden font-bold text-gray-400 text-xs uppercase">Zipcode:</span>
+                            <span>{{ target.zipcode }}</span>
+                        </td>
+                        <td class="flex justify-between items-center px-4 py-2 md:table-cell md:p-4">
+                            <span class="md:hidden font-bold text-gray-400 text-xs uppercase">Recent Events:</span>
+                            <span>{{ target.event_count }}</span>
+                        </td>
+                        <td class="flex justify-between items-center px-4 py-2 md:table-cell md:p-4 text-yellow-400 font-bold">
+                            <span class="md:hidden font-bold text-gray-400 text-xs uppercase">Max Hail:</span>
+                            <span>{% if target.max_hail %}{{ target.max_hail }}"{% else %}-{% endif %}</span>
+                        </td>
+                        <td class="flex justify-between items-center px-4 py-2 md:table-cell md:p-4 text-gray-400">
+                            <span class="md:hidden font-bold text-gray-400 text-xs uppercase">Last Event:</span>
+                            <span>{{ target.last_event_date[:10] if target.last_event_date else 'Unknown' }}</span>
+                        </td>
+                        <td class="flex justify-between items-center px-4 py-2 md:table-cell md:p-4">
+                            <span class="md:hidden font-bold text-gray-400 text-xs uppercase">Our Leads:</span>
+                            <span>{{ target.total_leads }} ({{ target.active_leads }} active)</span>
+                        </td>
                     </tr>
                     {% endfor %}
                     {% if not targets %}
-                    <tr><td colspan="5" class="p-4 text-center text-gray-500">No storm events recorded yet. Run the ingestion script.</td></tr>
+                    <tr class="block md:table-row"><td colspan="5" class="p-8 text-center text-gray-500">No storm events recorded yet. Run the ingestion script.</td></tr>
                     {% endif %}
                 </tbody>
             </table>
