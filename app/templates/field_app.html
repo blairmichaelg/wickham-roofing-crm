@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Field Intake</title>
     <meta name="theme-color" content="#1e3a8a">
     <link rel="manifest" href="/static/manifest.json">
@@ -21,44 +21,25 @@
     </style>
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen relative font-sans">
-    <nav class="bg-gray-900 border-b border-gray-800 px-6 py-3 flex flex-wrap justify-between items-center z-30 mb-6">
-        <div class="flex items-center space-x-3">
-            <img src="/static/logo.png" alt="Wickham Roofing Logo" class="w-9 h-9 rounded shadow">
-            <span class="text-white font-bold tracking-wide text-lg hidden sm:inline">Wickham Roofing</span>
-        </div>
+    <!-- Desktop Office Nav (md+) -->
+    <div class="hidden md:block mb-6">
+        {% include '_nav_office.html' %}
+    </div>
 
-        <!-- Dashboard Switcher -->
-        <div class="flex items-center space-x-2 bg-gray-950 p-1.5 rounded-lg border border-gray-800 my-1 sm:my-0">
-            {% if is_core %}
-            <a href="/admin" class="px-3.5 py-1.5 rounded-md font-bold text-xs tracking-wider transition-all flex items-center gap-1.5 text-gray-400 hover:text-white hover:bg-gray-800">
-                <span>👑</span>
-                <span>Admin Board</span>
-            </a>
-            <a href="/accounting" class="px-3.5 py-1.5 rounded-md font-bold text-xs tracking-wider transition-all flex items-center gap-1.5 text-gray-400 hover:text-white hover:bg-gray-800">
-                <span>📊</span>
-                <span>Accounting</span>
-            </a>
-            <a href="/api/operations/board" class="px-3.5 py-1.5 rounded-md font-bold text-xs tracking-wider transition-all flex items-center gap-1.5 text-gray-400 hover:text-white hover:bg-gray-800">
-                <span>🏗️</span>
-                <span>Production</span>
-            </a>
-            {% endif %}
-            <a href="/field" class="px-3.5 py-1.5 rounded-md font-bold text-xs tracking-wider transition-all flex items-center gap-1.5 bg-orange-600 text-white shadow-lg">
-                <span>📱</span>
-                <span>Field Intake</span>
-            </a>
+    <!-- Mobile Top Header (< md) -->
+    <header class="md:hidden bg-gray-900 border-b border-gray-800 px-4 py-3 flex items-center justify-between z-30 mb-4 sticky top-0">
+        <div class="flex items-center space-x-2.5">
+            <img src="/static/logo.png" alt="Wickham Roofing Logo" class="w-8 h-8 rounded shadow">
+            <div>
+                <span class="text-white font-bold text-base leading-tight block">Wickham Field</span>
+                <span class="text-[10px] text-gray-400 font-mono block">{% if current_rep_name %}{{ current_rep_name }}{% else %}Field Rep{% endif %}</span>
+            </div>
         </div>
-
-        <!-- Utility Links -->
-        <div class="flex items-center space-x-2">
-            {% if is_core %}
-                <a href="/admin/reps" class="text-purple-400 hover:text-white px-3 py-1.5 border border-purple-800 hover:border-purple-600 rounded text-xs font-bold transition-all">👥 Reps</a>
-                <a href="/api/office/admin/triage" class="text-yellow-400 hover:text-white px-3 py-1.5 border border-yellow-800 hover:border-yellow-600 rounded text-xs font-bold transition-all">⚠️ Triage</a>
-            {% endif %}
-            <a href="/help" class="text-blue-400 hover:text-white px-3 py-1.5 border border-blue-800 hover:border-blue-600 rounded text-xs font-bold transition-all">❓ Help</a>
-            <a href="/auth/logout" class="text-gray-400 hover:text-white px-3 py-1.5 border border-gray-800 hover:border-gray-600 rounded text-xs transition-all">Logout</a>
+        <div class="flex items-center gap-2">
+            <a href="/help" class="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-blue-400 hover:text-white rounded-lg hover:bg-gray-800 text-xs font-bold" aria-label="Help">❓</a>
+            <a href="/auth/logout" class="px-2.5 py-1 min-h-[44px] flex items-center justify-center text-gray-400 hover:text-white rounded border border-gray-800 hover:bg-gray-800 text-xs">Logout</a>
         </div>
-    </nav>
+    </header>
 
     <!-- Toast Container -->
     <div id="toastContainer" class="fixed top-4 right-4 z-50 flex flex-col space-y-2 pointer-events-none"></div>
@@ -73,7 +54,7 @@
         </button>
     </div>
 
-    <div class="max-w-md mx-auto p-6 pb-24">
+    <div class="max-w-md mx-auto p-6 pb-28 md:pb-12">
         <!-- Compact Mobile Sync Status Bar -->
         <div id="syncStatusBar" class="mb-4 px-3.5 py-2 bg-gray-950/90 border border-gray-800 rounded-xl flex items-center justify-between text-xs shadow-md">
             <div class="flex items-center gap-2">
@@ -84,7 +65,7 @@
             </div>
             <div class="flex items-center gap-2">
                 <span id="lastSyncTime" class="text-[10px] text-gray-500">Synced just now</span>
-                <button type="button" id="btnManualSync" onclick="triggerManualSync()" class="bg-gray-800 hover:bg-gray-700 text-purple-300 px-2 py-0.5 rounded font-medium border border-gray-700 text-[11px] transition-colors">
+                <button type="button" id="btnManualSync" onclick="triggerManualSync()" class="bg-gray-800 hover:bg-gray-700 text-purple-300 px-3 py-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg font-medium border border-gray-700 text-xs transition-colors">
                     🔄 Sync
                 </button>
             </div>
@@ -316,9 +297,9 @@
                 <div class="bg-white rounded-lg p-1 border border-gray-600 mb-2 relative">
                     <canvas id="signaturePad" width="380" height="150" class="w-full border-none touch-none rounded bg-white"></canvas>
                 </div>
-                <div class="flex justify-between items-center mt-2">
-                    <button type="button" id="clearBtn" class="text-sm text-red-400 hover:text-red-300 font-semibold px-4 py-2 bg-gray-800 rounded">Clear Signature</button>
-                    <button type="button" id="lockBtn" class="text-sm text-green-400 hover:text-green-300 font-semibold px-4 py-2 bg-gray-800 rounded">Lock Signature</button>
+                <div class="flex justify-between items-center mt-2 gap-3">
+                    <button type="button" id="clearBtn" class="text-sm text-red-400 hover:text-red-300 font-semibold px-4 py-2 min-h-[44px] inline-flex items-center justify-center bg-gray-800 rounded-lg">Clear Signature</button>
+                    <button type="button" id="lockBtn" class="text-sm text-green-400 hover:text-green-300 font-semibold px-4 py-2 min-h-[44px] inline-flex items-center justify-center bg-gray-800 rounded-lg">Lock Signature</button>
                 </div>
                 <p id="signatureHint" class="text-xs text-gray-300 mt-2 text-right"></p>
             </div>
@@ -741,20 +722,20 @@
                     </div>
                     <div class="flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-gray-700/80">
                         <div class="flex items-center gap-2 flex-wrap">
-                            <button onclick="loadDocuments('${job.id}', this)" class="text-blue-400 text-xs font-semibold hover:text-blue-300 bg-gray-900 px-2.5 py-1.5 rounded border border-gray-700">
+                            <button onclick="loadDocuments('${job.id}', this)" class="text-blue-400 text-xs font-semibold hover:text-blue-300 bg-gray-900 px-3 py-2 min-h-[44px] rounded-lg border border-gray-700 inline-flex items-center justify-center">
                                 Docs &darr;
                             </button>
-                            <a href="/api/field/jobs/${job.id}/evidence_grid" target="_blank" class="text-emerald-300 hover:text-white text-xs font-bold bg-emerald-950/80 px-2.5 py-1.5 rounded border border-emerald-700/80 flex items-center gap-1">
+                            <a href="/api/field/jobs/${job.id}/evidence_grid" target="_blank" class="text-emerald-300 hover:text-white text-xs font-bold bg-emerald-950/80 px-3 py-2 min-h-[44px] rounded-lg border border-emerald-700/80 inline-flex items-center gap-1 justify-center">
                                 📄 Evidence Grid
                             </a>
-                            <button onclick="loadSalesTools('${job.id}', this)" class="text-purple-300 text-xs font-bold bg-purple-950/80 px-2.5 py-1.5 rounded border border-purple-700/80 flex items-center gap-1 hover:bg-purple-900">
+                            <button onclick="loadSalesTools('${job.id}', this)" class="text-purple-300 text-xs font-bold bg-purple-950/80 px-3 py-2 min-h-[44px] rounded-lg border border-purple-700/80 inline-flex items-center gap-1 justify-center hover:bg-purple-900">
                                 🤖 Sales Tools
                             </button>
-                            ${['INSTALL_COMPLETED','FINAL_INSPECTION','FINAL_INSPECTION_COMPLETED','INVOICED','CLOSED','PAYMENT_RECEIVED','ACV_PAYMENT_RECEIVED','DEPRECIATION_PAYMENT_RECEIVED','RETAIL_PAYMENT_RECEIVED'].includes(job.status) ? '<a href="/api/field/jobs/' + job.id + '/docs/neighbor-letter" target="_blank" class="text-orange-300 hover:text-white text-xs font-bold bg-orange-950/80 px-2.5 py-1.5 rounded border border-orange-700/80 flex items-center gap-1">🏘️ Neighbor Letter</a>' : ''}
-                            ${isNakedLead ? '<a href="/api/field/jobs/' + job.id + '/docs/contingency" target="_blank" class="text-blue-300 hover:text-white text-xs font-bold bg-blue-950/80 px-2.5 py-1.5 rounded border border-blue-700/80 flex items-center gap-1">✉️ Unsigned PDF</a><button onclick="emailUnsignedAgreement(\'' + job.id + '\', \'' + encodeURIComponent(job.homeowner_name) + '\', \'' + encodeURIComponent(job.email || '') + '\')" class="text-amber-300 hover:text-white text-xs font-bold bg-amber-950/80 px-2.5 py-1.5 rounded border border-amber-700/80 flex items-center gap-1">✉️ Email Client</button>' : ''}
-                            ${job.status === 'RETAIL_CONTRACT_SIGNED' ? '<button onclick="downloadRetailNoticeOfCancellation(\'' + job.id + '\')" class="text-emerald-300 hover:text-white text-xs font-bold bg-emerald-950/80 px-2.5 py-1.5 rounded border border-emerald-700/80 flex items-center gap-1">📄 NOC PDF</button><button onclick="emailRetailNoticeOfCancellation(\'' + job.id + '\', \'' + encodeURIComponent(job.homeowner_name) + '\', \'' + encodeURIComponent(job.email || '') + '\')" class="text-amber-300 hover:text-white text-xs font-bold bg-amber-950/80 px-2.5 py-1.5 rounded border border-amber-700/80 flex items-center gap-1">✉️ Email NOC</button>' : ''}
+                            ${['INSTALL_COMPLETED','FINAL_INSPECTION','FINAL_INSPECTION_COMPLETED','INVOICED','CLOSED','PAYMENT_RECEIVED','ACV_PAYMENT_RECEIVED','DEPRECIATION_PAYMENT_RECEIVED','RETAIL_PAYMENT_RECEIVED'].includes(job.status) ? '<a href="/api/field/jobs/' + job.id + '/docs/neighbor-letter" target="_blank" class="text-orange-300 hover:text-white text-xs font-bold bg-orange-950/80 px-3 py-2 min-h-[44px] rounded-lg border border-orange-700/80 inline-flex items-center justify-center gap-1">🏘️ Neighbor Letter</a>' : ''}
+                            ${isNakedLead ? '<a href="/api/field/jobs/' + job.id + '/docs/contingency" target="_blank" class="text-blue-300 hover:text-white text-xs font-bold bg-blue-950/80 px-3 py-2 min-h-[44px] rounded-lg border border-blue-700/80 inline-flex items-center justify-center gap-1">✉️ Unsigned PDF</a><button onclick="emailUnsignedAgreement(\'' + job.id + '\', \'' + encodeURIComponent(job.homeowner_name) + '\', \'' + encodeURIComponent(job.email || '') + '\')" class="text-amber-300 hover:text-white text-xs font-bold bg-amber-950/80 px-3 py-2 min-h-[44px] rounded-lg border border-amber-700/80 inline-flex items-center justify-center gap-1">✉️ Email Client</button>' : ''}
+                            ${job.status === 'RETAIL_CONTRACT_SIGNED' ? '<button onclick="downloadRetailNoticeOfCancellation(\'' + job.id + '\')" class="text-emerald-300 hover:text-white text-xs font-bold bg-emerald-950/80 px-3 py-2 min-h-[44px] rounded-lg border border-emerald-700/80 inline-flex items-center justify-center gap-1">📄 NOC PDF</button><button onclick="emailRetailNoticeOfCancellation(\'' + job.id + '\', \'' + encodeURIComponent(job.homeowner_name) + '\', \'' + encodeURIComponent(job.email || '') + '\')" class="text-amber-300 hover:text-white text-xs font-bold bg-amber-950/80 px-3 py-2 min-h-[44px] rounded-lg border border-amber-700/80 inline-flex items-center justify-center gap-1">✉️ Email NOC</button>' : ''}
                         </div>
-                        ${isNakedLead ? '<button onclick="resumeLead(\'' + job.id + '\')" class="text-purple-200 hover:text-white text-xs font-bold bg-purple-900 hover:bg-purple-800 px-3.5 py-1.5 rounded-lg border border-purple-500 shadow flex items-center gap-1">✍️ Resume & Sign &rarr;</button>' : '<a href="/office/jobs/' + job.id + '" class="text-purple-300 hover:text-white text-xs font-bold bg-purple-950/80 hover:bg-purple-900 px-3 py-1.5 rounded border border-purple-700/80 flex items-center gap-1">⚡ View Overview &rarr;</a>'}
+                        ${isNakedLead ? '<button onclick="resumeLead(\'' + job.id + '\')" class="text-purple-200 hover:text-white text-xs font-bold bg-purple-900 hover:bg-purple-800 px-4 py-2 min-h-[44px] rounded-lg border border-purple-500 shadow inline-flex items-center justify-center gap-1">✍️ Resume & Sign &rarr;</button>' : '<a href="/office/jobs/' + job.id + '" class="text-purple-300 hover:text-white text-xs font-bold bg-purple-950/80 hover:bg-purple-900 px-4 py-2 min-h-[44px] rounded-lg border border-purple-700/80 inline-flex items-center justify-center gap-1">⚡ View Overview &rarr;</a>'}
                     </div>
                     <div id="docs-${job.id}" class="hidden mt-2 space-y-2 border-t border-gray-700 pt-3"></div>
                     <div id="sales-tools-${job.id}" class="hidden mt-2 space-y-2 border-t border-gray-700 pt-3"></div>
@@ -994,9 +975,9 @@
                     <div class="relative group">
                         <img src="${url}" onclick="openLightbox('${url}')" class="w-full h-24 object-cover rounded-lg border border-gray-600 cursor-pointer">
                         <button type="button" onclick="removePhoto(${index})"
-                                class="absolute top-1 right-1 bg-red-600 text-white
-                                       rounded-full w-6 h-6 flex items-center justify-center
-                                       opacity-80 hover:opacity-100">×</button>
+                                class="absolute top-1 right-1 bg-red-600/95 hover:bg-red-600 text-white
+                                       rounded-full min-h-[44px] min-w-[44px] flex items-center justify-center
+                                       text-lg font-bold shadow-lg transition-transform active:scale-95" aria-label="Remove photo">×</button>
                     </div>`;
             });
             document.getElementById('photoCount').textContent =
@@ -2273,7 +2254,7 @@
                                 <p class="text-[10px] text-purple-300/80 italic">💡 ${act.reason}</p>
                             </div>
                             <div class="shrink-0 pt-1">
-                                <a href="${act.action_url || '#'}" class="text-[11px] bg-purple-900/80 hover:bg-purple-800 text-purple-200 px-2 py-1 rounded font-bold transition-colors">
+                                <a href="${act.action_url || '#'}" class="text-xs bg-purple-900/80 hover:bg-purple-800 text-purple-200 px-3 py-2 min-h-[44px] inline-flex items-center justify-center rounded-lg font-bold transition-colors">
                                     Take Action &rarr;
                                 </a>
                             </div>
@@ -2337,6 +2318,33 @@
             }
         };
 
+        window.navigateToFieldTab = (targetId) => {
+            const el = document.getElementById(targetId);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        };
+
+        // On-screen keyboard detection: hide bottom tab bar when typing so it never obscures form inputs
+        (function initKeyboardDetection() {
+            const bottomNav = document.getElementById('fieldBottomNav');
+            if (!bottomNav) return;
+
+            window.addEventListener('focusin', (e) => {
+                if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT')) {
+                    bottomNav.style.display = 'none';
+                }
+            });
+
+            window.addEventListener('focusout', (e) => {
+                if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT')) {
+                    setTimeout(() => {
+                        bottomNav.style.display = '';
+                    }, 150);
+                }
+            });
+        })();
+
         document.addEventListener('DOMContentLoaded', () => {
             loadMyJobs();
             updateSubmitButtonState();
@@ -2352,5 +2360,36 @@
             connectWebSocket();
         });
     </script>
+
+    <!-- Mobile Fixed Bottom Tab Bar (< md) -->
+    <nav id="fieldBottomNav" class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-gray-950/95 backdrop-blur-md border-t border-gray-800 px-2 py-1 flex justify-around items-center shadow-2xl transition-transform duration-200" aria-label="Field Mobile Bottom Navigation">
+        <a href="#intakeForm" onclick="navigateToFieldTab('intakeForm')" id="tabNewLead" class="flex-1 py-1 px-1 min-h-[48px] flex flex-col items-center justify-center text-orange-400 font-bold transition-colors">
+            <span class="text-lg leading-none">📝</span>
+            <span class="text-[10px] mt-1 tracking-tight">New Lead</span>
+        </a>
+        <a href="#myJobsSection" onclick="navigateToFieldTab('myJobsSection')" id="tabMyJobs" class="flex-1 py-1 px-1 min-h-[48px] flex flex-col items-center justify-center text-gray-400 hover:text-white transition-colors">
+            <span class="text-lg leading-none">📋</span>
+            <span class="text-[10px] mt-1 tracking-tight">My Jobs</span>
+        </a>
+        <a href="#stormDecisionPanel" onclick="navigateToFieldTab('stormDecisionPanel')" id="tabStormRadar" class="flex-1 py-1 px-1 min-h-[48px] flex flex-col items-center justify-center text-gray-400 hover:text-white transition-colors">
+            <span class="text-lg leading-none">⚡</span>
+            <span class="text-[10px] mt-1 tracking-tight">Storms</span>
+        </a>
+        <a href="#nextBestActionsPanel" onclick="navigateToFieldTab('nextBestActionsPanel')" id="tabBestActions" class="flex-1 py-1 px-1 min-h-[48px] flex flex-col items-center justify-center text-gray-400 hover:text-white transition-colors">
+            <span class="text-lg leading-none">🎯</span>
+            <span class="text-[10px] mt-1 tracking-tight">Actions</span>
+        </a>
+        {% if is_core %}
+        <a href="/admin" id="tabAdmin" class="flex-1 py-1 px-1 min-h-[48px] flex flex-col items-center justify-center text-purple-400 hover:text-white transition-colors">
+            <span class="text-lg leading-none">👑</span>
+            <span class="text-[10px] mt-1 tracking-tight">Admin</span>
+        </a>
+        {% else %}
+        <button type="button" onclick="triggerManualSync()" id="tabSync" class="flex-1 py-1 px-1 min-h-[48px] flex flex-col items-center justify-center text-gray-400 hover:text-purple-300 transition-colors">
+            <span class="text-lg leading-none">🔄</span>
+            <span class="text-[10px] mt-1 tracking-tight">Sync</span>
+        </button>
+        {% endif %}
+    </nav>
 </body>
 </html>

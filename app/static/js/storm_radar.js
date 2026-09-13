@@ -254,11 +254,11 @@ const StormRadar = {
                             <span class="text-[10px] text-gray-400 block">${timeStr}</span>
                         </div>
                     </div>
-                    <div class="mt-2.5 flex items-center gap-2 pt-2 border-t border-gray-800">
-                        <button type="button" onclick="${onSelectCallback}('${zip}')" class="text-xs bg-purple-900/60 hover:bg-purple-800 text-purple-200 px-2.5 py-1 rounded font-semibold transition-colors">
+                    <div class="mt-2.5 flex flex-wrap items-center gap-2 pt-2 border-t border-gray-800">
+                        <button type="button" onclick="${onSelectCallback}('${zip}')" class="text-xs bg-purple-900/60 hover:bg-purple-800 text-purple-200 px-3 py-2 min-h-[44px] rounded-lg font-semibold transition-colors inline-flex items-center justify-center">
                             🔍 Filter Jobs (${zip})
                         </button>
-                        <button type="button" onclick="prefillLeadZip('${zip}')" class="text-xs bg-emerald-900/60 hover:bg-emerald-800 text-emerald-200 px-2.5 py-1 rounded font-semibold transition-colors">
+                        <button type="button" onclick="prefillLeadZip('${zip}')" class="text-xs bg-emerald-900/60 hover:bg-emerald-800 text-emerald-200 px-3 py-2 min-h-[44px] rounded-lg font-semibold transition-colors inline-flex items-center justify-center">
                             📝 Pre-fill Lead (${zip})
                         </button>
                     </div>
