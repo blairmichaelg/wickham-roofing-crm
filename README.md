@@ -68,7 +68,7 @@ The system isolates operational data across four distinct user roles, authentica
 | **Background Task Queue** | ARQ over Local Redis | Asynchronous background document parsing, PDF compilation, and building code RAG lookups without halting UI threads. |
 | **Document Vault Engine** | ReportLab + pdfplumber | Deterministic, precision-aligned generation of statutory legal notices, supplier POs, and evidence grids. |
 | **Frontend & UI** | Vanilla JS + Tailwind CSS | Zero-bundle bloat, offline Service Worker capabilities with IndexedDB persistence, and crisp reactive dashboards. |
-| **Quality & Assurance** | Pytest / Mypy / Ruff | **351 tests** passing at a 100% pass rate; 75.27% code coverage enforced by CI gate; strict static analysis zero-error compliance across all layers. |
+| **Quality & Assurance** | Pytest / Mypy / Ruff | **590 tests** passing at a 100% pass rate; 79.68% code coverage enforced by CI gate (≥75%); strict static analysis zero-error compliance across all layers. |
 
 ---
 

@@ -186,9 +186,16 @@ That is completely normal. Carriers typically withhold recoverable depreciation 
 **Q: Can I export the same job to QuickBooks twice by accident?**
 No. Once a job is exported, it is automatically removed from future export batches.
 
-**Q: Can I see a job's full financials and signed documents?**
-Yes! Click the **"View Details →"** link on any job row. You will see the full job profile with all financials, margins, documents, and supplements.
+**Q: Can I see a job's full financials, signed documents, and evidence packets?**
+Yes! Click the **"View Details →"** link on any job row. You will see the full job profile with all financials, margins, documents, supplements, and generated Evidence Packet PDFs.
+
+**Q: How does the system handle penny rounding or fractional currency?**
+It doesn't. All database currency columns, models, and calculation routines strictly operate in **integer cents** (e.g., $10,596.00 is stored as 1,059,600 cents). This eliminates floating-point rounding errors and guarantees exact ledger balance reconciliation down to the penny.
+
+**Q: What is the "Close Ledger" action in the priority queue?**
+When all insurance or retail checks have been recorded (`PAYMENT_RECEIVED`), the Next Best Action engine flags the job under Priority 1 for accounting to perform final ledger reconciliation and close out the job without leaving dangling balances.
 
 ---
 
-*This guide reflects the production features for version 2.4.1 of the Wickham Roofing CRM. Includes read-only core role classification for Alex Wickham.*
+*This guide reflects the production features for version `2.10.0` (2026-09-13) of the Wickham Roofing CRM. Includes integer-cent financial precision, commercial progress billing, QBO invoice export, Evidence Packet visibility, and read-only core role classification for Alex Wickham.*
+

@@ -1,6 +1,6 @@
 # Wickham Roofing CRM — Field & Offline Runbook
 
-**Wickham Roofing CRM v2.8.1 · Operational Runbook**
+**Wickham Roofing CRM v2.10.0 · Operational Runbook**
 
 This runbook provides emergency operational procedures for Scott and field reps. If the CRM behaves unexpectedly in the field or office, execute the diagnostics below before escalating.
 
@@ -92,4 +92,25 @@ This runbook provides emergency operational procedures for Scott and field reps.
   2. Inspect the detailed error message displayed in the dialog.
   3. Tap **🔄 Retry Sync** to re-attempt queue processing immediately.
   4. If the error is a permanent 400 validation issue, note the job address and report to the office admin.
+
+## 8. Evidence Matrix Field Exhibit Upload Diagnostics
+
+- **Symptom**: Tapping **Save Exhibit** under a job returns a 403 Forbidden or fails silently.
+- **Diagnosis**:
+  1. The field representative does not own the job (`canvasser_rep_id` mismatch).
+  2. The network connection dropped before the photo asset could be attached.
+- **Action**:
+  1. Confirm the rep logged into the device matches the rep who created the lead.
+  2. If working offline, ensure the exhibit is saved to the local offline queue (the sync bar pending count will increment by 1).
+  3. Do not clear browser cache while pending exhibits exist in the queue.
+
+## 9. Today's Best Actions Not Refreshing
+
+- **Symptom**: The "Today's Best Actions" card displays stale action items or does not update after completing an inspection.
+- **Diagnosis**: Cached client state or delayed sync of completed job tasks.
+- **Action**:
+  1. Pull down or tap the refresh button on the field home screen.
+  2. Confirm device connectivity indicates **🟢 Online** on the top sync status bar.
+  3. Verify that any pending task submissions in the offline queue have cleared.
+
 

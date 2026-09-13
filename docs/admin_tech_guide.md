@@ -445,5 +445,89 @@ When a field rep's device is lost or stolen, or when offboarding personnel, admi
 
 ---
 
-*This guide reflects the Admin workflow as of version `2.8.17`. Includes commercial progress billing, automated lien monitoring, JWT session revocation, decoupled payment recording, expanded 90-mile storm canvassing intelligence, gated review workflows, and the read-only core role classification for Alex Wickham.*
+## 13. Deterministic Next Best Actions & Office Action Triage
+
+Administrators and office managers have direct access to automated pipeline triage and follow-up tracking without relying on opaque AI reasoning:
+
+### Action Priority Architecture
+Actions are deterministically ranked across a 5-tier priority hierarchy:
+1. **Priority 1 (Urgent Deadlines & Denials)**:
+   - Georgia Statutory Denial Lock (O.C.G.A. § 10-1-393.12 5-day post-denial invoicing restriction).
+   - Georgia Commercial Mechanic's Lien Warnings (O.C.G.A. § 44-14-361.1 90-day deadline approaching).
+   - Incomplete ledger closures after final payment receipt.
+2. **Priority 2 (Office Blocks & Carrier SLAs)**:
+   - Operator review triage blocks (`PENDING_OPERATOR_REVIEW`).
+   - Carrier SLA timeout overruns (`AWAITING_CARRIER_RESPONSE` exceeding 14 days without response).
+3. **Priority 3 (Storm Opportunity Outreach)**:
+   - Newly matched storm opportunities pending homeowner contact or inspection scheduling.
+4. **Priority 4 (Customer Agreements & Contingencies)**:
+   - Unsigned contingency or retail agreements requiring field or office follow-up.
+5. **Priority 5 (Production Milestones & Customer Reviews)**:
+   - Roof installations completed and awaiting final punch list and 5-star Google review solicitations.
+
+### Office Triage Endpoint & Ledger
+- **Endpoint**: `GET /api/office/actions/triage`
+- **Output**: Groups all open actions across the company into categorized buckets: `stalled_jobs`, `carrier_sla_overruns`, `storm_opportunities`, and `review_queue`.
+- **First-Party Contact Ledger**: Tracks customer outreach attempts (`contact_attempts` table) with structured methods (`CALL`, `TEXT`, `DOOR`, `EMAIL`), notes, and rep attribution without third-party CRM fees.
+
+---
+
+## 14. Evidence Matrix v1 & Supplement Evidence Packet PDF
+
+To maximize insurance supplement capture and provide undeniable forensic proof to claims adjusters, the system features a structured Evidence Matrix:
+
+### Evidence Exhibits Architecture
+- **Table**: `evidence_exhibits` (Migration 0028) stores structured observations linked to jobs, photo assets, and claim discrepancy line items.
+- **Categories**: Standardized architectural categories:
+  - *Decking / Sheathing*
+  - *Flashing / Penetrations*
+  - *Membrane / Shingle Damage*
+  - *Ventilation*
+  - *Ice & Water / Code-Related Upgrade*
+  - *Interior Water Damage*
+  - *Debris / Access / Other*
+- **Office Review Gate**: Exhibits flagged with `requires_office_review = 1` remain quarantined until approved by an administrator or office manager via `PATCH /api/office/jobs/{job_id}/evidence/{exhibit_id}`.
+- **Sequential Exhibit Ordering**: Exhibits can be drag-and-drop reordered via `POST /api/office/jobs/{job_id}/evidence/reorder`.
+
+### Supplement Evidence Packet PDF Generation
+- **Generator**: ReportLab Platypus engine (`EvidencePacketGenerator` in `app/services/pdf/evidence_packet.py`).
+- **Layout**: Outputs `evidence_packet_v{N}.pdf` with branded header, metadata table, deterministic claim discrepancy summary, photo exhibits grid, and 7-year statutory retention notice.
+- **Endpoints**:
+  - `POST /api/office/jobs/{job_id}/generate-evidence-packet`
+  - `GET /api/office/jobs/{job_id}/download-evidence-packet?version={N}`
+
+---
+
+## 15. Secure Experimental ESX Archive Import
+
+The CRM includes a safe, read-only Xactimate `.esx` archive parser for importing carrier and contractor scopes:
+
+### Security Boundaries
+- **Disabled by Default**: Controlled by `enable_esx_import: bool = False` in `app/config.py` and labeled experimental.
+- **Strict Limits**: Rejects archives exceeding 50 members, 25MB compressed, or 20MB uncompressed to defend against zip bombs.
+- **Zip Slip Defense**: Member filepaths are normalized and verified via `os.path.commonpath`.
+- **XXE & XML Entity Defense**: Pre-scans XML files and rejects any stream containing `<!DOCTYPE` or `<!ENTITY` declarations with `ValueError`.
+
+### Profile Distinction & Integer Cents Reconciliation
+- **Profile Support**: Extracts estimate profile (`8D` contractor estimate vs. `5L` carrier scope).
+- **Sum Validation**: Sums itemized line items in integer cents and reconciles against header RCV/ACV totals. Discrepancies are flagged in `UniversalClaimAST.gross_rcv.verified = False` with a descriptive message rather than crashing.
+- **Validation Status**: Validated against synthetic multi-line-item fixtures; recommend manual validation with a real carrier-issued file before removing the experimental flag.
+
+---
+
+## 16. Grounded AI Sales Provenance & Prohibited Sales Guardrails
+
+All sales narratives and insurance talks generated by the AI are bound by negative guardrails to prevent statutory violations:
+
+### Anti-Deductible Waiving Guardrail (O.C.G.A. § 33-23-43(c)(4))
+- **Enforcement**: `app/services/ai/guardrails.py:verify_prohibited_sales_promises()` scans text against word-stem patterns and immediately raises `SalesPromiseViolationError` if prohibited language is detected:
+  - Waiving, absorbing, rebating, or paying homeowner insurance deductibles.
+  - Promising promotional credits to offset deductibles.
+  - Acting as a public adjuster or guaranteeing claim approval.
+- **Sales Provenance**: Every generated sales draft links directly to verified NWS storm dates/reports and carries the mandatory disclosure: *"AI-assisted draft — verify before use with property owner."*
+- **Ungrounded Fallback**: When building-code or weather context is missing, the code router returns the neutral status: *"Manual review required; no supporting statutory or building-code source attached."*
+
+---
+
+*This guide reflects the Admin workflow as of version `2.10.0` (2026-09-13). Includes commercial progress billing, automated lien monitoring, JWT session revocation, storm targets canvassing engine, Next Best Action triage, Evidence Matrix v1, experimental ESX import, and statutory AI sales guardrails.*
 

@@ -53,6 +53,7 @@ Open `.env` in a secure editor and configure your production parameter tokens:
 | `STORM_CANVASSING_WINDOW_HOURS` | `168` | Look-back window in hours (default 7 days) for canvassing target prioritization. |
 | `STORM_FRESH_WINDOW_HOURS` | `48` | Look-back window in hours (default 48h) for fresh alert badges on job cards. |
 | `STORM_CANVASSING_RADIUS_MILES` | `90.0` | Radius in miles around the office center for canvassing territory operations. |
+| `ENABLE_ESX_IMPORT` | `false` | Feature flag gating experimental Xactimate .esx archive import (defaults to false). |
 
 
 > [!CAUTION]

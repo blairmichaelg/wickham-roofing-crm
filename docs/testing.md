@@ -1,6 +1,6 @@
 # Testing Guide — Wickham Roofing CRM
 
-This guide documents the **77 test modules** (564 passing tests) comprising the Wickham Roofing CRM test suite, mapping each module to the business guarantee it protects, documenting how to run the suite with coverage, and specifying the enforced threshold targets.
+This guide documents the **79 test modules** (590 passing tests) comprising the Wickham Roofing CRM test suite, mapping each module to the business guarantee it protects, documenting how to run the suite with coverage, and specifying the enforced threshold targets.
 
 ---
 
@@ -35,7 +35,7 @@ The automated test suite (`tests/conftest.py`) automatically provisions an isola
 | `app/core/` | ≥ 90% |
 | `app/services/` | ≥ 90% |
 | Rest of `app/` | ≥ 75% |
-| Overall | ≥ 75% (enforced via `fail_under = 75` in `pyproject.toml`; current: **79.28%**) |
+| Overall | ≥ 75% (enforced via `fail_under = 75` in `pyproject.toml`; current: **79.68%**) |
 
 ---
 
@@ -43,6 +43,9 @@ The automated test suite (`tests/conftest.py`) automatically provisions an isola
 
 | Module | Business Guarantee Protected |
 |---|---|
+| `test_revenue_capture_and_evidence_matrix.py` | Idempotent storm opportunity matching, 5-tier Next Best Actions, Evidence Matrix exhibit CRUD & drag-and-drop reordering, and Platypus Evidence Packet PDF generation |
+| `test_esx_parser_and_security.py` | Secure read-only ESX import: zip-bomb limits, path traversal defense, XML XXE/entity blocking, 8D vs 5L profile extraction, and integer cent sum reconciliation |
+| `test_ai_provenance_and_guardrails.py` | Negative sales guardrails blocking deductible absorption (O.C.G.A. § 33-23-43(c)(4)), grounded NWS sales provenance with disclaimers, and ungrounded code router fallback |
 | `test_pdf_engine.py` | Centralized PDF branding engine, typography hierarchies, NumberedCanvas two-pass pagination, EXIF transpose correction, and sub-brand generators |
 | `test_ai_safety_and_math.py` | AI prompts contain mandatory `CRITICAL NO-MATH DIRECTIVE`; Pydantic schema rejects hallucinated arithmetic on claim ASTs |
 | `test_ai_service.py` | Gemini photo analysis service returns validated `PhotoAnalysis` objects; multimodal batching and fallback paths work correctly |

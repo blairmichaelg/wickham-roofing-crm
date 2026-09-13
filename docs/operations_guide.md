@@ -166,10 +166,17 @@ location and crew scheduling can begin. Don't mark something on site
 until it's actually there — this drives the real-world production
 schedule and downstream crew assignment.
 
-**Q: Can I see a job's financials or documents?**
+**Q: Can I see a job's financials, documents, or forensic evidence packets?**
 Yes — click the **"View Details →"** link on any job card. You'll see
-the full job detail page with all financials, margins, documents, and
-supplements. This is the same view that Admin and Accounting see.
+the full job detail page with all financials, margins, documents,
+supplements, and generated Evidence Packet PDFs (`evidence_packet_v{N}.pdf`).
+This is the same unified view that Admin and Accounting see.
+
+**Q: How does the Next Best Action engine affect Operations?**
+The Next Best Action engine automatically monitors production lifecycle
+milestones (such as alerting when supplier POs are needed after supplement
+approval, or flagging completed builds awaiting final punch lists). This
+keeps jobs advancing smoothly without manual status searching.
 
 **Q: What happens if I try to access an admin page directly?**
 You'll be blocked with an access error. This is intentional — while
@@ -184,6 +191,7 @@ already confirmed with a mistake, contact the Tech Admin to correct it.
 
 ---
 
-*This guide reflects the Operations workflow as of version `2.4.1` (2026-08-28).
-If new panels, buttons, or workflows are added in future updates, this
-guide should be reviewed and updated to match.*
+*This guide reflects the Operations workflow as of version `2.10.0` (2026-09-13).
+Includes material ordering workflows, crew dispatching, unified job detail
+access, Evidence Packet visibility, and Next Best Action production gates.*
+
