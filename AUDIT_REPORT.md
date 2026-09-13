@@ -118,13 +118,40 @@ A commercial-readiness engineering pass was implemented to support multi-stage c
   - `tests/test_commercial_billing.py`: 6 tests verifying SOV lifecycle, multi-cycle billing, 100% cap overbill rejection, configurable retainage, and QBO CSV exports.
   - `tests/test_commercial_lien_monitor.py`: 2 async tests verifying ARQ task scheduling, deadline calculations, and alert triggering.
 
+## 12. REVENUE CAPTURE, EVIDENCE MATRIX & FIELD EFFECTIVENESS AUDIT (2026-09-13 v2.10.0)
+A comprehensive security, authorization, and operational hardening pass was implemented for the Revenue Capture & Field Effectiveness upgrade:
+- **RBAC & IDOR Protections on Field & Office Action Endpoints**:
+  - `GET /api/field/actions/today`: Requires authenticated field rep token (`verify_field_rep`). Enforces `assert_field_rep_owns_job` across candidate job evaluations; field reps can only view their own assigned job actions and assigned storm opportunities.
+  - `GET /api/office/actions/triage`: Strictly restricted to `admin`, `manager`, and `office` roles via `verify_office_role` (`verify_office_user`). Aggregates enterprise-wide stalled jobs, unassigned storm opportunities, and pending evidence reviews.
+- **Evidence Matrix v1 Authorization & Document Vault Isolation**:
+  - `GET /api/field/jobs/{job_id}/evidence` & `POST /api/field/jobs/{job_id}/evidence`: Validates field rep job ownership with `assert_field_rep_owns_job(rep_id, job_id, db_path)`. Attempting to access evidence on unassigned jobs returns `HTTP 403 Forbidden`.
+  - `GET /api/office/jobs/{job_id}/evidence`, `POST /api/office/jobs/{job_id}/evidence`, `PATCH /api/office/jobs/{job_id}/evidence/{exhibit_id}`, and `POST /api/office/jobs/{job_id}/evidence/reorder`: Enforces `verify_office_role`. Restricts review gates (`requires_office_review`), exhibit inclusion/exclusion, and sequence numbering to authorized office personnel.
+  - Generated supplement evidence packets are registered in `job_documents` with `visibility = 'office_only'` and stored in the secure document vault (`data/documents/{job_id}/`). Download endpoints enforce safe filename resolution and prevent directory traversal.
+- **Hardened ESX Archive Parser & Ingestion Gateways**:
+  - Ingestion endpoint `POST /api/office/contracts/upload_esx/{job_id}` is feature-flagged via `enable_esx_import: bool = False` in `app/config.py`.
+  - Strict Zip Bomb Defenses: Archive payload capped at 25MB compressed and 20MB total uncompressed size; maximum member limit capped at 50 files.
+  - Zip Slip & Path Traversal Protections: Archive member filenames are normalized and verified via `os.path.commonpath` against the destination root.
+  - XXE & Injection Defenses: XML streams are pre-scanned before parsing; documents containing `<!DOCTYPE` or `<!ENTITY` declarations are rejected with `ValueError` and logged to audit telemetry.
+  - UniversalClaimAST Conversion: Integer cents precision is strictly enforced on line items, ACV, and RCV totals. Discrepancies between line item sums and header totals are surfaced as flags rather than silently accepted.
+- **AI Grounding, Provenance & Prohibited Sales Promise Defense**:
+  - `app/services/ai/guardrails.py` implements regex word-stem matching (`verify_prohibited_sales_promises`) against illegal deductible absorption (O.C.G.A. § 33-23-43(c)(4)) and unverified insurance coverage guarantees (`waiv*`, `absorb*`, `pay* deductible`, `guarantee* approv*`). Violations immediately raise `SalesPromiseViolationError`.
+  - Grounded AI provenance models (`build_sales_provenance`) attach explicit verified NWS event dates, hail/wind observations, and statutory building code references. Ungrounded models return neutral manual-review fallbacks without hallucinations.
+- **Service Worker & Cache Upgrade**:
+  - Cache version incremented to `field-app-shell-v3` in `app/static/service-worker.js`.
+  - Offline queue status indicators in `app/templates/field_app.html` sanitize queue error messages to prevent leakage of client PII while surfacing transparent retry controls.
+- **Tests Enforcing Behavior**:
+  - `tests/test_revenue_capture_and_evidence_matrix.py`: 5 tests verifying storm opportunity lifecycle, field RBAC isolation, next-best-action priority ranking, evidence matrix CRUD, and ReportLab PDF packet generation.
+  - `tests/test_esx_parser_and_security.py`: 7 tests verifying valid ESX import to UniversalClaimAST, zip bomb rejection, member count limits, XXE attack prevention, Zip Slip path traversal rejection, and total reconciliation validation.
+  - `tests/test_ai_provenance_and_guardrails.py`: 5 tests verifying prohibited deductible waiver detection, coverage guarantee rejection, sales narrative grounding provenance, and ungrounded manual-review fallbacks.
+
 ---
 
 ### Final Summary & Metrics
-- **Test Count**: 539+ Passing (100% Pass Rate)
-- **PDF Engine Document Types Verified**: 10 / 10
+- **Test Count**: 581 Passing (100% Pass Rate)
+- **PDF Engine Document Types Verified**: 11 / 11 (including new `evidence_packet`)
 - **CVEs Detected**: 0
-- **System Health**: Hardened, Modular, Local-First, Production-Grade (v2.9.0)
+- **System Health**: Hardened, Modular, Local-First, Production-Grade (v2.10.0)
+
 
 
 

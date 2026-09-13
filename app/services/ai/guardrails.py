@@ -27,6 +27,11 @@ class GuardrailValidationError(ValueError):
         self.details = details or {}
 
 
+class SalesPromiseViolationError(GuardrailValidationError):
+    """Raised when content violates sales promises rules (deductible waiving, coverage guarantees)."""
+    pass
+
+
 class GuardrailResult(BaseModel):
     """Result of a deterministic guardrail inspection."""
     passed: bool
@@ -152,6 +157,41 @@ def verify_legal_disclaimers(
         passed=passed,
         violations=violations,
         details={"disclaimer_type": disclaimer_type, "checked_keywords": required_keywords},
+    )
+
+
+PROHIBITED_PATTERNS = [
+    (re.compile(r"\b(?:waiv|absorb|cover|pay)\w*\b[^\.\n]*\bdeductible\b", re.IGNORECASE), "Prohibited deductible waiving or absorption offer"),
+    (re.compile(r"\bfree roof\b", re.IGNORECASE), "Prohibited 'free roof' deceptive advertising claim"),
+    (re.compile(r"\b(?:guarantee|promise|certif)\w*\b[^\.\n]*\b(?:cover|approv|pay)\w*\b", re.IGNORECASE), "Prohibited insurance coverage or carrier approval guarantee"),
+    (re.compile(r"\binsurance\b[^\.\n]*\b(?:guaranteed to pay|must pay|will 100% pay|will pay)\b", re.IGNORECASE), "Prohibited carrier payment assertion"),
+    (re.compile(r"\binsurance owes you\b", re.IGNORECASE), "Prohibited public adjuster assertion"),
+]
+
+
+def verify_prohibited_sales_promises(text: str, raise_on_failure: bool = False) -> GuardrailResult:
+    """
+    Ensure AI-generated pitch or sales scripts contain zero deceptive claims:
+    - No deductible waiving or rebate offers.
+    - No guarantees of insurance claim coverage/approval.
+    - No public adjuster representation assertions.
+    """
+    violations: list[str] = []
+    for pattern, reason in PROHIBITED_PATTERNS:
+        if pattern.search(text):
+            violations.append(reason)
+
+    if violations and raise_on_failure:
+        raise SalesPromiseViolationError(
+            f"Prohibited sales promises detected: {'; '.join(violations)}",
+            violations=violations,
+            details={"violations_count": len(violations)},
+        )
+
+    return GuardrailResult(
+        passed=len(violations) == 0,
+        violations=violations,
+        details={"violations_count": len(violations)},
     )
 
 

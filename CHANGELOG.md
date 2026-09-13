@@ -1,5 +1,38 @@
 # Changelog
 
+## [2.10.0] - 2026-09-13
+### Added (Revenue Capture & Field Effectiveness Upgrade)
+
+- **Phase A — Storm Radar Canvassing Decision Engine (`app/services/storm_matching.py`, `app/workers/storm_worker.py`, `Migration 0028`)**:
+  - Unified terminology everywhere around "Storm Targets" with explicit qualification rules: hail ≥ 1.0" or wind ≥ 50 mph within configured radius (default 50 mi).
+  - Eliminated unexplained aggregate counters and defensively filtered zero/unknown magnitude events.
+  - Implemented idempotent `match_storm_opportunities()` linking existing jobs/leads to verified NWS storm events within a 168h lookback window into the first-party `storm_opportunities` table without duplicate tasks.
+  - Created first-party storm opportunity queue with role-based access, rep assignment, status workflow (`new`, `surfaced`, `contacted`, `inspection_scheduled`, `dismissed`), and local attribution metrics.
+  - Added direct field action to prefill new lead intake with target storm ZIP and verified NWS damage talking points.
+- **Phase B — Deterministic Next Best Action Engine & First-Party Follow-Up (`app/services/next_best_action.py`, `app/api/field/actions.py`, `app/api/office/actions.py`)**:
+  - Built a 5-level deterministic priority engine deriving next actions from job status, missing artifacts, statutory deadlines, and storm opportunities without LLM black boxes.
+  - Added mobile "Today's Best Actions" panel on field dashboard with direct action links and copy-ready scripts.
+  - Added Office Action Triage grouping stalled jobs, unassigned storm opportunities, review-ready supplement packets, and missing production artifacts.
+  - Implemented first-party `contact_attempts` ledger (CALL, TEXT, DOOR, EMAIL) tracking manual outreach history without paid messaging SaaS.
+- **Phase C — Evidence Matrix v1 & Supplement Evidence Packet PDF (`app/services/evidence_matrix.py`, `app/services/pdf/evidence_packet.py`, `Migration 0028`)**:
+  - Added `evidence_exhibits` table storing structured forensic observations linked to jobs, photo records, and claim discrepancy line items.
+  - Sequential exhibit numbering, office review gates (`requires_office_review`), and drag-and-drop reordering.
+  - Created ReportLab Platypus `evidence_packet_v{N}.pdf` with brand letterhead, deterministic discrepancy table, photo exhibits grid, and 7-year document retention.
+- **Phase D — Secure Experimental ESX Archive Import (`app/services/esx_parser.py`, `app/config.py`, `app/api/office/contracts_uploads.py`)**:
+  - Implemented safe, read-only Xactimate ESX archive parser guarded behind `enable_esx_import: bool = False`.
+  - Strict security boundaries: max 50 entries, 25MB compressed, 20MB uncompressed, path traversal (Zip Slip) prevention, and XML XXE / DOCTYPE / ENTITY injection defense.
+  - Integer-cent financial precision and automatic conversion into `UniversalClaimAST`.
+- **Phase E — Grounded AI Provenance & Negative Guardrails (`app/services/ai/guardrails.py`, `app/services/sales_narrative.py`, `app/core/code_router.py`)**:
+  - Implemented negative sales guardrail (`verify_prohibited_sales_promises`): blocks deductible waiving, rebate promises, and coverage guarantees.
+  - Added explicit sales provenance citations linking talking points to verified NWS reports with "AI-assisted draft — verify before use" disclaimer.
+  - Enforced code router fallback: returns neutral review state `"Manual review required; no supporting statutory or building-code source attached."` when ungrounded.
+- **Phase F — Mobile Offline Reliability & Sync Visibility (`app/templates/field_app.html`, `app/static/service-worker.js`)**:
+  - Upgraded Service Worker cache to `field-app-shell-v3`.
+  - Added compact Mobile Sync Status Bar showing online/offline status, pending IndexedDB operations count, last sync time, and non-destructive manual retry.
+- **Phase G — Database Migration & Contract Enforcement (`Migration 0028`, `docs/openapi_snapshot.json`)**:
+  - Applied linear migration 0028 creating `storm_opportunities`, `evidence_exhibits`, and `contact_attempts`.
+  - Updated OpenAPI contract snapshot to 115 endpoints with zero breaking changes.
+
 ## [2.9.0] - 2026-09-12
 ### Added (Hardening, Modular Decomposition & Commercial Readiness Pass)
 

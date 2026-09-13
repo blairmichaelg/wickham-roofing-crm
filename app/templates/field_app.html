@@ -74,6 +74,51 @@
     </div>
 
     <div class="max-w-md mx-auto p-6 pb-24">
+        <!-- Compact Mobile Sync Status Bar -->
+        <div id="syncStatusBar" class="mb-4 px-3.5 py-2 bg-gray-950/90 border border-gray-800 rounded-xl flex items-center justify-between text-xs shadow-md">
+            <div class="flex items-center gap-2">
+                <span id="syncNetDot" class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+                <span id="syncNetStatus" class="font-bold text-gray-200">Online</span>
+                <span class="text-gray-700">|</span>
+                <span id="syncQueueStatus" class="text-gray-400">All synced</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <span id="lastSyncTime" class="text-[10px] text-gray-500">Synced just now</span>
+                <button type="button" id="btnManualSync" onclick="triggerManualSync()" class="bg-gray-800 hover:bg-gray-700 text-purple-300 px-2 py-0.5 rounded font-medium border border-gray-700 text-[11px] transition-colors">
+                    🔄 Sync
+                </button>
+            </div>
+        </div>
+
+        <!-- Today's Best Actions Panel -->
+        <div id="nextBestActionsPanel" class="mb-6 bg-gradient-to-r from-purple-950/40 via-gray-900 to-gray-900 border border-purple-800/50 rounded-xl p-4 shadow-lg">
+            <div class="flex justify-between items-center mb-2.5">
+                <div class="flex items-center gap-2">
+                    <span class="text-base">🎯</span>
+                    <h3 class="font-bold text-white text-sm tracking-wide">Today's Best Actions</h3>
+                </div>
+                <span id="actionsCountBadge" class="text-[10px] bg-purple-900 text-purple-200 px-2 py-0.5 rounded-full font-bold border border-purple-700">Top Priority</span>
+            </div>
+            <div id="nextActionsList" class="space-y-2">
+                <p class="text-xs text-gray-400 italic">Scanning priority actions...</p>
+            </div>
+        </div>
+
+        <!-- Storm Targets Panel -->
+        <div id="stormDecisionPanel" class="mb-6 bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-lg">
+            <div class="flex justify-between items-center mb-1">
+                <div class="flex items-center gap-2">
+                    <span class="text-base">⚡</span>
+                    <h3 class="font-bold text-white text-sm tracking-wide">Storm Targets</h3>
+                </div>
+                <span class="text-[10px] text-emerald-400 bg-emerald-950/80 border border-emerald-800 px-2 py-0.5 rounded-full font-bold">Last 7 Days</span>
+            </div>
+            <p class="text-[11px] text-gray-400 mb-2.5">Qualifying: hail &ge; 1.0" or wind &ge; 50 mph</p>
+            <div id="stormTargetsContainer" class="space-y-2">
+                <p class="text-xs text-gray-400 italic">Checking storm activity in service area...</p>
+            </div>
+        </div>
+
         <div class="flex justify-between items-center mb-8 border-b border-gray-700 pb-4">
             <div class="flex items-center">
                 <img src="/static/logo.png" alt="Wickham Roofing Logo" class="w-10 h-10 mr-3 rounded">
@@ -2125,9 +2170,178 @@
             btn.disabled = false;
         }
 
+        window.lastSyncSuccessTimestamp = Date.now();
+
+        async function updateSyncStatusBar() {
+            const netDot = document.getElementById('syncNetDot');
+            const netStatus = document.getElementById('syncNetStatus');
+            const qStatus = document.getElementById('syncQueueStatus');
+            const lastTime = document.getElementById('lastSyncTime');
+            if (!netDot || !netStatus) return;
+
+            const isOnline = navigator.onLine;
+            if (isOnline) {
+                netDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block';
+                netStatus.textContent = 'Online';
+                netStatus.className = 'font-bold text-gray-200';
+            } else {
+                netDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-500 inline-block animate-pulse';
+                netStatus.textContent = 'Offline';
+                netStatus.className = 'font-bold text-amber-400';
+            }
+
+            if (idb) {
+                try {
+                    const tx = idb.transaction('offline_queue', 'readonly');
+                    const store = tx.objectStore('offline_queue');
+                    const records = await new Promise((res, rej) => {
+                        const req = store.getAll();
+                        req.onsuccess = () => res(req.result);
+                        req.onerror = () => rej(req.error);
+                    });
+                    const pending = records.filter(r => r.status === 'pending_sync').length;
+                    const failed = records.filter(r => r.status === 'failed_permanent').length;
+
+                    if (failed > 0) {
+                        qStatus.innerHTML = `<span class="text-red-400 font-bold">⚠️ ${failed} failed</span>`;
+                    } else if (pending > 0) {
+                        qStatus.innerHTML = `<span class="text-amber-400 font-bold">${pending} queued</span>`;
+                    } else {
+                        qStatus.textContent = 'All synced';
+                    }
+                } catch (e) {
+                    qStatus.textContent = 'Queue ready';
+                }
+            }
+
+            if (lastTime && window.lastSyncSuccessTimestamp) {
+                const diffMin = Math.round((Date.now() - window.lastSyncSuccessTimestamp) / 60000);
+                lastTime.textContent = diffMin <= 0 ? 'Synced just now' : `${diffMin}m ago`;
+            }
+        }
+
+        window.addEventListener('online', updateSyncStatusBar);
+        window.addEventListener('offline', updateSyncStatusBar);
+        setInterval(updateSyncStatusBar, 10000);
+
+        async function triggerManualSync() {
+            const btn = document.getElementById('btnManualSync');
+            if (btn) btn.textContent = '⏳ Syncing...';
+            showToast('Checking offline queue...', 'info');
+
+            if (typeof flushAllPendingRecords === 'function') {
+                await flushAllPendingRecords();
+            }
+            window.lastSyncSuccessTimestamp = Date.now();
+            updatePendingSyncBadge();
+            await updateSyncStatusBar();
+            if (btn) btn.textContent = '🔄 Sync';
+            showToast('Sync check completed', 'success');
+        }
+
+        async function loadTodayBestActions() {
+            const container = document.getElementById('nextActionsList');
+            const badge = document.getElementById('actionsCountBadge');
+            if (!container) return;
+
+            try {
+                const resp = await fetch('/api/field/actions/today?limit=4', {
+                    headers: { 'x-internal-token': FIELD_TOKEN }
+                });
+                if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                const data = await resp.json();
+                const actions = data.actions || [];
+
+                if (badge) badge.textContent = `${actions.length} Action${actions.length === 1 ? '' : 's'}`;
+
+                if (actions.length === 0) {
+                    container.innerHTML = '<p class="text-xs text-gray-400 italic">No urgent actions pending today. Great job!</p>';
+                    return;
+                }
+
+                container.innerHTML = actions.map(act => {
+                    const prioColor = act.priority === 'CRITICAL' ? 'bg-red-950 text-red-300 border-red-800'
+                        : (act.priority === 'HIGH' ? 'bg-amber-950 text-amber-300 border-amber-800' : 'bg-purple-950 text-purple-300 border-purple-800');
+                    return `
+                        <div class="p-2.5 bg-gray-950/80 border border-gray-800 rounded-lg text-left flex justify-between items-start gap-2 hover:border-purple-600/50 transition-colors">
+                            <div class="space-y-0.5">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="text-[9px] px-1.5 py-0.2 rounded font-bold uppercase border ${prioColor}">${act.priority}</span>
+                                    <span class="text-xs font-bold text-white">${act.action_title}</span>
+                                </div>
+                                <p class="text-[11px] text-gray-300 font-mono">${act.job_address || act.job_homeowner}</p>
+                                <p class="text-[10px] text-purple-300/80 italic">💡 ${act.reason}</p>
+                            </div>
+                            <div class="shrink-0 pt-1">
+                                <a href="${act.action_url || '#'}" class="text-[11px] bg-purple-900/80 hover:bg-purple-800 text-purple-200 px-2 py-1 rounded font-bold transition-colors">
+                                    Take Action &rarr;
+                                </a>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (err) {
+                container.innerHTML = '<p class="text-xs text-gray-500 italic">Actions unavailable in offline mode.</p>';
+            }
+        }
+
+        async function loadStormRadar() {
+            const container = document.getElementById('stormTargetsContainer');
+            if (!container) return;
+
+            try {
+                const resp = await fetch('/api/field/storms/targets', {
+                    headers: { 'x-internal-token': FIELD_TOKEN }
+                });
+                if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                const data = await resp.json();
+                const targets = data.targets || [];
+
+                if (targets.length === 0) {
+                    container.innerHTML = '<p class="text-xs text-gray-400 italic">No qualifying storm targets in service area in the last 7 days.</p>';
+                    return;
+                }
+
+                container.innerHTML = targets.slice(0, 4).map(t => StormRadar.renderTargetZipCard(t, false, 'filterJobsByZip')).join('');
+            } catch (err) {
+                container.innerHTML = '<p class="text-xs text-gray-500 italic">Storm targets unavailable while offline.</p>';
+            }
+        }
+
+        function connectWebSocket() {
+            try {
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${protocol}//${window.location.host}/ws/storms`;
+                const ws = new WebSocket(wsUrl);
+                ws.onmessage = (event) => {
+                    try {
+                        const alertData = JSON.parse(event.data);
+                        if (StormRadar.filterWebSocketAlert(alertData)) {
+                            showToast(`⚡ Storm Alert: ${alertData.event_type} near ${alertData.county || 'local area'}`, 'warning');
+                            loadStormRadar();
+                        }
+                    } catch (e) {}
+                };
+                ws.onerror = () => {};
+            } catch (e) {}
+        }
+
+        window.prefillLeadZip = (zip) => {
+            const el = document.getElementById('postal_code');
+            if (el) {
+                el.value = zip;
+                el.dispatchEvent(new Event('blur'));
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el.focus();
+                showToast(`Pre-filled ZIP ${zip} for new lead intake!`, 'success');
+            }
+        };
+
         document.addEventListener('DOMContentLoaded', () => {
             loadMyJobs();
             updateSubmitButtonState();
+            updateSyncStatusBar();
+            loadTodayBestActions();
             const params = new URLSearchParams(window.location.search);
             const resumeId = params.get('resume_job_id');
             if (resumeId) {

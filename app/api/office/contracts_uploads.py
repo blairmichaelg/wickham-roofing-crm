@@ -6,6 +6,7 @@ Part of decomposed Office Control Center contracts module.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import uuid
 from pathlib import Path
 
@@ -559,3 +560,82 @@ async def upload_job_document(job_id: str, file_type: str = Form(...), file: Upl
     except Exception as e:
         logger.error("job_document_upload_failed", job_id=job_id, error=str(e))
         raise HTTPException(status_code=500, detail="Failed to save document")
+
+
+@router.post("/contracts/upload_esx/{job_id}", dependencies=[Depends(verify_admin)])
+async def upload_esx_archive(job_id: str, file: UploadFile = File(...)):
+    """
+    Experimental read-only Xactimate ESX archive ingestion.
+    Converts valid ESX estimates into UniversalClaimAST.
+    Protected behind enable_esx_import configuration setting.
+    """
+    from app.config import get_settings
+    from app.services.esx_parser import (
+        ESXParseError,
+        ESXSecurityError,
+        parse_esx_to_ast,
+    )
+
+    settings = get_settings()
+    if not settings.enable_esx_import:
+        raise HTTPException(
+            status_code=403,
+            detail="Experimental ESX import is currently disabled in configuration. Set enable_esx_import=True to enable.",
+        )
+
+    try:
+        job_id = str(uuid.UUID(job_id))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid job_id format.")
+
+    filename = Path(file.filename or "estimate.esx").name
+    if not (filename.lower().endswith(".esx") or filename.lower().endswith(".zip")):
+        raise HTTPException(status_code=400, detail="File must have an .esx or .zip extension.")
+
+    file_bytes = await file.read()
+    file_hash = hashlib.sha256(file_bytes).hexdigest()
+
+    try:
+        ast = parse_esx_to_ast(
+            file_bytes=file_bytes,
+            source_doc_id=f"esx_{job_id[:8]}",
+            source_doc_sha256=file_hash,
+        )
+    except ESXSecurityError as sec_err:
+        logger.warning("esx_security_rejection", job_id=job_id, error=str(sec_err))
+        raise HTTPException(status_code=400, detail=f"ESX security validation failed: {sec_err}")
+    except ESXParseError as parse_err:
+        logger.warning("esx_parse_error", job_id=job_id, error=str(parse_err))
+        raise HTTPException(status_code=422, detail=f"Failed to parse ESX estimate: {parse_err}")
+    except Exception as exc:
+        logger.error("esx_unexpected_error", job_id=job_id, error=str(exc))
+        raise HTTPException(status_code=500, detail=f"Unexpected error processing ESX archive: {exc}")
+
+    # Save to disk
+    job_dir = FIELD_DOCS_DIR / job_id
+    job_dir.mkdir(parents=True, exist_ok=True)
+    target_path = job_dir / filename
+    target_path.write_bytes(file_bytes)
+
+    await asyncio.to_thread(
+        insert_job_document,
+        job_id,
+        filename,
+        "application/octet-stream",
+        str(target_path),
+        file_hash,
+        "office_only",
+        "XACTIMATE_ESX",
+    )
+
+    return {
+        "status": "success",
+        "message": "Experimental ESX import parsed successfully.",
+        "filename": filename,
+        "sha256": file_hash,
+        "claim_number": ast.claim_number.value if ast.claim_number else None,
+        "line_items_count": len(ast.line_items),
+        "gross_rcv": float(ast.financials.gross_rcv.value),
+        "net_claim": float(ast.financials.net_claim.value),
+        "total_squares": float(ast.roof_geometry.total_squares.value),
+    }

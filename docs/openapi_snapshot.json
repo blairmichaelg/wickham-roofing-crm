@@ -29,6 +29,23 @@
         "title": "AccountingBrief",
         "type": "object"
       },
+      "AssignStormOpportunityPayload": {
+        "properties": {
+          "rep_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rep Id"
+          }
+        },
+        "title": "AssignStormOpportunityPayload",
+        "type": "object"
+      },
       "Body_login_auth_login_post": {
         "properties": {
           "pin": {
@@ -90,6 +107,20 @@
           "file"
         ],
         "title": "Body_upload_eagleview_api_office_jobs__job_id__eagleview_post",
+        "type": "object"
+      },
+      "Body_upload_esx_archive_api_office_contracts_upload_esx__job_id__post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_esx_archive_api_office_contracts_upload_esx__job_id__post",
         "type": "object"
       },
       "Body_upload_field_photo_api_field_jobs__job_id__photos_post": {
@@ -392,6 +423,72 @@
         "title": "FieldClaimInfoPayload",
         "type": "object"
       },
+      "FieldEvidenceCreatePayload": {
+        "properties": {
+          "category": {
+            "description": "decking, flashing, membrane_shingle_damage, ventilation, ice_and_water, interior, debris_access, other",
+            "title": "Category",
+            "type": "string"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
+          "location_roof_area": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Roof plane or location",
+            "title": "Location Roof Area"
+          },
+          "observation": {
+            "description": "Field observation notes",
+            "minLength": 3,
+            "title": "Observation",
+            "type": "string"
+          },
+          "photo_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo Path"
+          },
+          "proposed_claim_line_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Claim Line Ref"
+          }
+        },
+        "required": [
+          "category",
+          "observation"
+        ],
+        "title": "FieldEvidenceCreatePayload",
+        "type": "object"
+      },
       "FieldReferralPayload": {
         "properties": {
           "referral_code": {
@@ -499,6 +596,24 @@
           "resolution_note"
         ],
         "title": "FlagResolutionPayload",
+        "type": "object"
+      },
+      "GeneratePacketPayload": {
+        "properties": {
+          "included_only": {
+            "default": false,
+            "description": "If True, only exhibits with status='included' will be printed",
+            "title": "Included Only",
+            "type": "boolean"
+          },
+          "version": {
+            "default": 1,
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "title": "GeneratePacketPayload",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -789,6 +904,46 @@
           "phone"
         ],
         "title": "LeadIntakePayload",
+        "type": "object"
+      },
+      "LogContactAttemptPayload": {
+        "properties": {
+          "contact_method": {
+            "title": "Contact Method",
+            "type": "string"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "opportunity_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opportunity Id"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          }
+        },
+        "required": [
+          "contact_method",
+          "outcome"
+        ],
+        "title": "LogContactAttemptPayload",
         "type": "object"
       },
       "ManualFlashingPayload": {
@@ -1101,6 +1256,166 @@
           "status"
         ],
         "title": "MaterialRow",
+        "type": "object"
+      },
+      "OfficeEvidenceCreatePayload": {
+        "properties": {
+          "category": {
+            "description": "decking, flashing, membrane_shingle_damage, ventilation, ice_and_water, interior, debris_access, other",
+            "title": "Category",
+            "type": "string"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
+          "location_roof_area": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Roof Area"
+          },
+          "observation": {
+            "minLength": 3,
+            "title": "Observation",
+            "type": "string"
+          },
+          "photo_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo Path"
+          },
+          "proposed_claim_line_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Claim Line Ref"
+          },
+          "status": {
+            "default": "reviewed",
+            "description": "draft, reviewed, included, excluded",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "category",
+          "observation"
+        ],
+        "title": "OfficeEvidenceCreatePayload",
+        "type": "object"
+      },
+      "OfficeEvidenceReorderPayload": {
+        "properties": {
+          "exhibit_ids": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Exhibit Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "exhibit_ids"
+        ],
+        "title": "OfficeEvidenceReorderPayload",
+        "type": "object"
+      },
+      "OfficeEvidenceUpdatePayload": {
+        "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "location_roof_area": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Roof Area"
+          },
+          "observation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observation"
+          },
+          "proposed_claim_line_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Claim Line Ref"
+          },
+          "requires_office_review": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requires Office Review"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "draft, reviewed, included, excluded",
+            "title": "Status"
+          }
+        },
+        "title": "OfficeEvidenceUpdatePayload",
         "type": "object"
       },
       "OperationsBrief": {
@@ -1483,6 +1798,41 @@
         "title": "TogglePaymentPayload",
         "type": "object"
       },
+      "UpdateStormOpportunityPayload": {
+        "properties": {
+          "dismissed_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dismissed Reason"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "UpdateStormOpportunityPayload",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -1528,7 +1878,7 @@
   "info": {
     "description": "Standalone CRM orchestrator and Google Gemini AI middleware.",
     "title": "Wickham Roofing AI Orchestrator",
-    "version": "2.8.17"
+    "version": "2.9.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -2338,6 +2688,100 @@
         ]
       }
     },
+    "/api/field/actions/today": {
+      "get": {
+        "description": "Return top-ranked next best actions for the authenticated field rep.\nFiltered to rep-owned and unassigned jobs, sorted by deterministic priority.",
+        "operationId": "get_today_best_actions_api_field_actions_today_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 5,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-internal-token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "auth_token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Auth Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Today Best Actions Api Field Actions Today Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Today Best Actions",
+        "tags": [
+          "field_ux"
+        ]
+      }
+    },
     "/api/field/jobs": {
       "get": {
         "description": "List jobs for the current rep.\n\nMatches canvasser_name OR canvasser_rep_id so admin/core-team leads\ncreated via the dropdown always appear in their recent jobs list.",
@@ -2689,6 +3133,105 @@
           }
         },
         "summary": "Update Field Claim Info",
+        "tags": [
+          "field_ux"
+        ]
+      }
+    },
+    "/api/field/jobs/{job_id}/contact-attempt": {
+      "post": {
+        "description": "Log a manual customer follow-up attempt (CALL, TEXT, DOOR, EMAIL) without paid messaging.",
+        "operationId": "record_job_contact_attempt_api_field_jobs__job_id__contact_attempt_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-internal-token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "auth_token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Auth Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogContactAttemptPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Record Job Contact Attempt",
         "tags": [
           "field_ux"
         ]
@@ -3153,6 +3696,200 @@
           }
         },
         "summary": "Download Field Job Document",
+        "tags": [
+          "field_ux"
+        ]
+      }
+    },
+    "/api/field/jobs/{job_id}/evidence": {
+      "get": {
+        "description": "List all evidence exhibits for a job owned by this rep.",
+        "operationId": "get_field_evidence_api_field_jobs__job_id__evidence_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-internal-token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "auth_token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Auth Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Field Evidence Api Field Jobs  Job Id  Evidence Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Field Evidence",
+        "tags": [
+          "field_ux"
+        ]
+      },
+      "post": {
+        "description": "Create a new evidence exhibit for a job owned by this rep.",
+        "operationId": "create_field_evidence_api_field_jobs__job_id__evidence_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-internal-token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "auth_token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Auth Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldEvidenceCreatePayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Field Evidence Api Field Jobs  Job Id  Evidence Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Field Evidence",
         "tags": [
           "field_ux"
         ]
@@ -4556,6 +5293,211 @@
         ]
       }
     },
+    "/api/field/storms/opportunities": {
+      "get": {
+        "description": "List storm opportunities for the authenticated field rep.\nIncludes unassigned opportunities or opportunities assigned to this rep.",
+        "operationId": "list_field_storm_opportunities_api_field_storms_opportunities_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-internal-token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "auth_token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Auth Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Field Storm Opportunities",
+        "tags": [
+          "field_ux"
+        ]
+      }
+    },
+    "/api/field/storms/opportunities/{opportunity_id}": {
+      "patch": {
+        "description": "Update status of a storm opportunity (e.g. mark contacted, scheduled, dismissed).",
+        "operationId": "patch_field_storm_opportunity_api_field_storms_opportunities__opportunity_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "opportunity_id",
+            "required": true,
+            "schema": {
+              "title": "Opportunity Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-internal-token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "auth_token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Auth Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateStormOpportunityPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Patch Field Storm Opportunity",
+        "tags": [
+          "field_ux"
+        ]
+      }
+    },
     "/api/field/storms/targets": {
       "get": {
         "description": "Fetch prioritized storm canvassing target areas for field reps.\nExposes only physical weather parameters and canvassing priority metrics (no financials).",
@@ -5506,6 +6448,90 @@
         ]
       }
     },
+    "/api/office/actions/triage": {
+      "get": {
+        "description": "Return grouped office triage items:\n- stalled_jobs\n- unassigned_storm_opportunities\n- supplement_packets_awaiting_review\n- missing_production_artifacts",
+        "operationId": "get_office_triage_api_office_actions_triage_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-internal-token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "auth_token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Auth Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Office Triage Api Office Actions Triage Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Office Triage",
+        "tags": [
+          "office_ux"
+        ]
+      }
+    },
     "/api/office/admin/triage": {
       "get": {
         "description": "Admin Triage View functionality.\n\nArgs:\n        request (Request): request parameter.\n\nReturns:\n    Any: The resulting output.",
@@ -5684,6 +6710,105 @@
           }
         },
         "summary": "Admin Triage Resolve",
+        "tags": [
+          "office_ux"
+        ]
+      }
+    },
+    "/api/office/contracts/upload_esx/{job_id}": {
+      "post": {
+        "description": "Experimental read-only Xactimate ESX archive ingestion.\nConverts valid ESX estimates into UniversalClaimAST.\nProtected behind enable_esx_import configuration setting.",
+        "operationId": "upload_esx_archive_api_office_contracts_upload_esx__job_id__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-internal-token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "auth_token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Auth Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_esx_archive_api_office_contracts_upload_esx__job_id__post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Esx Archive",
         "tags": [
           "office_ux"
         ]
@@ -6980,7 +8105,7 @@
     },
     "/api/office/jobs/{job_id}/docs/escalation": {
       "get": {
-        "description": "Download Escalation functionality.\n\nArgs:\n        job_id (str): job_id parameter.\n\nReturns:\n    Any: The resulting output.",
+        "description": "Download Escalation Demand letter.",
         "operationId": "download_escalation_api_office_jobs__job_id__docs_escalation_get",
         "parameters": [
           {
@@ -7251,7 +8376,7 @@
     },
     "/api/office/jobs/{job_id}/docs/rebuttal": {
       "get": {
-        "description": "Download Rebuttal functionality.\n\nArgs:\n        job_id (str): job_id parameter.\n\nReturns:\n    Any: The resulting output.",
+        "description": "Download generated Rebuttal PDF.",
         "operationId": "download_rebuttal_api_office_jobs__job_id__docs_rebuttal_get",
         "parameters": [
           {
@@ -7432,6 +8557,105 @@
         ]
       }
     },
+    "/api/office/jobs/{job_id}/download-evidence-packet": {
+      "get": {
+        "description": "Download the generated evidence packet PDF.",
+        "operationId": "download_packet_endpoint_api_office_jobs__job_id__download_evidence_packet_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "title": "Version",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-internal-token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "auth_token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Auth Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Download Packet Endpoint",
+        "tags": [
+          "office_ux"
+        ]
+      }
+    },
     "/api/office/jobs/{job_id}/eagleview": {
       "post": {
         "description": "Trigger the V4 Automath pipeline.\nSaves PDF, extracts metrics, calculates BOM, generates QBO CSV, and updates status.",
@@ -7533,7 +8757,7 @@
     },
     "/api/office/jobs/{job_id}/escalate": {
       "post": {
-        "description": "Queue Escalation functionality.\n\nArgs:\n        request (Request): request parameter.\n        job_id (str): job_id parameter.\n\nReturns:\n    Any: The resulting output.",
+        "description": "Queue Escalation background worker.",
         "operationId": "queue_escalation_api_office_jobs__job_id__escalate_post",
         "parameters": [
           {
@@ -7615,6 +8839,415 @@
           }
         },
         "summary": "Queue Escalation",
+        "tags": [
+          "office_ux"
+        ]
+      }
+    },
+    "/api/office/jobs/{job_id}/evidence": {
+      "get": {
+        "description": "Retrieve all evidence exhibits for a job.",
+        "operationId": "get_office_evidence_api_office_jobs__job_id__evidence_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-internal-token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "auth_token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Auth Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Office Evidence Api Office Jobs  Job Id  Evidence Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Office Evidence",
+        "tags": [
+          "office_ux"
+        ]
+      },
+      "post": {
+        "description": "Create a new evidence exhibit from the office dashboard.",
+        "operationId": "create_office_evidence_api_office_jobs__job_id__evidence_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-internal-token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "auth_token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Auth Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OfficeEvidenceCreatePayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Office Evidence Api Office Jobs  Job Id  Evidence Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Office Evidence",
+        "tags": [
+          "office_ux"
+        ]
+      }
+    },
+    "/api/office/jobs/{job_id}/evidence/reorder": {
+      "post": {
+        "description": "Reorder exhibits sequence for packet generation.",
+        "operationId": "reorder_office_evidence_api_office_jobs__job_id__evidence_reorder_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-internal-token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "auth_token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Auth Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OfficeEvidenceReorderPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Reorder Office Evidence Api Office Jobs  Job Id  Evidence Reorder Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reorder Office Evidence",
+        "tags": [
+          "office_ux"
+        ]
+      }
+    },
+    "/api/office/jobs/{job_id}/evidence/{exhibit_id}": {
+      "patch": {
+        "description": "Update an exhibit's review status, notes, or categorization.",
+        "operationId": "update_office_evidence_api_office_jobs__job_id__evidence__exhibit_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "exhibit_id",
+            "required": true,
+            "schema": {
+              "title": "Exhibit Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-internal-token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "auth_token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Auth Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OfficeEvidenceUpdatePayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Update Office Evidence Api Office Jobs  Job Id  Evidence  Exhibit Id  Patch",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Office Evidence",
         "tags": [
           "office_ux"
         ]
@@ -7803,6 +9436,116 @@
           }
         },
         "summary": "Update Job Financials",
+        "tags": [
+          "office_ux"
+        ]
+      }
+    },
+    "/api/office/jobs/{job_id}/generate-evidence-packet": {
+      "post": {
+        "description": "Generate a versioned Supplement Evidence Packet PDF.",
+        "operationId": "generate_packet_endpoint_api_office_jobs__job_id__generate_evidence_packet_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-internal-token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "auth_token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Auth Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/GeneratePacketPayload"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Generate Packet Endpoint Api Office Jobs  Job Id  Generate Evidence Packet Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Generate Packet Endpoint",
         "tags": [
           "office_ux"
         ]
@@ -9311,6 +11054,323 @@
           }
         },
         "summary": "Get Pipeline Summary",
+        "tags": [
+          "office_ux"
+        ]
+      }
+    },
+    "/api/office/storms/metrics": {
+      "get": {
+        "description": "Office view: retrieve internal, local storm performance and conversion metrics.",
+        "operationId": "get_office_storm_metrics_api_office_storms_metrics_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-internal-token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "auth_token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Auth Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Office Storm Metrics",
+        "tags": [
+          "office_ux"
+        ]
+      }
+    },
+    "/api/office/storms/opportunities": {
+      "get": {
+        "description": "Office view: list all storm-matched lead/job opportunities with status and rep filters.",
+        "operationId": "list_office_storm_opportunities_api_office_storms_opportunities_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "job_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Job Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "rep_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Rep Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-internal-token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "auth_token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Auth Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Office Storm Opportunities",
+        "tags": [
+          "office_ux"
+        ]
+      }
+    },
+    "/api/office/storms/opportunities/{opportunity_id}/assign": {
+      "post": {
+        "description": "Assign or unassign a field sales rep to a storm opportunity.",
+        "operationId": "assign_office_storm_opportunity_api_office_storms_opportunities__opportunity_id__assign_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "opportunity_id",
+            "required": true,
+            "schema": {
+              "title": "Opportunity Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-internal-token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "auth_token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Auth Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignStormOpportunityPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Assign Office Storm Opportunity",
         "tags": [
           "office_ux"
         ]

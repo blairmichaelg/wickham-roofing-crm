@@ -380,10 +380,18 @@ async def admin_triage_view(request: Request):
         stuck_jobs = [dict(r) for r in cursor.fetchall()]
     finally:
         conn.close()
+
+    from app.services.next_best_action import get_office_action_triage
+    triage_data = get_office_action_triage()
+
     return templates.TemplateResponse(
         request,
         "admin_triage.html",
-        {"request": request, "stuck_jobs": stuck_jobs}
+        {
+            "request": request,
+            "stuck_jobs": stuck_jobs,
+            "triage_data": triage_data,
+        }
     )
 
 

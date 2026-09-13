@@ -102,4 +102,6 @@ def get_relevant_codes(report: DiscrepancyReport, code_index: dict[str, CodeSect
     # Return the aggregated citations for the AI prompt
     # Sort for deterministic output
     sorted_texts = [relevant_texts[cite] for cite in sorted(relevant_texts.keys())]
+    if not sorted_texts:
+        return "Manual review required; no supporting statutory or building-code source attached."
     return "\n\n".join(sorted_texts)

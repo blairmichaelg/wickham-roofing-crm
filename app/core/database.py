@@ -113,13 +113,18 @@ def _configure_connection(conn: sqlite3.Connection) -> None:
     conn.execute("PRAGMA mmap_size=268435456;")
     conn.execute("PRAGMA busy_timeout=30000;")
 
-def get_connection() -> sqlite3.Connection:
-    """Get a SQLite connection with WAL mode enabled for concurrency."""
-    conn = sqlite3.connect(get_db_path(), check_same_thread=False, timeout=30.0)
+def get_db_connection(db_path: str | Path | None = None) -> sqlite3.Connection:
+    """Get a SQLite connection to a specific db path with WAL mode configured."""
+    target_path = Path(db_path) if db_path else get_db_path()
+    conn = sqlite3.connect(str(target_path), check_same_thread=False, timeout=30.0)
     conn.row_factory = sqlite3.Row
     conn.isolation_level = None  # Explicit transaction control
     _configure_connection(conn)
     return conn
+
+def get_connection() -> sqlite3.Connection:
+    """Get a SQLite connection with WAL mode enabled for concurrency."""
+    return get_db_connection()
 
 def wal_checkpoint_truncate() -> dict[str, int]:
     """Execute PRAGMA wal_checkpoint(TRUNCATE) to safely checkpoint and truncate the WAL file.
@@ -161,9 +166,9 @@ def _fetch_job_sync(job_id: str) -> dict | None:
     finally:
         conn.close()
 
-def run_migrations() -> None:
+def run_migrations(db_path: str | Path | None = None) -> None:
     """Run versioned migrations."""
-    conn = get_connection()
+    conn = get_db_connection(db_path) if db_path else get_connection()
     try:
         conn.execute("BEGIN IMMEDIATE")
         conn.execute('''
@@ -355,8 +360,14 @@ def run_migrations() -> None:
             m27.up(conn)
             conn.execute("UPDATE schema_version SET version = 27, applied_at = CURRENT_TIMESTAMP WHERE id = 1")
 
+        if current_version < 28:
+            import importlib
+            m28 = importlib.import_module("app.core.migrations.0028_revenue_capture_and_evidence_matrix")
+            m28.up(conn)
+            conn.execute("UPDATE schema_version SET version = 28, applied_at = CURRENT_TIMESTAMP WHERE id = 1")
+
         conn.execute("COMMIT")
-        logger.info("migrations_applied", current_version=current_version, target_version=27)
+        logger.info("migrations_applied", current_version=current_version, target_version=28)
 
         
         # Since seed logic was removed from up(), do it here outside the transaction

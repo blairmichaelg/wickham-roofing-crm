@@ -150,6 +150,12 @@ class Settings(BaseSettings):
         description="Days prior to commercial lien deadline to dispatch high-priority accounting/admin alerts.",
     )
 
+    # --- Experimental Features ---
+    enable_esx_import: bool = Field(
+        default=False,
+        description="Enable experimental read-only Xactimate ESX archive ingestion. False by default.",
+    )
+
 
     @property
     def get_db_path(self) -> str:

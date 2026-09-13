@@ -8,7 +8,7 @@
  * - All other API calls: Network-first with silent failure fallback.
  */
 
-const CACHE_NAME = 'field-app-shell-v2';
+const CACHE_NAME = 'field-app-shell-v3';
 const SYNC_TAG = 'field-lead-sync';
 const IDB_NAME = 'wickham-field-queue';
 const IDB_STORE = 'pending-submissions';

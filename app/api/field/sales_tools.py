@@ -329,13 +329,24 @@ async def get_sales_tools(job_id: str, request: Request, claims: dict = Depends(
         window_hours=168,
     )
 
-    from app.services.sales_narrative import generate_door_script, generate_sales_summary
+    from app.services.sales_narrative import (
+        build_sales_provenance,
+        generate_door_script,
+        generate_sales_summary,
+    )
     summary, script = await asyncio.gather(
         generate_sales_summary(job, storm_events),
         generate_door_script(job, storm_events),
     )
+    provenance = build_sales_provenance(job, storm_events)
 
-    result = {"sales_summary": summary, "door_script": script, "cached": False}
+    result = {
+        "sales_summary": summary,
+        "door_script": script,
+        "provenance": provenance,
+        "disclaimer": "AI-assisted draft — verify before use. Does not constitute an insurance coverage guarantee.",
+        "cached": False,
+    }
 
     # Persist to vault as a JSON text file
     import json as _json

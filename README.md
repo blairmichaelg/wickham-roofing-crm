@@ -4,10 +4,12 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109%2B-00a393.svg)](https://fastapi.tiangolo.com/)
 [![SQLite WAL](https://img.shields.io/badge/Database-SQLite%20WAL-003B57.svg)](https://www.sqlite.org/wal.html)
 [![AI Engine: Gemini 2.5 Flash](https://img.shields.io/badge/AI%20Engine-Gemini%202.5%20Flash-8A2BE2.svg)](https://deepmind.google/technologies/gemini/)
-[![Tests: 564 Passing (100%)](https://img.shields.io/badge/Tests-564%20Passed%20(100%25)-brightgreen.svg)](https://pytest.org/)
-[![Version](https://img.shields.io/badge/Version-2.9.0-orange.svg)](https://github.com/blairmichaelg/wickham-roofing-crm)
+[![Tests: 581 Passing (100%)](https://img.shields.io/badge/Tests-581%20Passed%20(100%25)-brightgreen.svg)](https://pytest.org/)
+[![Version](https://img.shields.io/badge/Version-2.10.0-orange.svg)](https://github.com/blairmichaelg/wickham-roofing-crm)
 
 The **Wickham Roofing CRM (V4)** is a proprietary, local-first operational platform designed to automate insurance roofing production from field lead intake to financial ledger reconciliation.
+
+Featuring the **Storm Targets Canvassing Decision Engine**, **Deterministic Next Best Actions**, **Evidence Matrix v1**, and **Platypus Supplement Packet Generator**, Wickham Roofing maximizes qualified field inspections and captures legitimate insurance supplement revenue through deterministic reconciliation and grounded evidence.
 
 Engineered to operate entirely offline or via zero-cloud tunneling directly from field office hardware, V4 completely eliminates third-party SaaS dependency by orchestrating deterministic insurance math, forensic AI roof analysis, automated paperwork matrices, and QuickBooks Online (QBO) invoice exporting over a self-healing SQLite state machine.
 

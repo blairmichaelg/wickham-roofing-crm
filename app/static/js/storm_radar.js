@@ -230,16 +230,25 @@ const StormRadar = {
                 </div>
             `;
         } else {
+            const talkingPoint = maxHail >= 1.0
+                ? `Verified NWS report: ${maxHail.toFixed(2)}" hail in ${loc} area.`
+                : maxWind >= 50
+                    ? `Verified NWS report: ${Math.round(maxWind)} mph wind in ${loc} area.`
+                    : `Verified storm activity in ${loc} area.`;
+
             return `
                 <div class="bg-gray-900/90 border border-gray-700/80 hover:border-purple-500 p-3 rounded-lg text-left transition-all shadow-sm">
                     <div class="flex justify-between items-start gap-2">
                         <div>
                             <div class="flex items-center gap-2">
                                 <span class="font-bold text-white text-sm">📍 ZIP ${zip}</span>
-                                <span class="text-xs text-purple-300">${loc}</span>
+                                <span class="text-xs text-purple-300 font-medium">${loc}</span>
                                 <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-purple-950 text-purple-300 border border-purple-700">${prio}</span>
                             </div>
                             <div class="text-xs text-gray-300 mt-1">${detailStr}</div>
+                            <div class="text-[11px] text-purple-200/90 bg-purple-950/40 border border-purple-900/50 rounded px-2 py-1 mt-1.5 font-mono">
+                                💬 <em>"${talkingPoint}"</em>
+                            </div>
                         </div>
                         <div class="text-right shrink-0">
                             <span class="text-[10px] text-gray-400 block">${timeStr}</span>
@@ -248,6 +257,9 @@ const StormRadar = {
                     <div class="mt-2.5 flex items-center gap-2 pt-2 border-t border-gray-800">
                         <button type="button" onclick="${onSelectCallback}('${zip}')" class="text-xs bg-purple-900/60 hover:bg-purple-800 text-purple-200 px-2.5 py-1 rounded font-semibold transition-colors">
                             🔍 Filter Jobs (${zip})
+                        </button>
+                        <button type="button" onclick="prefillLeadZip('${zip}')" class="text-xs bg-emerald-900/60 hover:bg-emerald-800 text-emerald-200 px-2.5 py-1 rounded font-semibold transition-colors">
+                            📝 Pre-fill Lead (${zip})
                         </button>
                     </div>
                 </div>

@@ -398,15 +398,50 @@ To speed up intake without typing long notes on a phone keyboard, the Field App 
 
 ---
 
-## 15. Offline Sync Error Modal & Manual Retry Flow
+## 16. Today's Best Actions (Field Priority Queue)
 
-If an offline item fails during automatic replay (for example, if network connectivity drops mid-stream or a server error occurs):
+Near the top of your field home screen, you will find the **Today's Best Actions** panel:
 
-- **Sync Error Notification**: The pending sync badge indicates any replay failure.
-- **Opening the Sync Error Modal**: Tapping the sync alert opens the **Sync Error Modal** (`#syncErrorModal`), showing the exact reason for the failure (such as a temporary network timeout or server validation error).
-- **Manual Retry Action**: Tap the **🔄 Retry Sync** button inside the modal to immediately re-attempt synchronization without losing your recorded notes, photos, or e-signatures.
-- **Escalation to Office**: If the error persists after multiple retries, note the job address shown in the modal and contact the office team.
+- **What It Does**: Deterministically calculates your top 3–5 highest-priority actions across all jobs assigned to you.
+- **Priority Rules**:
+  1. **Urgent Deadlines**: Georgia 5-day post-denial locks or commercial statutory lien notifications.
+  2. **Stalled Jobs**: Leads awaiting inspection capture, missing photos, or insurer response timeouts.
+  3. **Verified Storm Opportunities**: Existing customer addresses impacted by newly verified qualifying hail or wind.
+  4. **Incomplete Leads**: Unsigned contingency or retail agreements needing field follow-up.
+  5. **Post-Install Reviews**: Completed roof builds ready for final punch list and 5★ Google reviews.
+- **Copy-Ready Scripts**: Each action includes an immediate action button (e.g. *Resume Intake*, *Capture Photos*, *View Evidence*) along with a copy-ready talking script tailored for that customer.
 
 ---
 
-*This guide reflects the field app as of version `2.8.17`. If the app's screens, buttons, or error messages change in a future update, this guide should be reviewed and updated to match.*
+## 17. Evidence Matrix v1 Field Capture
+
+When inspecting a roof, field reps can attach structured forensic evidence exhibits to support insurance supplement claims:
+
+- **Adding an Exhibit**: Under the job details view, open the **Evidence Exhibits** section and tap **➕ Add Exhibit**.
+- **Human-First Categories**: Select intuitive roof components without memorizing Xactimate codes:
+  - *Decking / Sheathing*
+  - *Flashing / Penetrations*
+  - *Membrane / Shingle Damage*
+  - *Ventilation*
+  - *Ice & Water / Code-Related Upgrade*
+  - *Interior Water Damage*
+  - *Debris / Access / Other*
+- **Observation Details**: Specify the roof area/location (e.g. *North Slope, Chimney Valley*) and describe the physical condition observed (e.g. *Corroded step flashing unable to maintain watertight seal*).
+- **Photo Linking**: Attach a photo from your device or reference an existing uploaded job photo.
+- **Offline Safety**: Exhibits created while offline are queued in IndexedDB and sync automatically once cell service is restored.
+
+---
+
+## 18. Mobile Sync Status Bar & Transparent Recovery
+
+At the top of the field app, a dedicated **Sync Status Bar** keeps you informed of your connectivity and data sync state at all times:
+
+- **Status Indicator**: Displays **🟢 Online** when connected or **🔴 Offline (Local Storage)** when working in dead zones.
+- **Pending Counter**: Shows the exact number of forms, photos, signatures, or exhibits waiting in your offline queue.
+- **Last Sync Timestamp**: Shows the exact time of the last successful synchronization with the office server.
+- **Manual Sync**: If you're back in service and want to force an immediate sync, tap **🔄 Sync Now**.
+- **No Data Loss Guarantee**: Unsynced records are never discarded. Even if a network timeout occurs, records remain safely encrypted in local storage until the server acknowledges receipt.
+
+---
+
+*This guide reflects the field app as of version `2.10.0`. If the app's screens, buttons, or error messages change in a future update, this guide should be reviewed and updated to match.*

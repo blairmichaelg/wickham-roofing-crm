@@ -155,6 +155,14 @@ async def ingest_storm_events(ctx: dict) -> None:
     try:
         conn.commit()
         logger.info("ingest_storm_events_success", processed=len(reports), inserted=inserted_count, alerts_count=len(new_alerts))
+        # Trigger storm-to-lead matching for newly ingested qualifying events
+        if inserted_count > 0:
+            try:
+                from app.services.storm_matching import match_storm_opportunities
+                match_storm_opportunities(conn)
+                conn.commit()
+            except Exception as match_err:
+                logger.error("storm_opportunity_matching_failed", error=str(match_err))
     except Exception as commit_error:
         logger.error("ingest_storm_events_commit_failed", error=str(commit_error))
     finally:

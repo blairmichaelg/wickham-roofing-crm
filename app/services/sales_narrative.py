@@ -74,6 +74,7 @@ async def generate_sales_summary(job: dict, storm_events: list[dict]) -> str:
         Plain-text summary string.
     """
     from app.services.ai import GeminiClient, verify_legal_disclaimers
+    from app.services.ai.guardrails import verify_prohibited_sales_promises
 
     context = _build_context_block(job, storm_events)
     user_prompt = f"Data:\n{context}\n\nWrite the 2-3 sentence sales summary."
@@ -85,6 +86,18 @@ async def generate_sales_summary(job: dict, storm_events: list[dict]) -> str:
             user_prompt=user_prompt,
         )
         text = str(result).strip()
+
+        # Enforce negative guardrail (no coverage/rebate promises)
+        prohibited = verify_prohibited_sales_promises(text)
+        if not prohibited.passed:
+            logger.warning("prohibited_sales_language_intercepted", violations=prohibited.violations)
+            addr = job.get("address_line1", "this property")
+            return (
+                f"Recent storm activity was recorded near {addr}. "
+                "A free, non-obligation roof inspection from Wickham Roofing can document visible conditions "
+                "to determine whether an insurance claim should be considered."
+            )
+
         # Enforce legal disclaimers guardrail
         check = verify_legal_disclaimers(text, disclaimer_type="sales_script")
         if not check.passed:
@@ -113,6 +126,7 @@ async def generate_door_script(job: dict, storm_events: list[dict]) -> str:
         Plain-text door script string.
     """
     from app.services.ai import GeminiClient, verify_legal_disclaimers
+    from app.services.ai.guardrails import verify_prohibited_sales_promises
 
     context = _build_context_block(job, storm_events)
     user_prompt = f"Data:\n{context}\n\nWrite the door-knocking opening script."
@@ -124,6 +138,20 @@ async def generate_door_script(job: dict, storm_events: list[dict]) -> str:
             user_prompt=user_prompt,
         )
         text = str(result).strip()
+
+        # Enforce negative guardrail
+        prohibited = verify_prohibited_sales_promises(text)
+        if not prohibited.passed:
+            logger.warning("prohibited_door_script_language_intercepted", violations=prohibited.violations)
+            addr = job.get("address_line1", "your neighborhood")
+            return (
+                f"Hi, I'm with Wickham Roofing & Restoration. "
+                f"We've been in the area near {addr} following recent verified storm reports. "
+                "We're offering complimentary roof inspections to check for any visible weather impact. "
+                "Would you have 15 minutes for us to take a quick look? "
+                "There's no obligation — we just want to make sure your home is secure."
+            )
+
         # Enforce legal disclaimers guardrail
         check = verify_legal_disclaimers(text, disclaimer_type="sales_script")
         if not check.passed:
@@ -139,3 +167,30 @@ async def generate_door_script(job: dict, storm_events: list[dict]) -> str:
             "Would you have 15 minutes for us to take a quick look? "
             "There's no obligation — we just want to make sure your home is protected."
         )
+
+
+def build_sales_provenance(job: dict, storm_events: list[dict]) -> dict:
+    """
+    Return explicit citations and grounding sources for sales tools.
+    """
+    cited_storms = []
+    for ev in storm_events[:3]:
+        etype = ev.get("event_type", "STORM")
+        hail = ev.get("hail_size_inches") or ev.get("max_hail_inches")
+        wind = ev.get("wind_speed_mph") or ev.get("max_wind_mph")
+        loc = ev.get("county") or ev.get("location") or "Local area"
+        ts = ev.get("report_time_utc") or ev.get("last_event_utc") or ""
+        cited_storms.append({
+            "event_type": etype,
+            "location": loc,
+            "timestamp": ts[:10] if ts else "Recent",
+            "magnitude": f"{hail}\" hail" if hail else (f"{wind} mph wind" if wind else "Verified event"),
+        })
+
+    return {
+        "grounded_job_address": f"{job.get('address_line1', '')}, {job.get('city', '')} {job.get('state', '')}".strip(" ,"),
+        "job_status": job.get("status", "LEAD_CAPTURED"),
+        "storm_events_cited": cited_storms,
+        "citation_count": len(cited_storms),
+        "disclaimer": "AI-assisted draft — verify before use. Does not constitute an insurance coverage or payment guarantee.",
+    }

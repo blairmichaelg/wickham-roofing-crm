@@ -173,3 +173,89 @@ async def get_zip_storms(
     finally:
         conn.close()
 
+
+from pydantic import BaseModel, Field
+
+
+class UpdateStormOpportunityPayload(BaseModel):
+    status: str
+    dismissed_reason: str | None = None
+    notes: str | None = None
+
+
+class LogContactAttemptPayload(BaseModel):
+    contact_method: str
+    outcome: str
+    notes: str | None = None
+    opportunity_id: str | None = None
+
+
+@router.get("/storms/opportunities")
+async def list_field_storm_opportunities(
+    status: str | None = None,
+    limit: int = 50,
+    claims: dict = Depends(get_current_claims),
+):
+    """
+    List storm opportunities for the authenticated field rep.
+    Includes unassigned opportunities or opportunities assigned to this rep.
+    """
+    from app.services.storm_matching import get_storm_opportunities
+    rep_id = claims.get("rep_id")
+    opps = await asyncio.to_thread(
+        get_storm_opportunities,
+        rep_id=rep_id,
+        status=status,
+        limit=limit,
+    )
+    return {"status": "success", "count": len(opps), "opportunities": opps}
+
+
+@router.patch("/storms/opportunities/{opportunity_id}")
+async def patch_field_storm_opportunity(
+    opportunity_id: str,
+    payload: UpdateStormOpportunityPayload,
+    claims: dict = Depends(get_current_claims),
+):
+    """
+    Update status of a storm opportunity (e.g. mark contacted, scheduled, dismissed).
+    """
+    from app.services.storm_matching import update_storm_opportunity_status
+    try:
+        updated = await asyncio.to_thread(
+            update_storm_opportunity_status,
+            opportunity_id=opportunity_id,
+            status=payload.status,
+            rep_id=claims.get("rep_id"),
+            dismissed_reason=payload.dismissed_reason,
+            notes=payload.notes,
+        )
+        return {"status": "success", "opportunity": updated}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/jobs/{job_id}/contact-attempt")
+async def record_job_contact_attempt(
+    job_id: str,
+    payload: LogContactAttemptPayload,
+    claims: dict = Depends(get_current_claims),
+):
+    """
+    Log a manual customer follow-up attempt (CALL, TEXT, DOOR, EMAIL) without paid messaging.
+    """
+    from app.services.storm_matching import log_contact_attempt
+    try:
+        record = await asyncio.to_thread(
+            log_contact_attempt,
+            job_id=job_id,
+            rep_id=claims.get("rep_id"),
+            rep_name=claims.get("rep_name") or "Field Rep",
+            contact_method=payload.contact_method,
+            outcome=payload.outcome,
+            notes=payload.notes,
+            opportunity_id=payload.opportunity_id,
+        )
+        return {"status": "success", "contact_attempt": record}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

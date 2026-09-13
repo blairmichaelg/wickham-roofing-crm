@@ -278,4 +278,48 @@ For commercial roofing contracts, Schedules of Values (SOV), and AIA G702/G703 s
 - **NumberedCanvas Two-Pass Footers**: Subclasses `canvas.Canvas` to defer page footer rendering until the document build completes, ensuring deterministic `Page X of Y` footers across dynamic multi-page commercial contracts and continuation sheets.
 - **KeepInFrame Dynamic Scope Protection**: Unbounded dynamic engineering specifications and AI-generated scopes of work are wrapped in `KeepInFrame` flowables to prevent layout engine crashes and page boundary clipping.
 - **AIA G702/G703 Structured Separation**: Enforces a strict two-part flow: Page 1 contains the Application and Certificate for Payment (summary financials and contractor certification), followed by a page break to Page 2+ containing the detailed Schedule of Values Continuation Sheet.
-- **Integer Cents Precision**: All financial amounts stored in the database as integer cents are formatted strictly at render time into localized currency strings.
+- **Integer Cents Precision**: All financial amounts stored in the database as integer cents are formatted strictly at render time into localized currency strings.
+
+---
+
+## 9. Revenue Capture & Field Effectiveness Architecture (V4.2.10)
+
+### A. Storm Targets Canvassing Decision Engine (`app/services/storm_matching.py`, `app/workers/storm_worker.py`)
+- **Qualification Rule**: Severe weather events are ingested from the National Weather Service (NWS) and filtered strictly to actionable damage criteria: hail $\ge 1.00"$ or wind gusts $\ge 50$ mph within a configured service radius (default 50 miles of office coordinates). Zero or unknown magnitude records are defensively discarded.
+- **Idempotent Opportunity Matching**: A background matching process evaluates eligible active and historical customer properties within a 168-hour (7-day) lookback window. When a qualifying event overlaps a customer ZIP or coordinate radius, a record is created in `storm_opportunities` with unique deduplication key `opp_{job_id}_{storm_event_id}_{window_bucket}`. Re-running ingest is 100% idempotent.
+- **Role-Appropriate Access**: Field reps view only storm opportunities assigned to them or unassigned leads in their territory. Admin and office managers access full opportunity triage for rep assignment, status management (`new`, `surfaced`, `contacted`, `inspection_scheduled`, `dismissed`), and local attribution metrics.
+- **Direct Intake Pre-fill**: Target ZIP cards provide a 1-tap action that pre-fills lead intake with verified storm dates and NWS talking points.
+
+### B. Deterministic Next Best Action Engine (`app/services/next_best_action.py`)
+- **Explainable Priority Hierarchy**: Evaluates job state, missing production artifacts, statutory compliance deadlines, and storm opportunities using a strict 5-level deterministic ranking:
+  1. *Priority 1: Statutory Compliance & Lien Deadlines* (Georgia 5-day post-denial locks, commercial 90-day materialman lien warnings).
+  2. *Priority 2: Stalled Jobs & Carrier SLA Exceeded* (missing inspection photos, insurer response timeouts).
+  3. *Priority 3: Fresh Storm Opportunities* (verified hail/wind event re-inspection candidates).
+  4. *Priority 4: Incomplete Leads / Unsigned Agreements* (intake captured without signed contingency or contract).
+  5. *Priority 5: Production & Post-Install Retention* (material orders, final punch lists, 5★ review requests).
+- **First-Party Contact Ledger**: Reps log outreach attempts into `contact_attempts` (CALL, TEXT, DOOR, EMAIL) without introducing paid messaging APIs or SMS vendor lock-in.
+
+### C. Evidence Matrix v1 & Supplement Evidence Packet PDF (`app/services/evidence_matrix.py`, `app/services/pdf/evidence_packet.py`)
+- **Structured Exhibits**: Physical evidence items are recorded in `evidence_exhibits` with human-first categories (decking/sheathing, flashing/penetrations, membrane/shingle damage, ventilation, ice & water code upgrades, interior water damage), specific roof area locations, observed condition text, and optional linkages to uploaded photo vault records and claim AST discrepancy keys.
+- **Evidence Packet Synthesis**: Built using ReportLab Platypus flowable elements, generating versioned `evidence_packet_v{N}.pdf` packages with corporate letterhead, deterministic claim discrepancy reconciliation tables, photo exhibits grids, and statutory non-guarantee disclaimers. Registered in `job_documents` with 7-year statutory retention.
+
+### D. Safe Read-Only ESX Archive Parser (`app/services/esx_parser.py`)
+- **Strict Security Boundaries**: Validates untrusted Xactimate ESX archives:
+  - Max archive member count: 50 files.
+  - Max compressed size: 25 MB; Max uncompressed size: 20 MB (Zip Bomb defense).
+  - Zip Slip / path traversal protection (`..` and absolute path rejection).
+  - XML XXE / DOCTYPE / ENTITY injection defenses.
+- **Integer-Cent Reconciliation**: Parses line items, extracts unit prices, RCV, depreciation, and ACV, converts them to integer cents, and validates line item sums against carrier summary totals. Automatically converts valid estimates into `UniversalClaimAST`.
+- **Feature Flag Gate**: Controlled by `enable_esx_import: bool = False` in `app/config.py` (labeled "Experimental ESX import").
+
+### E. Grounded AI Provenance & Negative Guardrails (`app/services/ai/guardrails.py`, `app/services/sales_narrative.py`)
+- **Negative Sales Guardrail**: Intercepts AI-generated sales text and blocks unlawful promises:
+  - Deductible waiving, absorption, or rebate offers (O.C.G.A. § 33-1-9).
+  - Deceptive "free roof" advertisements.
+  - Unqualified guarantees that insurance will cover or approve a claim.
+- **Provenance Citations**: Attaches verified grounding metadata (NWS report date, magnitude, location, source) to AI sales outputs with explicit `"AI-assisted draft — verify before use"` notices.
+- **Ungrounded Code Fallback**: When no verified building code citation is attached, the code router outputs the neutral review state: `"Manual review required; no supporting statutory or building-code source attached."`
+
+### F. Mobile Offline Reliability & Sync Visibility (`app/templates/field_app.html`, `app/static/service-worker.js`)
+- **Service Worker Cache Upgrade**: Versioned as `field-app-shell-v3`.
+- **Sync Status Bar**: Renders real-time online/offline state, pending IndexedDB queue counts, last successful sync timestamp, and non-destructive manual retry without blocking field data entry.

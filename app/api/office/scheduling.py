@@ -253,3 +253,59 @@ async def get_storm_canvassing_targets(
         logger.error("storm_targets_fetch_failed", error=str(exc))
         raise HTTPException(status_code=500, detail="Failed to fetch storm canvassing targets.")
 
+
+class AssignStormOpportunityPayload(BaseModel):
+    rep_id: str | None = None
+
+
+@router.get("/storms/opportunities", dependencies=[Depends(verify_office_role)])
+async def list_office_storm_opportunities(
+    job_id: str | None = None,
+    rep_id: str | None = None,
+    status: str | None = None,
+    limit: int = 50,
+):
+    """
+    Office view: list all storm-matched lead/job opportunities with status and rep filters.
+    """
+    from app.services.storm_matching import get_storm_opportunities
+    opps = await asyncio.to_thread(
+        get_storm_opportunities,
+        job_id=job_id,
+        rep_id=rep_id,
+        status=status,
+        limit=limit,
+    )
+    return {"status": "success", "count": len(opps), "opportunities": opps}
+
+
+@router.post("/storms/opportunities/{opportunity_id}/assign", dependencies=[Depends(verify_office_role)])
+async def assign_office_storm_opportunity(
+    opportunity_id: str,
+    payload: AssignStormOpportunityPayload,
+):
+    """
+    Assign or unassign a field sales rep to a storm opportunity.
+    """
+    from app.services.storm_matching import assign_storm_opportunity
+    try:
+        updated = await asyncio.to_thread(
+            assign_storm_opportunity,
+            opportunity_id=opportunity_id,
+            rep_id=payload.rep_id,
+        )
+        return {"status": "success", "opportunity": updated}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/storms/metrics", dependencies=[Depends(verify_office_role)])
+async def get_office_storm_metrics():
+    """
+    Office view: retrieve internal, local storm performance and conversion metrics.
+    """
+    from app.services.storm_matching import get_storm_metrics
+    metrics = await asyncio.to_thread(get_storm_metrics)
+    return {"status": "success", "metrics": metrics}
+
+

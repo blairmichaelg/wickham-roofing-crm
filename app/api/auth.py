@@ -204,3 +204,5 @@ async def verify_office_role(request: Request, claims: dict = Depends(get_curren
     if not is_office_or_core(claims, request.method):
         raise HTTPException(status_code=403, detail="Not authorized for office access")
     return claims["role"]
+
+verify_office_user = verify_office_role
