@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.10.1] - 2026-09-13
+### Changed & Optimized (UI/UX Responsiveness & Ergonomics Optimization)
+- **Phase 1 — Architectural Foundation & Standalone Tailwind CLI Build**:
+  - Migrated off the dynamic runtime Tailwind CDN script (`<script src="https://cdn.tailwindcss.com"></script>`) across all 11 target templates.
+  - Deployed standalone self-contained Tailwind CLI binary (`tools/tailwindcss.exe` v3.4.17) compiling pre-purged, minified static CSS (`app/static/css/output.css`, ~50.5KB) with zero Node.js/npm dependencies.
+  - Preserved brand theme tokens and custom utility definitions in `tailwind.config.js`.
+  - Updated Service Worker cache (`app/static/service-worker.js`) to cache `/static/css/output.css` and bumped cache version to `field-app-shell-v4`.
+  - Created shared responsive office navigation partial (`app/templates/_nav_office.html`) with active-state URL path comparison and accessible hamburger drawer (<768px).
+- **Phase 2 — Field Ergonomics & Touch Target Optimization**:
+  - Fixed mobile viewport meta tag (`width=device-width, initial-scale=1.0`) eliminating `user-scalable=no` restrictions in `app/templates/field_app.html`.
+  - Enforced global 16px minimum font size (`@layer base { input, select, textarea { font-size: 16px; } }` and explicit `text-base`) preventing iOS Safari auto-zoom.
+  - Resized all buttons, modal triggers, close buttons, and signature pad actions to meet 44x44px minimum touch targets.
+  - Implemented fixed bottom tab bar on `field_app.html` with 5 primary destinations (New Lead, My Jobs, Storm Targets, Actions, Sync/Admin) and virtual keyboard detection that auto-hides navigation while typing.
+- **Phase 3 — Dense Dashboard Responsiveness & Structural Reflow**:
+  - Applied horizontal scroll wrapper pattern (`<div class="w-full overflow-x-auto">`) with strict cell `whitespace-nowrap` across `accounting_dashboard.html`, `admin_triage.html`, and `completed_jobs.html`.
+  - Applied responsive card-transformation pattern (`block md:table-row` with `<span class="md:hidden">` labels) on `admin_reps.html` and `admin_canvassing.html`.
+  - Applied vertical pane reflow pattern (`flex flex-col lg:flex-row gap-y-6 lg:gap-x-8`) to `job_detail.html`.
+  - Implemented responsive column stacking on `operations_dashboard.html` and `admin_dashboard.html`.
+- **Phase 4 — Systematic Visual QA & Edge Verification**:
+  - Validated all 11 templates at 375px (mobile), 768px (tablet), and 1440px (desktop) with zero unwanted scrollbars, no fixed-height text clipping, and clean string wrapping.
+
 ## [2.10.0] - 2026-09-13
 ### Added (Revenue Capture & Field Effectiveness Upgrade)
 

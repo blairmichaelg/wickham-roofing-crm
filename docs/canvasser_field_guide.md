@@ -26,6 +26,19 @@ issues down the line.
 
 ---
 
+## 1.1 Mobile Field Navigation (Bottom Tab Bar)
+
+The field app features an ergonomic fixed bottom tab bar designed for rapid one-handed mobile navigation:
+- **New Lead (+)**: Immediate access to the homeowner intake form.
+- **My Jobs (📋)**: Quick view of your assigned pipeline, recent jobs, and documents.
+- **Storm Targets (⛈️)**: Live verified storm footprint ZIPs, maximum hail sizes, and NWS damage talking points.
+- **Actions (⚡)**: Today's Next Best Actions with prioritized follow-up tasks.
+- **Sync / Admin (🔄)**: Real-time IndexedDB offline queue status and manual sync trigger.
+
+All inputs and buttons adhere to a 44x44px minimum touch target size to prevent mis-taps on field devices, and form inputs are configured at 16px to prevent unwanted iOS Safari auto-zooming.
+
+---
+
 ## 2. Creating a New Lead
 
 When you're with a homeowner and ready to start a job, you'll fill out the
