@@ -65,10 +65,14 @@ async def process_supplement_event(
             from app.core.database import _update_job_status_internal
             _update_job_status_internal(conn, job_id, JobStatus.PENDING_OPERATOR_REVIEW, "Supplement drafting failed")
             
-            # Insert trace into job_tasks for triage board
+            # Upsert trace into job_tasks for triage board (PRIMARY KEY(job_id, task_type))
             conn.execute(
-                "INSERT INTO job_tasks (job_id, task_type, phase, last_error) VALUES (?, ?, ?, ?)",
-                (job_id, "SUPPLEMENT_DRAFTING", "GENERATION", error_trace)
+                """INSERT INTO job_tasks (job_id, task_type, phase, last_error)
+                   VALUES (?, ?, ?, ?)
+                   ON CONFLICT(job_id, task_type) DO UPDATE SET
+                       phase = excluded.phase,
+                       last_error = excluded.last_error""",
+                (job_id, "SUPPLEMENT_DRAFTING", "failed", error_trace)
             )
             conn.execute("COMMIT")
         except Exception as db_e:

@@ -315,8 +315,12 @@ async def process_inspection(ctx: dict, job_id: str) -> InspectionJob:
                     try:
                         conn.execute("BEGIN IMMEDIATE")
                         conn.execute(
-                            "INSERT INTO job_tasks (job_id, task_type, phase, last_error) VALUES (?, ?, ?, ?)",
-                            (job_id, "INSPECTION_VISION", "ANALYSIS", error_trace)
+                            """INSERT INTO job_tasks (job_id, task_type, phase, last_error)
+                               VALUES (?, ?, ?, ?)
+                               ON CONFLICT(job_id, task_type) DO UPDATE SET
+                                   phase = excluded.phase,
+                                   last_error = excluded.last_error""",
+                            (job_id, "INSPECTION_VISION", "failed", error_trace)
                         )
                         conn.execute("COMMIT")
                     except Exception:

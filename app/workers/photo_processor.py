@@ -26,7 +26,17 @@ def _sync_update_damage_signals(job_id: str, new_signal: dict):
         except Exception:
             signals = []
             
-        signals.append(new_signal)
+        new_filename = new_signal.get("filename")
+        updated = False
+        if new_filename:
+            for idx, existing in enumerate(signals):
+                if isinstance(existing, dict) and existing.get("filename") == new_filename:
+                    signals[idx] = new_signal
+                    updated = True
+                    break
+
+        if not updated:
+            signals.append(new_signal)
         
         conn.execute(
             "UPDATE jobs SET damage_signals = ? WHERE id = ?",

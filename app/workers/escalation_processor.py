@@ -97,19 +97,42 @@ async def process_escalation(ctx: dict, job_id: str) -> dict:
 
     # ── GATE: Second offense → invoke appraisal terminal state ──────────
     if job.get("escalation_sent_at"):
-        log.warning("escalation_second_offense_detected")
+        esc_str = str(job["escalation_sent_at"]).replace("Z", "").strip()
+        days_since_esc = 0
+        try:
+            esc_dt = _dt.fromisoformat(esc_str)
+            days_since_esc = (_dt.now(__import__('datetime').timezone.utc).replace(tzinfo=None) - esc_dt).days
+        except Exception:
+            days_since_esc = 0
 
-        def _invoke_appraisal():
-            update_job_status(
-                job_id,
-                JobStatus.APPRAISAL_INVOKED,
-                "Carrier failed to respond to escalation demand letter "
-                "within SLA. Appraisal invoked. Manual handling required.",
+        sla_threshold = int(job.get("carrier_sla_days") or 14)
+
+        if days_since_esc >= sla_threshold:
+            log.warning("escalation_second_offense_detected", days_since_escalation=days_since_esc, sla_threshold=sla_threshold)
+
+            def _invoke_appraisal():
+                update_job_status(
+                    job_id,
+                    JobStatus.APPRAISAL_INVOKED,
+                    "Carrier failed to respond to escalation demand letter "
+                    "within SLA. Appraisal invoked. Manual handling required.",
+                )
+
+            await asyncio.to_thread(_invoke_appraisal)
+            log.error("appraisal_invoked", job_id=job_id)
+            return {"status": "appraisal_invoked", "job_id": job_id}
+        else:
+            log.info(
+                "escalation_retry_within_sla_ignored",
+                days_since_escalation=days_since_esc,
+                sla_threshold=sla_threshold,
             )
-
-        await asyncio.to_thread(_invoke_appraisal)
-        log.error("appraisal_invoked", job_id=job_id)
-        return {"status": "appraisal_invoked", "job_id": job_id}
+            return {
+                "status": "complete",
+                "message": "Escalation already dispatched within SLA window",
+                "job_id": job_id,
+                "days_since_escalation": days_since_esc,
+            }
 
     # ── Calculate days elapsed since supplement was sent ─────────────────
     days_elapsed = 0

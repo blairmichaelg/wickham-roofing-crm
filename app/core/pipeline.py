@@ -1049,16 +1049,27 @@ async def run_supplement_pipeline(job_id: str, ev_pdf_path: str, sol_pdf_path: s
             dynamic_waste = calculate_dynamic_waste(score)
             report = await asyncio.to_thread(reconcile, ev_data, sol_data, job_id, dynamic_waste)  # type: ignore
             
-            # Persist report snapshot for potential resume
+            # Persist report snapshot for potential resume (deduplicate identical content on retry)
             def _save_report_sync() -> None:
                 _conn = get_connection()
                 try:
                     import uuid as _uuid
+                    new_json = report.model_dump_json()
+                    latest = _conn.execute(
+                        """SELECT report_json FROM supplement_reports
+                           WHERE job_id = ?
+                           ORDER BY created_at DESC
+                           LIMIT 1""",
+                        (job_id,),
+                    ).fetchone()
+                    if latest and latest["report_json"] == new_json:
+                        return
+
                     _conn.execute(
                         """INSERT INTO supplement_reports
                            (id, job_id, report_json, created_at)
                            VALUES (?, ?, ?, CURRENT_TIMESTAMP)""",
-                        (str(_uuid.uuid4()), job_id, report.model_dump_json())
+                        (str(_uuid.uuid4()), job_id, new_json),
                     )
                     _conn.commit()
                 finally:
