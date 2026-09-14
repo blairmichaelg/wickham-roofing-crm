@@ -9,24 +9,20 @@ from __future__ import annotations
 
 import structlog
 
+from app.services.ai.guardrails import (
+    SalesPromiseViolationError,
+    verify_prohibited_sales_promises,
+)
+from app.services.ai.prompts import (
+    DOOR_SCRIPT_SYSTEM_PROMPT,
+    SALES_SUMMARY_SYSTEM_PROMPT,
+)
+from app.services.ai.provenance import ProvenanceString
+
 logger = structlog.get_logger("app.services.sales_narrative")
 
-_SUMMARY_SYSTEM_PROMPT = (
-    "You are a roofing sales assistant for Wickham Roofing & Restoration. "
-    "Write a short (2–3 sentence) factual sales summary for a field representative "
-    "to use when speaking with a homeowner. "
-    "Use ONLY the data provided — do not invent storm dates, hail sizes, or addresses. "
-    "Be professional, empathetic, and action-oriented. Do not include disclaimers."
-)
-
-_DOOR_SCRIPT_SYSTEM_PROMPT = (
-    "You are a roofing sales coach for Wickham Roofing & Restoration. "
-    "Write a short, friendly door-knocking opening script (4–6 sentences) for a field rep. "
-    "Use ONLY the data provided — do not invent any storm, damage, or homeowner details. "
-    "The script should introduce the rep, reference the specific storm event if provided, "
-    "and invite the homeowner to schedule a FREE inspection. "
-    "Do not include bracketed placeholders like [Name] — use the actual values from the data."
-)
+_SUMMARY_SYSTEM_PROMPT = SALES_SUMMARY_SYSTEM_PROMPT
+_DOOR_SCRIPT_SYSTEM_PROMPT = DOOR_SCRIPT_SYSTEM_PROMPT
 
 
 def _build_context_block(job: dict, storm_events: list[dict]) -> str:
@@ -74,7 +70,6 @@ async def generate_sales_summary(job: dict, storm_events: list[dict]) -> str:
         Plain-text summary string.
     """
     from app.services.ai import GeminiClient, verify_legal_disclaimers
-    from app.services.ai.guardrails import verify_prohibited_sales_promises
 
     context = _build_context_block(job, storm_events)
     user_prompt = f"Data:\n{context}\n\nWrite the 2-3 sentence sales summary."
@@ -85,9 +80,13 @@ async def generate_sales_summary(job: dict, storm_events: list[dict]) -> str:
             system_prompt=_SUMMARY_SYSTEM_PROMPT,
             user_prompt=user_prompt,
         )
-        text = str(result).strip()
+        if isinstance(result, ProvenanceString):
+            assert result.guardrail_passed is True, "Provenance contract violation: guardrail_passed must be True"
+            text = result.text.strip()
+        else:
+            text = str(result).strip()
 
-        # Enforce negative guardrail (no coverage/rebate promises)
+        # Enforce negative guardrail (no coverage/rebate promises) defensive check
         prohibited = verify_prohibited_sales_promises(text)
         if not prohibited.passed:
             logger.warning("prohibited_sales_language_intercepted", violations=prohibited.violations)
@@ -103,6 +102,14 @@ async def generate_sales_summary(job: dict, storm_events: list[dict]) -> str:
         if not check.passed:
             text += " A free inspection from Wickham Roofing involves no obligation."
         return str(text)
+    except SalesPromiseViolationError as exc:
+        logger.warning("prohibited_sales_language_intercepted", violations=exc.violations)
+        addr = job.get("address_line1", "this property")
+        return (
+            f"Recent storm activity was recorded near {addr}. "
+            "A free, non-obligation roof inspection from Wickham Roofing can document visible conditions "
+            "to determine whether an insurance claim should be considered."
+        )
     except Exception as exc:
         logger.error("sales_summary_generation_failed", error=str(exc))
         # Graceful fallback — do not raise, return a generic message
@@ -126,7 +133,9 @@ async def generate_door_script(job: dict, storm_events: list[dict]) -> str:
         Plain-text door script string.
     """
     from app.services.ai import GeminiClient, verify_legal_disclaimers
-    from app.services.ai.guardrails import verify_prohibited_sales_promises
+    from app.services.ai.guardrails import (
+        SalesPromiseViolationError,
+    )
 
     context = _build_context_block(job, storm_events)
     user_prompt = f"Data:\n{context}\n\nWrite the door-knocking opening script."
@@ -137,7 +146,11 @@ async def generate_door_script(job: dict, storm_events: list[dict]) -> str:
             system_prompt=_DOOR_SCRIPT_SYSTEM_PROMPT,
             user_prompt=user_prompt,
         )
-        text = str(result).strip()
+        if isinstance(result, ProvenanceString):
+            assert result.guardrail_passed is True, "Provenance contract violation: guardrail_passed must be True"
+            text = result.text.strip()
+        else:
+            text = str(result).strip()
 
         # Enforce negative guardrail
         prohibited = verify_prohibited_sales_promises(text)
@@ -157,6 +170,16 @@ async def generate_door_script(job: dict, storm_events: list[dict]) -> str:
         if not check.passed:
             text += " There's no obligation — we just want to make sure your home is protected."
         return str(text)
+    except SalesPromiseViolationError as exc:
+        logger.warning("prohibited_door_script_language_intercepted", violations=exc.violations)
+        addr = job.get("address_line1", "your neighborhood")
+        return (
+            f"Hi, I'm with Wickham Roofing & Restoration. "
+            f"We've been in the area near {addr} following recent verified storm reports. "
+            "We're offering complimentary roof inspections to check for any visible weather impact. "
+            "Would you have 15 minutes for us to take a quick look? "
+            "There's no obligation — we just want to make sure your home is secure."
+        )
     except Exception as exc:
         logger.error("door_script_generation_failed", error=str(exc))
         addr = job.get("address_line1", "your neighborhood")

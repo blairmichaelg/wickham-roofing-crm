@@ -174,3 +174,49 @@ DOOR_SCRIPT_SYSTEM_PROMPT = (
     "5. Do NOT make up storm dates or hail sizes not provided in the context.\n"
     "6. Keep it conversational, confident, and under 75 words."
 )
+
+# --- Cryptographic Prompt Versioning & Hash Registry ---
+import hashlib
+
+
+def compute_prompt_hash(prompt_text: str) -> str:
+    """Compute a stable, deterministic 16-char hex hash of a prompt string."""
+    normalized = " ".join(prompt_text.strip().split())
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16]
+
+
+PROMPT_REGISTRY: dict[str, str] = {
+    "JOB_DATA_ANALYSIS_PROMPT_TEMPLATE": JOB_DATA_ANALYSIS_PROMPT_TEMPLATE,
+    "CLASSIFY_CARRIER_PROMPT": CLASSIFY_CARRIER_PROMPT,
+    "CRITICAL_NO_MATH_DIRECTIVE": CRITICAL_NO_MATH_DIRECTIVE,
+    "SOL_XACTIMATE_PROMPT": SOL_XACTIMATE_PROMPT,
+    "SOL_SYMBILITY_PROMPT": SOL_SYMBILITY_PROMPT,
+    "SOL_GENERIC_PROMPT": SOL_GENERIC_PROMPT,
+    "SUPPLEMENT_NARRATIVE_TEMPLATE": SUPPLEMENT_NARRATIVE_TEMPLATE,
+    "ROOF_PHOTO_INSPECTION_TEMPLATE": ROOF_PHOTO_INSPECTION_TEMPLATE,
+    "BATCH_ROOF_PHOTO_INSPECTION_PROMPT": BATCH_ROOF_PHOTO_INSPECTION_PROMPT,
+    "SALES_SUMMARY_SYSTEM_PROMPT": SALES_SUMMARY_SYSTEM_PROMPT,
+    "DOOR_SCRIPT_SYSTEM_PROMPT": DOOR_SCRIPT_SYSTEM_PROMPT,
+    "PROMPT_VERSION": PROMPT_VERSION,
+}
+
+PROMPT_VERSION_HASHES: dict[str, str] = {
+    name: compute_prompt_hash(text) for name, text in PROMPT_REGISTRY.items()
+}
+
+
+def get_prompt_version_hash(prompt_or_name: str) -> str:
+    """
+    Resolve a stable 16-character version hash for any registered prompt constant or raw text.
+    """
+    if prompt_or_name in PROMPT_VERSION_HASHES:
+        return PROMPT_VERSION_HASHES[prompt_or_name]
+
+    # Search registry for exact normalized text match
+    normalized_input = " ".join(prompt_or_name.strip().split())
+    for name, text in PROMPT_REGISTRY.items():
+        if " ".join(text.strip().split()) == normalized_input:
+            return PROMPT_VERSION_HASHES[name]
+
+    return compute_prompt_hash(prompt_or_name)
+

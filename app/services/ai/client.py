@@ -20,6 +20,7 @@ from google.genai import types as genai_types
 
 from app.config import get_settings
 from app.core.database import log_ai_usage
+from app.services.ai.provenance import ProvenanceString, enforce_provenance
 
 logger = structlog.get_logger("app.services.ai.client")
 
@@ -134,3 +135,27 @@ class GeminiTransportClient:
                 log_ai_usage, job_id, usage, self.model_name, operation_type
             )
         return response
+
+    @enforce_provenance(operation_type="generate_text")
+    async def generate_text(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        job_id: str | None = None,
+        operation_type: str = "generate_text",
+        source_refs: list[str] | None = None,
+        prompt_version_hash: str | None = None,
+    ) -> ProvenanceString:
+        """
+        Generate plain-text narrative wrapped in a validated ProvenanceString.
+        Enforces negative sales promises guardrails before returning.
+        """
+        contents = [system_prompt + "\n\n" + user_prompt]
+        response = await self.generate_content(
+            contents=contents,
+            config=genai_types.GenerateContentConfig(temperature=0.4),
+            job_id=job_id,
+            operation_type=operation_type,
+        )
+        return cast(ProvenanceString, getattr(response, "text", str(response)))
+

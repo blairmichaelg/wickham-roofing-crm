@@ -61,6 +61,7 @@ from app.services.ai.prompts import (
     SOL_XACTIMATE_PROMPT,
     SUPPLEMENT_NARRATIVE_TEMPLATE,
 )
+from app.services.ai.provenance import ProvenanceString, enforce_provenance
 
 logger = structlog.get_logger("app.services.ai_service")
 
@@ -83,7 +84,7 @@ class AiClient(ABC):
     async def extract_sol_from_pdf(self, pdf_path: str | Path, job_id: str | None = None) -> StatementOfLoss: ...
 
     @abstractmethod
-    async def generate_supplement_narrative(self, report: DiscrepancyReport, codes: str) -> str: ...
+    async def generate_supplement_narrative(self, report: DiscrepancyReport, codes: str) -> ProvenanceString: ...
     
     @abstractmethod
     async def analyze_roof_photo(self, file_path: str | Path, original_filename: str | None = None, job_id: str | None = None) -> PhotoAnalysis: ...
@@ -92,7 +93,7 @@ class AiClient(ABC):
     async def analyze_roof_photos_batch(self, file_paths: list[str | Path], original_filenames: list[str] | None = None, job_id: str | None = None) -> list[PhotoAnalysis]: ...
 
     @abstractmethod
-    async def generate_text(self, system_prompt: str, user_prompt: str, job_id: str | None = None, operation_type: str = "generate_text") -> str: ...
+    async def generate_text(self, system_prompt: str, user_prompt: str, job_id: str | None = None, operation_type: str = "generate_text") -> ProvenanceString: ...
 
     @abstractmethod
     async def extract_sol_structured_data(self, prompt: str) -> str: ...
@@ -460,10 +461,15 @@ class GeminiClient(AiClient):
                 except Exception as exc:
                     log.warning("sol_file_cleanup_failed", error=str(exc))
 
-    async def generate_supplement_narrative(self, report: DiscrepancyReport, codes: str) -> str:
+    @enforce_provenance(
+        prompt_name="SUPPLEMENT_NARRATIVE_TEMPLATE",
+        checks=["verify_prohibited_sales_promises", "verify_building_code_citations"],
+    )
+    async def generate_supplement_narrative(self, report: DiscrepancyReport, codes: str) -> ProvenanceString:
         """
         Generate a professional, assertive supplement request narrative.
         Uses the deterministic discrepancies and raw XML building codes as context.
+        Guaranteed to return a verified ProvenanceString.
         """
         log = logger.bind(job_id=report.job_id)
         log.info("supplement_narrative_started")
@@ -489,7 +495,7 @@ class GeminiClient(AiClient):
                 await asyncio.to_thread(log_ai_usage, report.job_id, usage, self.model_name, "generate_supplement_narrative")
             
             log.info("supplement_narrative_complete")
-            return cast(str, response.text)
+            return cast(ProvenanceString, cast(object, response.text))
         except Exception as exc:
             log.warning("supplement_narrative_fallback_used", error=str(exc))
             # Deterministic Defensive Summary fallback
@@ -502,7 +508,8 @@ class GeminiClient(AiClient):
                 lines.append("<br/><b>Identified Line-Item Discrepancies:</b>")
                 for d in report.discrepancies:
                     lines.append(f"• <b>{d.xactimate_code or 'RFG'} ({d.category}):</b> {d.description}")
-            return "<br/>".join(lines)
+            fallback_text = "<br/>".join(lines)
+            return cast(ProvenanceString, cast(object, fallback_text))
 
     async def analyze_roof_photo(
         self,
@@ -795,28 +802,21 @@ class GeminiClient(AiClient):
             batch_result = response.parsed  # type: ignore
             return cast(list[PhotoAnalysis], batch_result.analyses)
 
+    @enforce_provenance(operation_type="generate_text")
     async def generate_text(
         self,
         system_prompt: str,
         user_prompt: str,
         job_id: str | None = None,
         operation_type: str = "generate_text",
-    ) -> str:
+        source_refs: list[str] | None = None,
+        prompt_version_hash: str | None = None,
+    ) -> ProvenanceString:
         """
-        Generic plain-text generation method.
+        Generic plain-text generation method wrapped in Provenance enforcement.
 
         Sends a system prompt + user prompt to Gemini and returns
-        the raw text response. Used by escalation_processor and
-        any worker that needs unstructured narrative output.
-
-        Args:
-            system_prompt: Instruction context for the model.
-            user_prompt: The specific request content.
-            job_id: Optional job ID for usage logging.
-            operation_type: Label for the AI usage log entry.
-
-        Returns:
-            str: The model's text response, stripped of whitespace.
+        a validated ProvenanceString that has passed all negative sales promise checks.
         """
         log = logger.bind(job_id=job_id, operation=operation_type)
         log.info("generate_text_started")
@@ -841,7 +841,7 @@ class GeminiClient(AiClient):
                     log_ai_usage, job_id, usage, self.model_name, operation_type
                 )
             log.info("generate_text_complete")
-            return cast(str, response.text).strip()
+            return cast(ProvenanceString, getattr(response, "text", str(response)).strip())
         except Exception as exc:
             log.error("generate_text_failed", error=str(exc))
             raise

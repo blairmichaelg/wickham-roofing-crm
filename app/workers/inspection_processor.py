@@ -27,6 +27,10 @@ from app.core.cache import get_cached_analysis, set_cached_analysis
 from app.core.database import JobStatus, insert_job_document, update_job_status
 from app.core.inspection_models import InspectionJob
 from app.core.temp_manager import create_temp_file
+from app.services.ai.prompts import (
+    BATCH_ROOF_PHOTO_INSPECTION_PROMPT,
+    get_prompt_version_hash,
+)
 from app.services.ai_service import get_ai_client
 from app.services.inspection_summary import get_inspection_summary
 from app.services.pdf import PDFGenerator
@@ -142,10 +146,12 @@ async def process_inspection(ctx: dict, job_id: str) -> InspectionJob:
 
         ai = get_ai_client()
 
+        prompt_hash = get_prompt_version_hash(BATCH_ROOF_PHOTO_INSPECTION_PROMPT)
+
         non_cached_photos = []
         for idx, photo in enumerate(job.photos):
             if photo.sha256:
-                cached = await asyncio.to_thread(get_cached_analysis, job.job_id, photo.sha256)
+                cached = await asyncio.to_thread(get_cached_analysis, job.job_id, photo.sha256, prompt_hash)
                 if cached:
                     cached.filename = photo.filepath.name
                     job.analyses.append(cached)
@@ -192,7 +198,7 @@ async def process_inspection(ctx: dict, job_id: str) -> InspectionJob:
                     analysis.filename = photo.filepath.name
                     job.analyses.append(analysis)
                     if photo.sha256:
-                        await asyncio.to_thread(set_cached_analysis, job.job_id, photo.sha256, analysis)
+                        await asyncio.to_thread(set_cached_analysis, job.job_id, photo.sha256, analysis, prompt_hash)
                     log.info(
                         "photo_analysis_complete_batch",
                         photo=photo.filepath.name,

@@ -11,7 +11,7 @@ import asyncio
 import io
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
 from PIL import Image as PILImage
@@ -248,7 +248,7 @@ class TestInspectionProcessor:
             result = asyncio.run(process_inspection({"is_test": True}, "WR-TEST-001"))
 
         # Verify lifecycle
-        mock_get_cache.assert_called_once_with("WR-TEST-001", "fake_hash")
+        mock_get_cache.assert_called_once_with("WR-TEST-001", "fake_hash", ANY)
         mock_ai.analyze_roof_photos_batch.assert_called_once()
         mock_set_cache.assert_called_once()
 

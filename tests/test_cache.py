@@ -99,3 +99,29 @@ class TestCacheLayer:
             
         result = get_cached_analysis("JOB-BAD", "hash_x")
         assert result is None
+
+    def test_prompt_version_isolation(self):
+        """Altering the prompt version hash must result in a cache miss."""
+        analysis = _make_sample_analysis("roof.jpg")
+        set_cached_analysis("JOB-PVER", "hash_img1", analysis, prompt_hash="prompt_v1_hash")
+
+        # Matching prompt hash hits
+        hit = get_cached_analysis("JOB-PVER", "hash_img1", prompt_hash="prompt_v1_hash")
+        assert hit is not None
+        assert hit.filename == "roof.jpg"
+
+        # Different prompt hash misses
+        miss = get_cached_analysis("JOB-PVER", "hash_img1", prompt_hash="prompt_v2_hash")
+        assert miss is None
+
+    def test_legacy_cache_backward_compatibility(self):
+        """Legacy cache entries with prompt_hash='legacy' are safely retrieved."""
+        analysis = _make_sample_analysis("legacy.jpg")
+        # Legacy save without specifying prompt_hash defaults to 'legacy'
+        set_cached_analysis("JOB-LEGACY", "hash_img2", analysis)
+
+        # Retrieval without prompt_hash finds it
+        result = get_cached_analysis("JOB-LEGACY", "hash_img2")
+        assert result is not None
+        assert result.filename == "legacy.jpg"
+

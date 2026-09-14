@@ -40,6 +40,7 @@ from app.services.ai.prompts import (
     SOL_XACTIMATE_PROMPT,
     SUPPLEMENT_NARRATIVE_TEMPLATE,
 )
+from app.services.ai.provenance import ProvenanceString, enforce_provenance
 
 
 def get_ai_client() -> Any:
@@ -58,6 +59,8 @@ __all__ = [
     "GeminiTransportClient",
     "AiClient",
     "GeminiClient",
+    "ProvenanceString",
+    "enforce_provenance",
     "get_ai_client",
     "GuardrailResult",
     "GuardrailValidationError",
