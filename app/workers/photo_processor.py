@@ -93,6 +93,27 @@ async def process_photo_damage(ctx: dict, job_id: str, filename: str) -> None:
         }
         
         await asyncio.to_thread(_sync_update_damage_signals, job_id, signal)
+        
+        # Ensure status is advanced to PHOTOS_UPLOADED if job is still in pre-photo stage
+        def _ensure_photos_uploaded():
+            conn = get_connection()
+            try:
+                from app.core.database import JobStatus, update_job_status
+                row = conn.execute("SELECT status FROM jobs WHERE id = ?", (job_id,)).fetchone()
+                if row and row["status"] in (
+                    JobStatus.LEAD_CAPTURED.value,
+                    JobStatus.CONTINGENCY_SIGNED.value,
+                    JobStatus.RETAIL_CONTRACT_SIGNED.value,
+                ):
+                    update_job_status(
+                        job_id,
+                        JobStatus.PHOTOS_UPLOADED,
+                        f"Photo damage analysis complete: {filename}",
+                    )
+            finally:
+                conn.close()
+
+        await asyncio.to_thread(_ensure_photos_uploaded)
         log.info("photo_damage_analysis_complete", signal=signal)
         
     except Exception as e:

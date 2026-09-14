@@ -90,14 +90,19 @@ def test_queue_escalation(auth_cookies):
     conn.close()
 
     class MockPool:
-        async def enqueue_job(self, func, **kwargs):
+        async def enqueue_job(self, func, *args, **kwargs):
             self.enqueued = func
+            self.args = args
             self.kwargs = kwargs
     
+    orig_pool = getattr(app.state, "redis_pool", None)
     app.state.redis_pool = MockPool()
-    res = client.post(f"/api/office/jobs/{job_id}/escalate", cookies=auth_cookies)
-    assert res.status_code == 200
-    assert app.state.redis_pool.enqueued == "process_escalation"
+    try:
+        res = client.post(f"/api/office/jobs/{job_id}/escalate", cookies=auth_cookies)
+        assert res.status_code == 200
+        assert app.state.redis_pool.enqueued == "process_escalation"
+    finally:
+        app.state.redis_pool = orig_pool
 
 # 8. Test /jobs/{job_id}/docs/escalation missing
 def test_download_escalation_missing(auth_cookies):

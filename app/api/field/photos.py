@@ -116,6 +116,26 @@ async def upload_field_photo(job_id: str, request: Request, file: UploadFile = F
             False
         )
 
+        # Advance status to PHOTOS_UPLOADED if job is currently in intake or agreement stage
+        def _advance_to_photos_uploaded():
+            conn = get_connection()
+            try:
+                row = conn.execute("SELECT status FROM jobs WHERE id = ?", (job_id,)).fetchone()
+                if row and row["status"] in (
+                    JobStatus.LEAD_CAPTURED.value,
+                    JobStatus.CONTINGENCY_SIGNED.value,
+                    JobStatus.RETAIL_CONTRACT_SIGNED.value,
+                ):
+                    update_job_status(
+                        job_id,
+                        JobStatus.PHOTOS_UPLOADED,
+                        f"Field photo uploaded: {safe_name}",
+                    )
+            finally:
+                conn.close()
+
+        await asyncio.to_thread(_advance_to_photos_uploaded)
+
         # Trigger ARQ background damage analysis (Phase 1)
         redis = getattr(request.app.state, "redis_pool", None)
         if redis:
