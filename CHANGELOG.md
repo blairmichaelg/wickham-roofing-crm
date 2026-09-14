@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.12.0] - 2026-09-14
+### Fixed & Hardened (Worker Idempotency, Status Transition & Optimistic Concurrency)
+- **Phase 1 — Worker Retry Safety & Snapshot Deduplication**:
+  - **Escalation Retry Gate False-Positive (`app/workers/escalation_processor.py`)**: Fixed gate check so `escalation_sent_at` only invokes `APPRAISAL_INVOKED` if elapsed days since escalation meets or exceeds the carrier SLA threshold (`carrier_sla_days` or fallback 14 days). Interrupted worker retries within SLA now exit gracefully without triggering appraisal prematurely.
+  - **Photo Damage Signal Deduplication (`app/workers/photo_processor.py`)**: Fixed `_sync_update_damage_signals()` to check existing signal entries by `filename` and update matching items in-place instead of appending duplicate signals on retry.
+  - **Supplement Reports Snapshot Deduplication (`app/core/pipeline.py`)**: Updated `_save_report_sync()` to inspect the latest `report_json` for the given `job_id`. Identical report contents from retried worker jobs are skipped, preventing unbounded duplicate snapshot accumulation while preserving genuine historical report changes.
+  - **Job Tasks Error Upsert on Retry (`app/workers/supplement_processor.py`, `app/workers/inspection_processor.py`)**: Replaced unconstrained `INSERT INTO job_tasks` with `ON CONFLICT(job_id, task_type) DO UPDATE SET phase = excluded.phase, last_error = excluded.last_error, updated_at = CURRENT_TIMESTAMP`, and aligned phase value to `"failed"` per schema check constraints.
+  - **Test Coverage**: Added `tests/test_worker_idempotency.py` (5 tests verifying SLA gate false-positive prevention, genuine appraisal triggers, signal deduplication, supplement snapshot idempotency, and job task upsert).
+- **Phase 2 — PHOTOS_UPLOADED Status Transition Gap**:
+  - **Status Advancement Trigger (`app/api/field/photos.py`, `app/workers/photo_processor.py`)**: Implemented status transition to `JobStatus.PHOTOS_UPLOADED` upon successful photo intake in `upload_field_photo` (for jobs in `LEAD_CAPTURED`, `CONTINGENCY_SIGNED`, or `RETAIL_CONTRACT_SIGNED`), with fallback in `process_photo_damage`.
+  - **Next Best Action Engine Unblocked (`app/services/next_best_action.py`)**: Status progression replaces "Complete Forensic Photo Inspection" with "Upload EagleView & Carrier SoL", unblocking field reps immediately upon photo upload.
+  - **Test Coverage**: Added `tests/test_photos_uploaded_transition.py` (3 tests verifying forward status progression, NBA update, non-regression of advanced jobs, and worker fallback).
+- **Phase 3 — Optimistic Concurrency on High-Risk Office Endpoints**:
+  - **Database Migration 0030 (`app/core/migrations/0030_add_jobs_updated_at.py`)**: Added `updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP` column and update trigger `trg_jobs_updated_at` to `jobs` table, registered in `app/core/database.py`.
+  - **Commission Override Check-Before-Write (`app/api/office/billing.py`)**: Added `updated_at` to `CommissionOverridePayload`. Enforces `WHERE id = ? AND updated_at = ?` check; returns HTTP 409 Conflict if record was modified concurrently.
+  - **Manual Measurements Entry Check-Before-Write (`app/api/office/jobs.py`)**: Added `updated_at` to `ManualMeasurementPayload`. Validates `updated_at` against current database state before write; returns HTTP 409 Conflict on stale submissions.
+  - **Frontend Conflict Feedback (`app/templates/accounting_dashboard.html`, `app/templates/job_detail.html`)**: Frontend captures loaded `updated_at` and displays dedicated Conflict (409) modal/alert prompts advising users to reload rather than generic network failure toasts.
+  - **Test Coverage**: Added `tests/test_optimistic_concurrency.py` (4 tests verifying happy paths and 409 Conflict handling on both endpoints).
+
 ## [2.11.0] - 2026-09-14
 ### Added & Hardened (Document Pipeline, PDF Generation & AI Guardrail Hardening)
 - **Phase 1 — AI Provenance Contract, Prompt Versioning & Cache Isolation**:
