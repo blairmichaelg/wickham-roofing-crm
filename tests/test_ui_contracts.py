@@ -184,3 +184,56 @@ def test_field_jobs_include_storm_flags():
     assert "storm_window_hours" in job
     from app.config import get_settings
     assert job["storm_window_hours"] == get_settings().storm_fresh_window_hours
+
+
+def test_field_app_bottom_nav_consistency_and_scroll_margins():
+    """Verify Bug A (scroll margins) and Bug B (bottom tab 5 consistency) contract."""
+    from app.api.auth import create_access_token
+    # Test 1: Core user (e.g. Admin / Michael)
+    core_token = create_access_token("admin", rep_name="Michael", rep_id="rep-michael")
+    client.cookies.set("auth_token", core_token)
+    resp_core = client.get("/field")
+    assert resp_core.status_code == 200
+    html_core = resp_core.text
+
+    # Bottom nav must have tabSync for core user and NOT tabAdmin
+    assert 'id="fieldBottomNav"' in html_core
+    assert 'id="tabSync"' in html_core
+    assert 'triggerManualSync()' in html_core
+    assert 'id="tabAdmin"' not in html_core
+    # Core user gets distinct top header link to /admin
+    assert 'href="/admin"' in html_core
+    assert "👑 Office" in html_core
+
+    # Test 2: Field rep (non-core user)
+    field_token = create_access_token("field", rep_name="Johnny Rep", rep_id="rep-johnny")
+    client.cookies.set("auth_token", field_token)
+    resp_field = client.get("/field")
+    assert resp_field.status_code == 200
+    html_field = resp_field.text
+
+    # Bottom nav must have tabSync and NOT tabAdmin
+    assert 'id="tabSync"' in html_field
+    assert 'triggerManualSync()' in html_field
+    assert 'id="tabAdmin"' not in html_field
+    # Non-core user does NOT get the top header link to /admin
+    assert "👑 Office" not in html_field
+
+    # Test 3: Scroll margin classes on all target elements
+    for target in [
+        'id="syncStatusBar" class="mb-4 px-3.5 py-2 bg-gray-950/90 border border-gray-800 rounded-xl flex items-center justify-between text-xs shadow-md scroll-mt-20"',
+        'id="nextBestActionsPanel" class="mb-6 bg-gradient-to-r from-purple-950/40 via-gray-900 to-gray-900 border border-purple-800/50 rounded-xl p-4 shadow-lg scroll-mt-20"',
+        'id="stormDecisionPanel" class="mb-6 bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-lg scroll-mt-20"',
+        'id="newLeadHeading" class="flex justify-between items-center mb-8 border-b border-gray-700 pb-4 scroll-mt-20"',
+        'id="intakeForm" class="space-y-6 scroll-mt-20"',
+        'id="myJobsSection" class="mt-12 pt-8 border-t border-gray-700 scroll-mt-20"',
+    ]:
+        assert target in html_field, f"Target element missing scroll-mt-20: {target}"
+
+    # Test 4: All 5 tabs are buttons with min-h-[48px]
+    assert '<button type="button" onclick="navigateToFieldTab(\'intakeForm\')" id="tabNewLead"' in html_field
+    assert '<button type="button" onclick="navigateToFieldTab(\'myJobsSection\')" id="tabMyJobs"' in html_field
+    assert '<button type="button" onclick="navigateToFieldTab(\'stormDecisionPanel\')" id="tabStormRadar"' in html_field
+    assert '<button type="button" onclick="navigateToFieldTab(\'nextBestActionsPanel\')" id="tabBestActions"' in html_field
+    assert '<button type="button" onclick="triggerManualSync()" id="tabSync"' in html_field
+

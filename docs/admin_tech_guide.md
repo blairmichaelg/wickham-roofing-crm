@@ -25,6 +25,7 @@ the title.
 
 - **👥 Field Reps** — manage canvasser/rep records.
 - **⚠ Triage** — jobs stuck waiting for your review.
+- **📱 Field App** — accessible at `/field`. When using the Field App on mobile, the bottom navigation bar provides dedicated in-page field operations (New Lead, My Jobs, Storm Targets, Actions, and Sync). Core users can return to the Admin Board at any time via the dedicated **👑 Office** button located in the top sticky header.
 - **Logout**
 
 ### Status columns you'll see

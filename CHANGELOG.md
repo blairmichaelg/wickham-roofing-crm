@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.10.2] - 2026-09-14
+### Fixed (Field App Mobile Bottom Tab Bar — Scroll Offset & Action Consistency)
+- **Bug A — Dynamic Scroll Target Offset & Scroll Margin (`app/templates/field_app.html`, `app/static/css/output.css`)**:
+  - Measured rendered height of mobile top sticky header (69px) across 375px and 414px viewports.
+  - Added Tailwind `scroll-mt-20` (80px scroll margin, leaving an 11px–12.5px clearance buffer below sticky headers) to `#intakeForm`, `#newLeadHeading`, `#myJobsSection`, `#stormDecisionPanel`, `#nextBestActionsPanel`, and `#syncStatusBar`.
+  - Re-implemented `window.navigateToFieldTab(targetId)` with dynamic top-fixed header (`offsetHeight`) and active banner calculations (`window.scrollTo({ behavior: 'smooth' })`), ensuring headings are always cleanly visible below fixed bars.
+  - Added `flushAllPendingRecords()` to reliably replay pending offline items during manual sync check.
+- **Bug B — Ambiguous Admin Role Shortcut Removed from Bottom Navigation Bar**:
+  - Unified the 5th mobile bottom tab to `🔄 Sync` calling `triggerManualSync()` consistently for all users regardless of `is_core` role.
+  - Converted all 5 mobile bottom tab items to `<button type="button">` with `min-h-[48px]` touch targets and descriptive `aria-label`s.
+  - Placed an explicit secondary navigation link `👑 Office` in the top mobile header for `is_core` users, separating full-page navigation from in-page field scroll actions.
+
 ## [2.10.1] - 2026-09-13
 ### Changed & Optimized (UI/UX Responsiveness & Ergonomics Optimization)
 - **Phase 1 — Architectural Foundation & Standalone Tailwind CLI Build**:

@@ -36,6 +36,9 @@
             </div>
         </div>
         <div class="flex items-center gap-2">
+            {% if is_core %}
+            <a href="/admin" class="px-2.5 py-1 min-h-[44px] flex items-center justify-center text-purple-300 hover:text-white rounded border border-purple-800/80 bg-purple-950/50 hover:bg-purple-900 text-xs font-semibold tracking-tight" title="Return to Office Admin Board">👑 Office</a>
+            {% endif %}
             <a href="/help" class="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-blue-400 hover:text-white rounded-lg hover:bg-gray-800 text-xs font-bold" aria-label="Help">❓</a>
             <a href="/auth/logout" class="px-2.5 py-1 min-h-[44px] flex items-center justify-center text-gray-400 hover:text-white rounded border border-gray-800 hover:bg-gray-800 text-xs">Logout</a>
         </div>
@@ -56,7 +59,7 @@
 
     <div class="max-w-md mx-auto p-6 pb-28 md:pb-12">
         <!-- Compact Mobile Sync Status Bar -->
-        <div id="syncStatusBar" class="mb-4 px-3.5 py-2 bg-gray-950/90 border border-gray-800 rounded-xl flex items-center justify-between text-xs shadow-md">
+        <div id="syncStatusBar" class="mb-4 px-3.5 py-2 bg-gray-950/90 border border-gray-800 rounded-xl flex items-center justify-between text-xs shadow-md scroll-mt-20">
             <div class="flex items-center gap-2">
                 <span id="syncNetDot" class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
                 <span id="syncNetStatus" class="font-bold text-gray-200">Online</span>
@@ -72,7 +75,7 @@
         </div>
 
         <!-- Today's Best Actions Panel -->
-        <div id="nextBestActionsPanel" class="mb-6 bg-gradient-to-r from-purple-950/40 via-gray-900 to-gray-900 border border-purple-800/50 rounded-xl p-4 shadow-lg">
+        <div id="nextBestActionsPanel" class="mb-6 bg-gradient-to-r from-purple-950/40 via-gray-900 to-gray-900 border border-purple-800/50 rounded-xl p-4 shadow-lg scroll-mt-20">
             <div class="flex justify-between items-center mb-2.5">
                 <div class="flex items-center gap-2">
                     <span class="text-base">🎯</span>
@@ -86,7 +89,7 @@
         </div>
 
         <!-- Storm Targets Panel -->
-        <div id="stormDecisionPanel" class="mb-6 bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-lg">
+        <div id="stormDecisionPanel" class="mb-6 bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-lg scroll-mt-20">
             <div class="flex justify-between items-center mb-1">
                 <div class="flex items-center gap-2">
                     <span class="text-base">⚡</span>
@@ -100,14 +103,14 @@
             </div>
         </div>
 
-        <div class="flex justify-between items-center mb-8 border-b border-gray-700 pb-4">
+        <div id="newLeadHeading" class="flex justify-between items-center mb-8 border-b border-gray-700 pb-4 scroll-mt-20">
             <div class="flex items-center">
                 <img src="/static/logo.png" alt="Wickham Roofing Logo" class="w-10 h-10 mr-3 rounded">
                 <h1 class="text-3xl font-bold text-white">New Lead</h1>
             </div>
         </div>
         
-        <form id="intakeForm" class="space-y-6" autocomplete="off">
+        <form id="intakeForm" class="space-y-6 scroll-mt-20" autocomplete="off">
             <div>
                 <label class="block text-sm font-medium text-purple-400 mb-2 font-bold">👤 Sales Rep / Lead Owner</label>
                 {% if current_rep_name %}
@@ -427,7 +430,7 @@
             </div>
         </div>
 
-        <div id="myJobsSection" class="mt-12 pt-8 border-t border-gray-700">
+        <div id="myJobsSection" class="mt-12 pt-8 border-t border-gray-700 scroll-mt-20">
             <h2 class="text-2xl font-bold text-white mb-6">My Recent Jobs</h2>
             <div id="myJobsList" class="space-y-4">
                 <p class="text-gray-300 text-sm">Loading jobs...</p>
@@ -1323,13 +1326,16 @@
             setTimeout(() => banner.classList.add('hidden'), 8000);
         }
 
-        window.addEventListener('online', async () => {
-            showToast("Connection restored. Syncing offline data...", "success");
-            const tx = idb.transaction("offline_queue", "readonly");
-            const store = tx.objectStore("offline_queue");
-            const req = store.getAll();
-            req.onsuccess = async () => {
-                const items = req.result;
+        async function flushAllPendingRecords() {
+            if (!idb || !navigator.onLine) return false;
+            try {
+                const tx = idb.transaction("offline_queue", "readonly");
+                const store = tx.objectStore("offline_queue");
+                const items = await new Promise((res, rej) => {
+                    const req = store.getAll();
+                    req.onsuccess = () => res(req.result || []);
+                    req.onerror = () => rej(req.error);
+                });
                 let syncFailed = false;
                 for (const item of items) {
                     item.status = item.status || 'pending_sync';
@@ -1339,7 +1345,7 @@
                     if (item.next_retry_utc && now < new Date(item.next_retry_utc)) {
                         continue;
                     }
-                    if (inProgressRetries.has(item.id)) {
+                    if (typeof inProgressRetries !== 'undefined' && inProgressRetries.has(item.id)) {
                         continue;
                     }
                     
@@ -1360,7 +1366,15 @@
                 if (items.length > 0 && !syncFailed) {
                     showToast("Offline data synced successfully!", "success");
                 }
-            };
+                return !syncFailed;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        window.addEventListener('online', async () => {
+            showToast("Connection restored. Syncing offline data...", "success");
+            await flushAllPendingRecords();
         });
 
         async function replayQueuedRecord(record) {
@@ -2319,10 +2333,26 @@
         };
 
         window.navigateToFieldTab = (targetId) => {
-            const el = document.getElementById(targetId);
-            if (el) {
-                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
+            const resolvedId = (targetId === 'intakeForm' && document.getElementById('newLeadHeading'))
+                ? 'newLeadHeading'
+                : targetId;
+            const el = document.getElementById(resolvedId) || document.getElementById(targetId);
+            if (!el) return;
+
+            const stickyHeader = document.querySelector('header.sticky.top-0, header.sticky, header.md\\:hidden');
+            const headerHeight = (stickyHeader && window.innerWidth < 768) ? stickyHeader.offsetHeight : 0;
+            const banner = document.getElementById('offline-banner');
+            const bannerHeight = (banner && !banner.classList.contains('hidden')) ? banner.offsetHeight : 0;
+            // Provide at least 69px sticky header height + 12px clear buffer
+            const totalTopOffset = Math.max(headerHeight + bannerHeight, 69) + 12;
+
+            const elementPosition = el.getBoundingClientRect().top;
+            const offsetPosition = elementPosition + window.pageYOffset - totalTopOffset;
+
+            window.scrollTo({
+                top: Math.max(0, offsetPosition),
+                behavior: 'smooth'
+            });
         };
 
         // On-screen keyboard detection: hide bottom tab bar when typing so it never obscures form inputs
@@ -2363,33 +2393,26 @@
 
     <!-- Mobile Fixed Bottom Tab Bar (< md) -->
     <nav id="fieldBottomNav" class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-gray-950/95 backdrop-blur-md border-t border-gray-800 px-2 py-1 flex justify-around items-center shadow-2xl transition-transform duration-200" aria-label="Field Mobile Bottom Navigation">
-        <a href="#intakeForm" onclick="navigateToFieldTab('intakeForm')" id="tabNewLead" class="flex-1 py-1 px-1 min-h-[48px] flex flex-col items-center justify-center text-orange-400 font-bold transition-colors">
-            <span class="text-lg leading-none">📝</span>
+        <button type="button" onclick="navigateToFieldTab('intakeForm')" id="tabNewLead" class="flex-1 py-1 px-1 min-h-[48px] flex flex-col items-center justify-center text-orange-400 font-bold transition-colors" aria-label="New Lead">
+            <span class="text-lg leading-none" aria-hidden="true">📝</span>
             <span class="text-[10px] mt-1 tracking-tight">New Lead</span>
-        </a>
-        <a href="#myJobsSection" onclick="navigateToFieldTab('myJobsSection')" id="tabMyJobs" class="flex-1 py-1 px-1 min-h-[48px] flex flex-col items-center justify-center text-gray-400 hover:text-white transition-colors">
-            <span class="text-lg leading-none">📋</span>
+        </button>
+        <button type="button" onclick="navigateToFieldTab('myJobsSection')" id="tabMyJobs" class="flex-1 py-1 px-1 min-h-[48px] flex flex-col items-center justify-center text-gray-400 hover:text-white transition-colors" aria-label="My Jobs">
+            <span class="text-lg leading-none" aria-hidden="true">📋</span>
             <span class="text-[10px] mt-1 tracking-tight">My Jobs</span>
-        </a>
-        <a href="#stormDecisionPanel" onclick="navigateToFieldTab('stormDecisionPanel')" id="tabStormRadar" class="flex-1 py-1 px-1 min-h-[48px] flex flex-col items-center justify-center text-gray-400 hover:text-white transition-colors">
-            <span class="text-lg leading-none">⚡</span>
+        </button>
+        <button type="button" onclick="navigateToFieldTab('stormDecisionPanel')" id="tabStormRadar" class="flex-1 py-1 px-1 min-h-[48px] flex flex-col items-center justify-center text-gray-400 hover:text-white transition-colors" aria-label="Storm Targets">
+            <span class="text-lg leading-none" aria-hidden="true">⚡</span>
             <span class="text-[10px] mt-1 tracking-tight">Storms</span>
-        </a>
-        <a href="#nextBestActionsPanel" onclick="navigateToFieldTab('nextBestActionsPanel')" id="tabBestActions" class="flex-1 py-1 px-1 min-h-[48px] flex flex-col items-center justify-center text-gray-400 hover:text-white transition-colors">
-            <span class="text-lg leading-none">🎯</span>
+        </button>
+        <button type="button" onclick="navigateToFieldTab('nextBestActionsPanel')" id="tabBestActions" class="flex-1 py-1 px-1 min-h-[48px] flex flex-col items-center justify-center text-gray-400 hover:text-white transition-colors" aria-label="Today's Actions">
+            <span class="text-lg leading-none" aria-hidden="true">🎯</span>
             <span class="text-[10px] mt-1 tracking-tight">Actions</span>
-        </a>
-        {% if is_core %}
-        <a href="/admin" id="tabAdmin" class="flex-1 py-1 px-1 min-h-[48px] flex flex-col items-center justify-center text-purple-400 hover:text-white transition-colors">
-            <span class="text-lg leading-none">👑</span>
-            <span class="text-[10px] mt-1 tracking-tight">Admin</span>
-        </a>
-        {% else %}
-        <button type="button" onclick="triggerManualSync()" id="tabSync" class="flex-1 py-1 px-1 min-h-[48px] flex flex-col items-center justify-center text-gray-400 hover:text-purple-300 transition-colors">
-            <span class="text-lg leading-none">🔄</span>
+        </button>
+        <button type="button" onclick="triggerManualSync()" id="tabSync" class="flex-1 py-1 px-1 min-h-[48px] flex flex-col items-center justify-center text-gray-400 hover:text-purple-300 transition-colors" aria-label="Manual Sync">
+            <span class="text-lg leading-none" aria-hidden="true">🔄</span>
             <span class="text-[10px] mt-1 tracking-tight">Sync</span>
         </button>
-        {% endif %}
     </nav>
 </body>
 </html>
