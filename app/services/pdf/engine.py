@@ -2,7 +2,7 @@ import hashlib
 import html
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import structlog
 from reportlab.lib import colors
@@ -14,6 +14,7 @@ from reportlab.pdfgen import canvas
 from reportlab.platypus import (
     BaseDocTemplate,
     Frame,
+    KeepInFrame,
     KeepTogether,
     PageTemplate,
     Paragraph,
@@ -24,6 +25,8 @@ from reportlab.platypus import (
 
 from app.services.pdf.constants import (
     BRAND_BLUE,
+    BRAND_BORDER,
+    BRAND_LIGHT_BG,
     BRAND_NAVY,
     BRAND_SLATE,
     COMPANY_EMAIL,
@@ -181,6 +184,96 @@ class NumberedCanvas(canvas.Canvas):
         self.drawString(50, 30, f"Wickham Roofing LLC — Document Hash: {doc_hash}")
         self.drawRightString(560, 30, f"Page {page_num} of {page_count}")
         self.restoreState()
+
+
+def wrap_keep_in_frame(
+    flowables: list[Any] | Any,
+    max_width: float = 512,
+    max_height: float = 240,
+    mode: Literal["error", "continue", "shrink", "truncate"] = "shrink",
+) -> KeepInFrame:
+    """
+    Wrap dynamic or unpredictable-length flowables in a KeepInFrame container.
+    Guarantees that content will not overflow or break page constraints.
+    """
+    if not isinstance(flowables, list):
+        flowables = [flowables]
+    return KeepInFrame(maxWidth=max_width, maxHeight=max_height, content=flowables, mode=mode)
+
+
+def build_ai_provenance_flowable(
+    content: Any,
+    style: ParagraphStyle | None = None,
+    max_width: float = 512,
+    max_height: float = 240,
+    disclaimer: str = "AI-assisted draft — verify against source documents",
+) -> KeepInFrame:
+    """
+    Renders AI-generated narrative text with a subtle background tint,
+    fine border, and a mandatory disclaimer notice.
+    
+    If given a ProvenanceString, validates that guardrails passed.
+    Wrapped in KeepInFrame to guarantee layout stability across variable text lengths.
+    """
+    from app.services.ai.provenance import ProvenanceString
+
+    if isinstance(content, ProvenanceString):
+        assert content.guardrail_passed is True, "AI narrative failed compliance guardrails"
+        raw_text = content.text
+    else:
+        raw_text = str(content)
+
+    font_reg = get_font_name("normal")
+    font_italic = get_font_name("italic")
+
+    ai_style = ParagraphStyle(
+        "AINarrativeProvenanceBox",
+        parent=style,
+        fontName=style.fontName if style else font_reg,
+        fontSize=style.fontSize if style else 9.5,
+        leading=style.leading if style else 13.5,
+        textColor=style.textColor if style else BRAND_NAVY,
+        backColor=BRAND_LIGHT_BG,
+        borderColor=BRAND_BORDER,
+        borderWidth=0.75,
+        borderPadding=6,
+        borderRadius=2,
+        spaceAfter=4,
+    ) if style else ParagraphStyle(
+        "AINarrativeProvenanceBox",
+        fontName=font_reg,
+        fontSize=9.5,
+        leading=13.5,
+        textColor=BRAND_NAVY,
+        backColor=BRAND_LIGHT_BG,
+        borderColor=BRAND_BORDER,
+        borderWidth=0.75,
+        borderPadding=6,
+        borderRadius=2,
+        spaceAfter=4,
+    )
+
+    p_elements: list[Any] = [
+        Paragraph(html.escape(p.strip()), ai_style)
+        for p in raw_text.split("\n")
+        if p.strip()
+    ]
+    if not p_elements:
+        p_elements = [Paragraph(html.escape(raw_text.strip()), ai_style)]
+
+    # Mandatory disclaimer line
+    fine_style = ParagraphStyle(
+        "AIDisclaimerFine",
+        fontName=font_italic,
+        fontSize=7.5,
+        leading=10,
+        textColor=colors.HexColor("#64748b"),
+        spaceBefore=2,
+        spaceAfter=4,
+    )
+    p_elements.append(Paragraph(f"<i>{html.escape(disclaimer)}</i>", fine_style))
+
+    return KeepInFrame(maxWidth=max_width, maxHeight=max_height, content=p_elements, mode="shrink")
 
 
 class PDFEngine:

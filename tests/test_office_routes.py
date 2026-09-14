@@ -197,8 +197,9 @@ class TestSupplementUploadRoute:
             conn.commit()
             conn.close()
 
+    @patch("app.api.office_routes.run_supplement_pipeline", new_callable=AsyncMock)
     @patch("app.api.office.contracts.run_supplement_pipeline", new_callable=AsyncMock)
-    def test_supplement_upload_runs_inline_without_redis(self, mock_pipeline):
+    def test_supplement_upload_runs_inline_without_redis(self, mock_contracts_pipe, mock_office_pipe):
         import uuid
         job_id = str(uuid.uuid4())
         conn = get_connection()
@@ -222,8 +223,9 @@ class TestSupplementUploadRoute:
             )
 
             assert response.status_code == 200
-            mock_pipeline.assert_awaited_once()
-            kwargs = mock_pipeline.await_args.kwargs
+            called_mock = mock_office_pipe if mock_office_pipe.called else mock_contracts_pipe
+            called_mock.assert_awaited_once()
+            kwargs = called_mock.await_args.kwargs
             assert kwargs["generate_pdf"] is True
             assert uuid.UUID(kwargs["ev_doc_id"])
             assert uuid.UUID(kwargs["sol_doc_id"])

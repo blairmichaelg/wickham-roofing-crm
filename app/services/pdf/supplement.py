@@ -2,7 +2,7 @@ import asyncio
 import datetime
 import html
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import structlog
 from reportlab.lib import colors
@@ -19,10 +19,26 @@ from reportlab.platypus import (
 from reportlab.platypus.flowables import HRFlowable
 
 from app.core.supplement_models import DiscrepancyReport
+from app.services.ai.provenance import ProvenanceString
+from app.services.pdf.constants import (
+    BRAND_BLUE,
+    BRAND_BORDER,
+    BRAND_GREEN,
+    BRAND_LIGHT_BG,
+    BRAND_MUTED_BG,
+    BRAND_NAVY,
+    BRAND_RED,
+    BRAND_SLATE,
+    FIELD_DOCS_DIR,
+)
+from app.services.pdf.engine import (
+    NumberedCanvas,
+    PDFEngine,
+    build_ai_provenance_flowable,
+    wrap_keep_in_frame,
+)
 
 logger = structlog.get_logger("app.services.pdf")
-from app.services.pdf.constants import FIELD_DOCS_DIR
-from app.services.pdf.engine import PDFEngine
 
 
 class SupplementGenerator(PDFEngine):
@@ -370,7 +386,7 @@ class SupplementGenerator(PDFEngine):
             ]))
             story.append(auth_table)
 
-            doc.build(story)
+            doc.build(story, canvasmaker=NumberedCanvas)
 
         try:
             await asyncio.to_thread(build_pdf)
@@ -487,7 +503,7 @@ class SupplementGenerator(PDFEngine):
             
             story.append(self._build_signature_block(title1="Inspector Signature", title2="Homeowner Acknowledgment"))
             
-            doc.build(story)
+            doc.build(story, canvasmaker=NumberedCanvas)
             
         await asyncio.to_thread(build_pdf)
         return filepath
@@ -497,7 +513,7 @@ class SupplementGenerator(PDFEngine):
         self,
         job: dict,
         denial_text: str,
-        rebuttal_narrative: str
+        rebuttal_narrative: str | ProvenanceString
     ) -> str:
         """
         Generate a formal Rebuttal Letter PDF.
@@ -559,7 +575,7 @@ class SupplementGenerator(PDFEngine):
             ))
             story.append(HRFlowable(
                 width="100%", thickness=0.5,
-                color=colors.black, spaceAfter=10
+                color=BRAND_NAVY, spaceAfter=10
             ))
             narrative_style = ParagraphStyle(
                 "RebuttalBody",
@@ -569,19 +585,22 @@ class SupplementGenerator(PDFEngine):
                 spaceBefore=4,
                 spaceAfter=4,
             )
-            for para in rebuttal_narrative.split("\n"):
-                if para.strip():
-                    story.append(Paragraph(
-                        _html.escape(para.strip()),
-                        narrative_style
-                    ))
+            story.append(
+                build_ai_provenance_flowable(
+                    rebuttal_narrative,
+                    style=narrative_style,
+                    max_width=510,
+                    max_height=320,
+                    disclaimer="AI-assisted rebuttal draft — verify against policy endorsement & field exhibits",
+                )
+            )
 
             story.append(Spacer(1, 30))
             story.append(self._build_signature_block(
                 title1="Authorized Contractor Representative",
                 title2="Date"
             ))
-            doc.build(story)
+            doc.build(story, canvasmaker=NumberedCanvas)
 
         try:
             await asyncio.to_thread(build_pdf)
@@ -598,7 +617,7 @@ class SupplementGenerator(PDFEngine):
         self,
         job: dict,
         days_elapsed: int,
-        narrative: str,
+        narrative: str | ProvenanceString,
     ) -> str:
         """
         Generate a formal Second Request / Notice of Intent to Appraise PDF.
@@ -646,7 +665,7 @@ class SupplementGenerator(PDFEngine):
             )
             warning_table.setStyle(
                 TableStyle([
-                    ("BACKGROUND", (0, 0), (-1, -1), colors.darkred),
+                    ("BACKGROUND", (0, 0), (-1, -1), BRAND_RED),
                     ("TEXTCOLOR", (0, 0), (-1, -1), colors.white),
                     ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
                     ("FONTSIZE", (0, 0), (-1, -1), 13),
@@ -663,12 +682,15 @@ class SupplementGenerator(PDFEngine):
             )
             story.append(Spacer(1, 12))
 
-            for paragraph in narrative.split("\n\n"):
-                if paragraph.strip():
-                    story.append(
-                        Paragraph(paragraph.strip(), self.custom_styles["BodyText"])
-                    )
-                    story.append(Spacer(1, 10))
+            story.append(
+                build_ai_provenance_flowable(
+                    narrative,
+                    style=cast(ParagraphStyle, self.custom_styles["BodyText"]),
+                    max_width=490,
+                    max_height=300,
+                    disclaimer="AI-assisted notice draft — verify dates and carrier response ledger",
+                )
+            )
 
             story.append(Spacer(1, 24))
             story.append(
@@ -677,12 +699,12 @@ class SupplementGenerator(PDFEngine):
                     title2="Date",
                 )
             )
-            doc.build(story)
+            doc.build(story, canvasmaker=NumberedCanvas)
 
         await asyncio.to_thread(build_pdf)
         return filepath
 
-    async def generate_supplement_pdf(self, report: DiscrepancyReport, narrative: str, job: dict, db_context: dict) -> str:
+    async def generate_supplement_pdf(self, report: DiscrepancyReport, narrative: str | ProvenanceString, job: dict, db_context: dict) -> str:
         """
         Generate an official Insurance Supplement Request PDF including discrepancy breakdown, building code citations, AI narrative, and carrier SLA notice.
         Returns the absolute filepath to the temporary PDF.
@@ -906,15 +928,19 @@ class SupplementGenerator(PDFEngine):
                 log.error("pdf_db_context_read_failed", error=str(e))
 
             story.append(Spacer(1, 8))
+            story.append(PageBreak())
             
-            # --- 7. Technical AI Narrative ---
+            # --- 7. Technical AI Narrative (Protected by Provenance Flowable & KeepInFrame) ---
             story.append(Paragraph("Technical Justification Narrative", section_style))
-            narrative_elements: list[Any] = []
-            for p in narrative.split("\n"):
-                if p.strip():
-                    narrative_elements.append(Paragraph(html.escape(p.strip()), narrative_style))
-            if narrative_elements:
-                story.append(KeepTogether(narrative_elements))
+            story.append(
+                build_ai_provenance_flowable(
+                    narrative,
+                    style=narrative_style,
+                    max_width=510,
+                    max_height=320,
+                    disclaimer="AI-assisted technical justification — verify against IRC building codes & field exhibits",
+                )
+            )
             story.append(Spacer(1, 14))
             
             # --- 8. SLA Warning & 1-Year Workmanship Warranty ---
@@ -930,7 +956,7 @@ class SupplementGenerator(PDFEngine):
             # --- 9. Signature ---
             story.append(self._build_signature_block(title1="Authorized Contractor Representative — Wickham Roofing LLC", title2="Date"))
             
-            doc.build(story)
+            doc.build(story, canvasmaker=NumberedCanvas)
 
         try:
             await asyncio.to_thread(build_pdf)

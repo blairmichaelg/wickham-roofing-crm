@@ -32,7 +32,7 @@ from app.services.pdf.documents import (
     create_header,
     get_audience_styles,
 )
-from app.services.pdf.engine import PDFEngine
+from app.services.pdf.engine import NumberedCanvas, PDFEngine
 
 logger = structlog.get_logger("app.services.pdf.invoice")
 
@@ -145,7 +145,7 @@ class InvoiceGenerator(PDFEngine):
                 title2="Date"
             ))
 
-            doc.build(story)
+            doc.build(story, canvasmaker=NumberedCanvas)
 
         await asyncio.to_thread(build_pdf)
         return filepath
@@ -172,7 +172,7 @@ class InvoiceGenerator(PDFEngine):
             
             if not jobs:
                 story.append(Paragraph("No INVOICED or CLOSED jobs found for this period.", styles["BodyText"]))
-                doc.build(story)
+                doc.build(story, canvasmaker=NumberedCanvas)
                 return
             
             total_rev = 0.0
@@ -261,7 +261,7 @@ class InvoiceGenerator(PDFEngine):
             ]))
             story.append(dt)
             
-            doc.build(story)
+            doc.build(story, canvasmaker=NumberedCanvas)
             
         await asyncio.to_thread(build_pdf)
         log.info("monthly_summary_generation_complete", filepath=filepath)
@@ -354,7 +354,7 @@ class InvoiceGenerator(PDFEngine):
             story.append(Spacer(1, 14))
             story.append(Paragraph("<b>Supplier Verification & Signature:</b> ___________________________ &nbsp;&nbsp; <b>Date:</b> _________", styles["BodyText"]))
             
-            doc.build(story)
+            doc.build(story, canvasmaker=NumberedCanvas)
 
         try:
             await asyncio.to_thread(build_pdf)
@@ -459,7 +459,7 @@ class InvoiceGenerator(PDFEngine):
             )
             story.append(self._box_warning("STATUTORY DISCLOSURES & TERMS OF ESTIMATE", deductible_disclosure, BRAND_NAVY))
             
-            doc.build(story)
+            doc.build(story, canvasmaker=NumberedCanvas)
 
         try:
             await asyncio.to_thread(build_pdf)
@@ -547,7 +547,7 @@ class InvoiceGenerator(PDFEngine):
             story.append(Spacer(1, 14))
 
             story.append(self._build_signature_block(title1="Authorized Contractor Signature", title2="Date"))
-            doc.build(story)
+            doc.build(story, canvasmaker=NumberedCanvas)
 
         await asyncio.to_thread(build_pdf)
         return filepath

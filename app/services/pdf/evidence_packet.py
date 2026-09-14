@@ -50,7 +50,12 @@ from app.services.pdf.constants import (
     COMPANY_PHONE,
     COMPANY_TAGLINE,
 )
-from app.services.pdf.engine import PDFEngine, register_brand_fonts
+from app.services.pdf.engine import (
+    NumberedCanvas,
+    PDFEngine,
+    register_brand_fonts,
+    wrap_keep_in_frame,
+)
 
 logger = structlog.get_logger("app.services.pdf.evidence_packet")
 
@@ -169,6 +174,8 @@ class EvidencePacketGenerator(PDFEngine):
             topMargin=36,
             bottomMargin=36,
         )
+        doc.job_id = job_id  # type: ignore[attr-defined]
+        doc.doc_type = "EVIDENCE_PACKET"  # type: ignore[attr-defined]
 
         styles = getSampleStyleSheet()
         normal = styles["Normal"]
@@ -393,8 +400,9 @@ class EvidencePacketGenerator(PDFEngine):
                     f"<font size=7 color='#64748b'>Source Provenance: Verified Field Capture &bull; Exhibits Ledger #{ex['id']}</font>"
                 )
                 right_para = Paragraph(detail_text, body_style)
+                right_flowable = wrap_keep_in_frame(right_para, max_width=4.2 * inch, max_height=2.8 * inch)
 
-                ex_table = Table([[image_flowable, right_para]], colWidths=[3.3 * inch, 4.2 * inch])
+                ex_table = Table([[image_flowable, right_flowable]], colWidths=[3.3 * inch, 4.2 * inch])
                 ex_table.setStyle(TableStyle([
                     ("VALIGN", (0, 0), (-1, -1), "TOP"),
                     ("BOX", (0, 0), (-1, -1), 0.5, BRAND_BORDER),
@@ -405,7 +413,7 @@ class EvidencePacketGenerator(PDFEngine):
                 story.append(KeepTogether([ex_table, Spacer(1, 10)]))
 
         # Build Document
-        doc.build(story)
+        doc.build(story, canvasmaker=NumberedCanvas)
 
         # Register in job_documents
         with get_db_connection(resolved_db) as conn:

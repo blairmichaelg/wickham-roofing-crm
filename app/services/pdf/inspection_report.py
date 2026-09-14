@@ -36,7 +36,14 @@ from reportlab.platypus.flowables import HRFlowable
 from app.config import FIELD_DOCS_DIR
 from app.core.database import get_connection
 from app.core.inspection_models import InspectionJob, InspectionPhoto, PhotoAnalysis
-from app.services.pdf.engine import PDFEngine
+from app.services.pdf.constants import (
+    BRAND_BLUE,
+    BRAND_BORDER,
+    BRAND_LIGHT_BG,
+    BRAND_NAVY,
+    BRAND_SLATE,
+)
+from app.services.pdf.engine import NumberedCanvas, PDFEngine, wrap_keep_in_frame
 
 logger = structlog.get_logger("app.services.pdf.inspection_report")
 
@@ -156,9 +163,9 @@ class InspectionReportGenerator(PDFEngine):
             doc = self._get_doc_template(filepath, job_id=job_id, doc_type="HOMEOWNER_INSPECTION_REPORT")
             story: list[Any] = []
 
-            # Color Palette
-            NAVY = colors.HexColor("#1e3a8a")
-            TEXT_DARK = colors.HexColor("#1f2937")
+            # Color Palette from centralized brand constants
+            NAVY = BRAND_NAVY
+            TEXT_DARK = BRAND_SLATE
 
             style_title = ParagraphStyle(
                 "ReportTitle",
@@ -410,9 +417,9 @@ class InspectionReportGenerator(PDFEngine):
             ]))
             rec_story.append(sign_table)
 
-            story.append(KeepTogether(rec_story))
+            story.append(wrap_keep_in_frame(rec_story, max_width=7.2 * inch, max_height=3.8 * inch))
 
-            doc.build(story)
+            doc.build(story, canvasmaker=NumberedCanvas)
             return filepath
 
         result = await asyncio.to_thread(build_pdf)

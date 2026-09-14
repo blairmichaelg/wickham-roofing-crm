@@ -22,7 +22,7 @@ from app.services.pdf.constants import (
     INTERNAL_PALETTE,
 )
 from app.services.pdf.documents import create_financial_table, create_header, get_audience_styles
-from app.services.pdf.engine import PDFEngine
+from app.services.pdf.engine import NumberedCanvas, PDFEngine
 
 logger = structlog.get_logger("app.services.pdf.commission")
 
@@ -110,7 +110,7 @@ class CommissionGenerator(PDFEngine):
                     title2="Date Received"
                 )
             )
-            doc.build(story)
+            doc.build(story, canvasmaker=NumberedCanvas)
 
         await asyncio.to_thread(build_pdf)
         return filepath

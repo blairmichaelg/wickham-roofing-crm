@@ -32,6 +32,7 @@ from reportlab.platypus import (
 )
 
 from app.config import FIELD_DOCS_DIR
+from app.services.ai.provenance import ProvenanceString
 from app.services.pdf.constants import (
     BRAND_BLUE,
     BRAND_BORDER,
@@ -45,7 +46,13 @@ from app.services.pdf.constants import (
     COMPANY_TAGLINE,
 )
 from app.services.pdf.documents import create_header, get_audience_styles
-from app.services.pdf.engine import NumberedCanvas, PDFEngine, get_font_name
+from app.services.pdf.engine import (
+    NumberedCanvas,
+    PDFEngine,
+    build_ai_provenance_flowable,
+    get_font_name,
+    wrap_keep_in_frame,
+)
 
 logger = structlog.get_logger("app.services.pdf.commercial")
 
@@ -72,7 +79,7 @@ class CommercialPDFGenerator(PDFEngine):
         job: dict[str, Any],
         sov_items: list[dict[str, Any]],
         terms: dict[str, Any] | None = None,
-        scope_text: str | None = None,
+        scope_text: str | ProvenanceString | None = None,
         filepath: str | None = None,
     ) -> str:
         """
@@ -146,21 +153,34 @@ class CommercialPDFGenerator(PDFEngine):
 
             # --- Section 1: Scope of Work (Protected with KeepInFrame for dynamic lengths) ---
             story.append(Paragraph("1. Scope of Work & Engineering Specifications", styles["SectionHeading"]))
-            raw_scope = scope_text or job.get("scope_of_work") or (
-                "Contractor agrees to furnish all required labor, supervision, materials, equipment, and insurance "
-                "to execute the complete commercial roof replacement in accordance with project specifications, "
-                "local municipal building codes, and manufacturer specifications. Work includes complete teardown "
-                "of designated roof sections, inspection and replacement of deteriorated structural decking, installation "
-                "of code-compliant thermal barrier, synthetic underlayment, commercial-grade flashings, and complete cleanup."
-            )
+            if isinstance(scope_text, ProvenanceString):
+                story.append(
+                    build_ai_provenance_flowable(
+                        scope_text,
+                        style=styles["BodyText"],
+                        max_width=512,
+                        max_height=220,
+                        disclaimer="AI-assisted scope of work — verify against architectural plans & engineering specs",
+                    )
+                )
+            else:
+                raw_scope = str(scope_text) if scope_text else (
+                    job.get("scope_of_work") or (
+                        "Contractor agrees to furnish all required labor, supervision, materials, equipment, and insurance "
+                        "to execute the complete commercial roof replacement in accordance with project specifications, "
+                        "local municipal building codes, and manufacturer specifications. Work includes complete teardown "
+                        "of designated roof sections, inspection and replacement of deteriorated structural decking, installation "
+                        "of code-compliant thermal barrier, synthetic underlayment, commercial-grade flashings, and complete cleanup."
+                    )
+                )
 
-            # KeepInFrame ensures long dynamic scope text fits within bounding frame constraints cleanly
-            scope_flowables = [
-                Paragraph(raw_scope, styles["BodyText"]),
-                Spacer(1, 6),
-                Paragraph("<b>Manufacturer Specs:</b> Installation compliant with ASTM standards and manufacturer specifications.", styles["FinePrint"]),
-            ]
-            story.append(KeepInFrame(maxWidth=512, maxHeight=220, content=scope_flowables, mode="shrink"))
+                # KeepInFrame ensures long dynamic scope text fits within bounding frame constraints cleanly
+                scope_flowables = [
+                    Paragraph(raw_scope, styles["BodyText"]),
+                    Spacer(1, 6),
+                    Paragraph("<b>Manufacturer Specs:</b> Installation compliant with ASTM standards and manufacturer specifications.", styles["FinePrint"]),
+                ]
+                story.append(wrap_keep_in_frame(scope_flowables, max_width=512, max_height=220))
             story.append(Spacer(1, 12))
 
             # --- Section 2: Schedule of Values (SOV) ---

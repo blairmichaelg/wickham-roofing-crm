@@ -24,6 +24,7 @@ from reportlab.platypus import (
     TableStyle,
 )
 
+from app.services.ai.provenance import ProvenanceString
 from app.services.pdf.constants import (
     BRAND_ACCENT,
     BRAND_BLUE,
@@ -40,7 +41,12 @@ from app.services.pdf.constants import (
     SPACING_XS,
 )
 from app.services.pdf.documents import create_header, get_audience_styles
-from app.services.pdf.engine import PDFEngine
+from app.services.pdf.engine import (
+    NumberedCanvas,
+    PDFEngine,
+    build_ai_provenance_flowable,
+    wrap_keep_in_frame,
+)
 
 logger = structlog.get_logger("app.services.pdf.neighbor_letter")
 
@@ -52,6 +58,7 @@ class NeighborLetterGenerator(PDFEngine):
         self,
         job: dict,
         storm_events: list[dict] | None = None,
+        narrative: str | ProvenanceString | None = None,
     ) -> str:
         """
         Generate the neighbor letter PDF and save it to the job's document directory.
@@ -133,7 +140,20 @@ class NeighborLetterGenerator(PDFEngine):
                     ("BOX", (0, 0), (-1, -1), 1, BRAND_BORDER),
                     ("PADDING", (0, 0), (-1, -1), 8),
                 ]))
-                story.append(storm_box)
+                story.append(wrap_keep_in_frame(storm_box, max_width=510, max_height=180))
+                story.append(Spacer(1, 10))
+
+            # ── AI-Assisted Custom Narrative (if provided) ───────────────────
+            if narrative:
+                story.append(
+                    build_ai_provenance_flowable(
+                        narrative,
+                        style=styles["BodyText"],
+                        max_width=510,
+                        max_height=180,
+                        disclaimer="AI-assisted neighborhood notice — verify against local hail/wind data",
+                    )
+                )
                 story.append(Spacer(1, 10))
 
             # ── Free inspection offer ────────────────────────────────────────
@@ -173,7 +193,7 @@ class NeighborLetterGenerator(PDFEngine):
             fine_print_style = self.custom_styles.get("FinePrint", styles["BodyText"])
             story.append(Paragraph(footer, fine_print_style))
 
-            doc.build(story)
+            doc.build(story, canvasmaker=NumberedCanvas)
 
         await asyncio.to_thread(_build)
         log.info("neighbor_letter_generation_complete", path=filepath)

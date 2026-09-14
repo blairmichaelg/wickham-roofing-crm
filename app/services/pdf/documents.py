@@ -41,7 +41,13 @@ from app.services.pdf.constants import (
     SPACING_SM,
     SPACING_XS,
 )
-from app.services.pdf.engine import PDFEngine, get_font_name, register_brand_fonts
+from app.services.pdf.engine import (
+    NumberedCanvas,
+    PDFEngine,
+    get_font_name,
+    register_brand_fonts,
+    wrap_keep_in_frame,
+)
 
 logger = structlog.get_logger("app.services.pdf.documents")
 
@@ -641,7 +647,7 @@ class DocumentsGenerator(PDFEngine):
             time_str = f" on {timestamp_utc}" if timestamp_utc else ""
             story.append(Paragraph(f"Digitally signed & verified by <b>{signer_name}</b> from IP address <b>{ip_address}</b>{time_str}", styles["FinePrint"]))
 
-            doc.build(story)
+            doc.build(story, canvasmaker=NumberedCanvas)
 
         try:
             await asyncio.to_thread(build_pdf)
@@ -694,7 +700,7 @@ class DocumentsGenerator(PDFEngine):
                 if copy_type == "Customer Copy":
                     story.append(PageBreak())
 
-            doc.build(story)
+            doc.build(story, canvasmaker=NumberedCanvas)
 
         await asyncio.to_thread(build_pdf)
         return filepath
@@ -788,7 +794,7 @@ class DocumentsGenerator(PDFEngine):
             time_str = f" on {timestamp_utc}" if timestamp_utc else ""
             story.append(Paragraph(f"Digitally signed & verified by <b>{signer_name}</b> from IP <b>{ip_address}</b>{time_str}", styles["FinePrint"]))
 
-            doc.build(story)
+            doc.build(story, canvasmaker=NumberedCanvas)
 
         try:
             await asyncio.to_thread(build_pdf)
@@ -845,7 +851,7 @@ class DocumentsGenerator(PDFEngine):
                 if copy_type == "Customer Copy":
                     story.append(PageBreak())
 
-            doc.build(story)
+            doc.build(story, canvasmaker=NumberedCanvas)
 
         await asyncio.to_thread(build_pdf)
         return filepath
@@ -908,7 +914,7 @@ class DocumentsGenerator(PDFEngine):
 
             story.append(self._build_signature_block(title1="Homeowner Signature", title2="Wickham Roofing LLC Representative", include_witness=True))
 
-            doc.build(story)
+            doc.build(story, canvasmaker=NumberedCanvas)
 
         await asyncio.to_thread(build_pdf)
         return filepath
@@ -981,7 +987,7 @@ class DocumentsGenerator(PDFEngine):
             # Signature block
             story.append(self._build_signature_block(title1="Homeowner Signature", title2="Wickham Roofing LLC Representative"))
 
-            doc.build(story)
+            doc.build(story, canvasmaker=NumberedCanvas)
 
         await asyncio.to_thread(build_pdf)
         return filepath
@@ -1068,7 +1074,7 @@ class DocumentsGenerator(PDFEngine):
             story.append(HRFlowable(width="100%", thickness=0.5, color=BRAND_BORDER, spaceAfter=12))
             story.append(self._build_signature_block(title1="Operations Manager (Scott)", title2="Purchasing / Office (Debi)"))
 
-            doc.build(story)
+            doc.build(story, canvasmaker=NumberedCanvas)
 
         try:
             await asyncio.to_thread(build_pdf)
