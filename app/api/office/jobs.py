@@ -40,7 +40,7 @@ from app.core.database import (
 )
 from app.core.job_costing import compute_job_profitability
 from app.core.templates import templates
-from app.core.utils import now_utc
+from app.core.utils import now_utc, now_utc_iso
 from app.services.rate_limit import check_rate_limit
 
 logger = structlog.get_logger("app.api.office.jobs")
@@ -411,6 +411,7 @@ class ManualMeasurementPayload(BaseModel):
     pipe_boot_count: int | None = Field(default=None, ge=0)
     vent_count: int | None = Field(default=None, ge=0)
     starter_strip_lf: float | None = Field(default=None, ge=0)
+    updated_at: str | None = None
 
 
 def validate_geometry_dict(data: dict[str, Any]) -> None:
@@ -469,10 +470,18 @@ async def manual_measurement_entry(
 
     conn = get_connection()
     try:
-        cursor = conn.execute("SELECT id, status FROM jobs WHERE id = ?", (job_id,))
+        cursor = conn.execute("SELECT id, status, updated_at FROM jobs WHERE id = ?", (job_id,))
         job_row = cursor.fetchone()
         if not job_row:
             raise HTTPException(status_code=404, detail="Job not found.")
+
+        # Optimistic concurrency check: if client provided updated_at, enforce it matches current DB state
+        if payload.updated_at is not None and job_row["updated_at"] is not None:
+            if job_row["updated_at"] != payload.updated_at:
+                raise HTTPException(
+                    status_code=409,
+                    detail="This record was updated by another user since you loaded it. Please refresh and try again."
+                )
 
         db_updates: dict[str, Any] = {
             "ev_total_area_sf": payload.total_area_sf,
@@ -490,7 +499,8 @@ async def manual_measurement_entry(
             "ev_pipe_boot_count": payload.pipe_boot_count,
             "ev_vent_count": payload.vent_count,
             "ev_starter_strip_lf": payload.starter_strip_lf,
-            "pipeline_error_message": None
+            "pipeline_error_message": None,
+            "updated_at": now_utc_iso()
         }
         set_clause = ", ".join(f"{k} = ?" for k in db_updates)
         values = list(db_updates.values()) + [job_id]

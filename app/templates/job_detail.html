@@ -1449,7 +1449,8 @@
             total_facets: parseIntNum('modalTotalFacets'),
             pipe_boot_count: parseIntNum('modalPipeBootCount'),
             vent_count: parseIntNum('modalVentCount'),
-            starter_strip_lf: parseNum('modalStarterStripLf')
+            starter_strip_lf: parseNum('modalStarterStripLf'),
+            updated_at: '{{ job.updated_at or "" }}' || null
         };
 
         try {
@@ -1460,8 +1461,13 @@
             });
             if (res.ok) {
                 window.location.reload();
+            } else if (res.status === 409) {
+                const err = await res.json().catch(() => ({}));
+                alert('Conflict (409): ' + (err.detail || 'This record was updated by another user. Please refresh the page and try again.'));
+                btn.disabled = false;
+                btn.textContent = 'Save & Validate Geometry';
             } else {
-                const err = await res.json();
+                const err = await res.json().catch(() => ({}));
                 alert('Geometry validation error: ' + (err.detail || 'Failed'));
                 btn.disabled = false;
                 btn.textContent = 'Save & Validate Geometry';

@@ -253,7 +253,7 @@
                                             <span class="font-mono font-bold text-green-400 text-lg">${commAmt}</span>
                                             <button onclick="showCommissionOverride('${row.job_id}')" class="text-xs text-blue-400 underline">Adjust %</button>
                                         </div>
-                                        <div id="commissionOverrideForm-${row.job_id}" class="hidden mt-2 flex items-center gap-2">
+                                        <div id="commissionOverrideForm-${row.job_id}" data-updated-at="${row.updated_at || ''}" class="hidden mt-2 flex items-center gap-2">
                                             <input type="number" step="0.1" min="0" max="100"
                                                 id="commissionPctInput-${row.job_id}"
                                                 value="${row.commission_pct_override !== null ? (row.commission_pct_override * 100) : 10}"
@@ -371,22 +371,44 @@
         async function saveCommissionOverride(jobId) {
             const pct = parseFloat(document.getElementById(`commissionPctInput-${jobId}`).value);
             if (isNaN(pct) || pct < 0 || pct > 100) { alert('Enter a valid % between 0-100.'); return; }
+            const formEl = document.getElementById(`commissionOverrideForm-${jobId}`);
+            const updatedAt = formEl ? (formEl.getAttribute('data-updated-at') || null) : null;
             const r = await fetch(`/api/office/accounting/jobs/${jobId}/commission-override`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-Internal-Token': AUTH_TOKEN },
-                body: JSON.stringify({ commission_pct: pct / 100 })
+                body: JSON.stringify({ commission_pct: pct / 100, updated_at: updatedAt })
             });
-            if (r.ok) fetchAccounting(); else alert('Error saving override.');
+            if (r.ok) {
+                fetchAccounting();
+            } else if (r.status === 409) {
+                const err = await r.json().catch(() => ({}));
+                alert('Conflict (409): ' + (err.detail || 'This record was updated by another user. Please refresh and try again.'));
+                fetchAccounting();
+            } else {
+                const err = await r.json().catch(() => ({}));
+                alert('Error saving override: ' + (err.detail || 'Failed'));
+            }
         }
 
         async function resetCommissionOverride(jobId) {
             if (!confirm('Reset to default 10%?')) return;
+            const formEl = document.getElementById(`commissionOverrideForm-${jobId}`);
+            const updatedAt = formEl ? (formEl.getAttribute('data-updated-at') || null) : null;
             const r = await fetch(`/api/office/accounting/jobs/${jobId}/commission-override`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-Internal-Token': AUTH_TOKEN },
-                body: JSON.stringify({ commission_pct: null })
+                body: JSON.stringify({ commission_pct: null, updated_at: updatedAt })
             });
-            if (r.ok) fetchAccounting(); else alert('Error resetting.');
+            if (r.ok) {
+                fetchAccounting();
+            } else if (r.status === 409) {
+                const err = await r.json().catch(() => ({}));
+                alert('Conflict (409): ' + (err.detail || 'This record was updated by another user. Please refresh and try again.'));
+                fetchAccounting();
+            } else {
+                const err = await r.json().catch(() => ({}));
+                alert('Error resetting: ' + (err.detail || 'Failed'));
+            }
         }
 
         fetchAccounting();

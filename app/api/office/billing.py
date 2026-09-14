@@ -396,7 +396,7 @@ def get_commissions_ready():
     try:
         cursor = conn.execute("""
             SELECT j.id as job_id, j.invoice_id, j.homeowner_name, j.canvasser_name, j.commission_generated_at,
-                   j.commission_pct_override, f.revenue_cents, f.canvasser_commission_pct
+                   j.commission_pct_override, j.updated_at, f.revenue_cents, f.canvasser_commission_pct
             FROM jobs j
             LEFT JOIN financials f ON j.id = f.job_id
             WHERE j.commission_ready = 1
@@ -536,6 +536,7 @@ async def mark_payment_route(job_id: str, payload: MarkPaymentPayload, request: 
 
 class CommissionOverridePayload(BaseModel):
     commission_pct: float | None
+    updated_at: str | None = None
 
 
 @router.post("/accounting/jobs/{job_id}/commission-override", dependencies=[Depends(verify_accounting)])
@@ -543,7 +544,23 @@ def commission_override_route(job_id: str, payload: CommissionOverridePayload):
     conn = get_connection()
     try:
         conn.execute("BEGIN IMMEDIATE")
-        cursor = conn.execute("UPDATE jobs SET commission_pct_override = ? WHERE id = ?", (payload.commission_pct, job_id))
+        # Check if job exists
+        existing = conn.execute("SELECT id, updated_at FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        if not existing:
+            raise HTTPException(status_code=404, detail="Job not found")
+
+        # Optimistic concurrency check: if client provided an updated_at, enforce it matches current DB state
+        if payload.updated_at is not None and existing["updated_at"] is not None:
+            if existing["updated_at"] != payload.updated_at:
+                raise HTTPException(
+                    status_code=409,
+                    detail="This record was updated by another user since you loaded it. Please refresh and try again."
+                )
+
+        cursor = conn.execute(
+            "UPDATE jobs SET commission_pct_override = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (payload.commission_pct, job_id)
+        )
         if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail="Job not found")
         conn.execute("COMMIT")
