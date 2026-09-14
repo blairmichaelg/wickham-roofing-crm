@@ -17,7 +17,7 @@ import re
 import xml.etree.ElementTree as ET
 import zipfile
 from decimal import ROUND_HALF_UP, Decimal
-from typing import Any
+from typing import Any, cast
 
 import structlog
 
@@ -120,18 +120,31 @@ def validate_and_extract_xml(file_bytes: bytes) -> tuple[str, bytes]:
 def parse_safe_xml(xml_bytes: bytes) -> ET.Element:
     """
     Defensively parse XML with entity expansion protections.
+    Uses defusedxml.ElementTree as standard secure parser.
     """
-    # Check for DOCTYPE or ENTITY definitions to prevent XXE / billion laughs
+    # 1. Defense-in-depth pre-scan check
     text_sample = xml_bytes[:8192].decode("utf-8", errors="ignore")
     if XML_SECURITY_PATTERN.search(text_sample):
         raise ESXSecurityError("XML contains prohibited DOCTYPE or ENTITY declarations")
 
+    # 2. Parse via defusedxml to neutralize entity expansion & billion laughs
     try:
-        root = ET.fromstring(xml_bytes)
-    except ET.ParseError as err:
-        raise ESXParseError(f"Malformed XML in ESX estimate: {err}") from err
+        import defusedxml.ElementTree as DefusedET  # type: ignore[import-untyped]
+        from defusedxml.common import DefusedXmlException  # type: ignore[import-untyped]
 
-    return root
+        try:
+            root = cast(ET.Element, DefusedET.fromstring(xml_bytes))
+        except DefusedXmlException as defused_err:
+            raise ESXSecurityError(f"Prohibited XML entity or DTD expansion detected: {defused_err}") from defused_err
+        except ET.ParseError as err:
+            raise ESXParseError(f"Malformed XML in ESX estimate: {err}") from err
+    except ImportError:
+        try:
+            root = ET.fromstring(xml_bytes)
+        except ET.ParseError as err:
+            raise ESXParseError(f"Malformed XML in ESX estimate: {err}") from err
+
+    return cast(ET.Element, root)
 
 
 def parse_esx_to_ast(

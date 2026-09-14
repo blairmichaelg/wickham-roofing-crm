@@ -40,3 +40,6 @@ structlog>=24.0.0
 
 # === Image Processing (V3 Inspection Engine) ===
 Pillow>=10.0
+
+# === XML Security & Parsing ===
+defusedxml>=0.7.1

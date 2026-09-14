@@ -99,6 +99,22 @@ def evaluate_job_next_actions(
             "suggested_script": None,
         })
 
+    # D. Mandatory Statement of Loss Reconciliation Required
+    if bool(job.get("requires_manual_reconciliation")):
+        actions.append({
+            "action_id": f"act-manual-reconciliation-{job_id}",
+            "job_id": job_id,
+            "homeowner_name": h_name,
+            "address": address,
+            "priority": 1,
+            "title": "Mandatory Statement of Loss Reconciliation",
+            "why": "Carrier Statement of Loss contains line-item math mismatches or parse gaps. Office review required before supplement generation.",
+            "action_type": "RECONCILIATION",
+            "action_url": f"/job/{job_id}",
+            "urgency": "critical",
+            "suggested_script": None,
+        })
+
     # -------------------------------------------------------------------------
     # Priority 2: Stalled / SLA-Exceeded Jobs
     # -------------------------------------------------------------------------
@@ -286,7 +302,7 @@ def get_field_best_actions(
         query = """
             SELECT id, homeowner_name, address_line1, city, postal_code, phone,
                    status, job_type, last_work_date, canvasser_rep_id, canvasser_name,
-                   supplement_sent_at, carrier_sla_days
+                   supplement_sent_at, carrier_sla_days, requires_manual_reconciliation
             FROM jobs
             WHERE status NOT IN ('CLOSED', 'PIPELINE_FAILED')
         """
@@ -314,8 +330,7 @@ def get_field_best_actions(
 
         all_actions: list[dict[str, Any]] = []
         for j in jobs:
-            j_actions = evaluate_job_next_actions(j, role="field", active_storm_opps=opps)
-            all_actions.extend(j_actions)
+            all_actions.extend(evaluate_job_next_actions(j, role="field", active_storm_opps=opps))
 
         # Sort strictly by priority (1 = highest urgency)
         all_actions.sort(key=lambda a: a["priority"])
@@ -334,7 +349,7 @@ def get_office_action_triage(db_path: str | Any | None = None) -> dict[str, Any]
             """
             SELECT id, homeowner_name, address_line1, city, postal_code, phone,
                    status, job_type, last_work_date, canvasser_rep_id, canvasser_name,
-                   supplement_sent_at, carrier_sla_days
+                   supplement_sent_at, carrier_sla_days, requires_manual_reconciliation
             FROM jobs
             WHERE status NOT IN ('CLOSED')
             ORDER BY created_at DESC LIMIT 100
@@ -376,11 +391,13 @@ def get_office_action_triage(db_path: str | Any | None = None) -> dict[str, Any]
         return {
             "total_actions": len(all_actions),
             "critical_compliance_count": len(grouped["compliance"]),
+            "manual_reconciliation_count": len([a for a in all_actions if a.get("action_type") == "RECONCILIATION"]),
             "stalled_count": len(grouped["stalled_jobs"]),
             "storm_opportunity_count": len(grouped["storm_opportunities"]),
             "leads_needing_signature_count": len(grouped["leads_to_close"]),
             "stalled_jobs": grouped["stalled_jobs"],
             "unassigned_storm_opportunities": unassigned_opps,
+            "manual_reconciliations": [a for a in all_actions if a.get("action_type") == "RECONCILIATION"],
             "supplement_packets_awaiting_review": [a for a in all_actions if a.get("action_type") in ("OFFICE_REVIEW", "SUPPLEMENT")],
             "missing_production_artifacts": [a for a in all_actions if a.get("action_type") in ("MEASUREMENTS", "PRODUCTION")],
             "groups": grouped,

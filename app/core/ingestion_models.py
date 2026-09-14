@@ -97,6 +97,10 @@ class UniversalClaimAST(BaseModel):
         description="Monotonically incrementing version. Increment on each "
                     "re-ingestion of a revised SoL to maintain append-only ledger."
     )
+    requires_manual_reconciliation: bool = Field(
+        default=False,
+        description="Flagged for mandatory office reconciliation if line-item/header totals mismatch or parse gaps occur."
+    )
 
     @model_validator(mode='after')
     def validate_total(self) -> 'UniversalClaimAST':
@@ -121,6 +125,7 @@ class UniversalClaimAST(BaseModel):
             self.financials.gross_rcv.verified = True
         else:
             self.financials.gross_rcv.verified = False
+            self.requires_manual_reconciliation = True
         
         # 2. Enforce strict overall claim financials math: gross_rcv - total_depreciation - deductible == net_claim
         gross = self.financials.gross_rcv.value

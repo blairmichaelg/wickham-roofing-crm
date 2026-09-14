@@ -814,6 +814,15 @@ def _writeback_sol_financials(conn: sqlite3.Connection, job_id: str, sol_data: U
             (_initial_rcv_to_set, job_id)
         )
 
+    # Check for parse gap or reconciliation requirement
+    has_parse_gap = len(updates) < 4 or getattr(sol_data, "requires_manual_reconciliation", False)
+    if fin.gross_rcv and not getattr(fin.gross_rcv, "verified", False):
+        has_parse_gap = True
+
+    if has_parse_gap:
+        conn.execute("UPDATE jobs SET requires_manual_reconciliation = 1 WHERE id = ?", (job_id,))
+        logger.warning("sol_manual_reconciliation_flagged", job_id=job_id, update_count=len(updates))
+
     logger.info("sol_financials_written_back", job_id=job_id, fields=list(updates.keys()))
 
 def _writeback_ev_geometry(conn: sqlite3.Connection, job_id: str, ev_data: EagleViewData) -> None:

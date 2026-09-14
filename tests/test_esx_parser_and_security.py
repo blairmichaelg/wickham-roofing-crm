@@ -235,8 +235,9 @@ def test_mismatched_totals_fixture_flags_discrepancy():
 
     # Line items sum to $10,596.00, but header claimed $14,000.00
     assert ast.financials.gross_rcv.value == Decimal("14000.00")
-    # Discrepancy correctly flagged as not verified
+    # Discrepancy correctly flagged as not verified and requires manual reconciliation
     assert ast.financials.gross_rcv.verified is False
+    assert ast.requires_manual_reconciliation is True
     # Overall equation gross - dep - ded == net still matches header numbers
     assert ast.financials.net_claim.verified is True
 
@@ -258,4 +259,29 @@ def test_esx_parser_edge_cases():
     # Compressed size limit raises ESXSecurityError
     with pytest.raises(ESXSecurityError, match="compressed size"):
         validate_and_extract_xml(b"0" * (MAX_COMPRESSED_BYTES + 10))
+
+
+def test_billion_laughs_entity_expansion_rejected():
+    """Verify synthetic nested entity expansion (billion laughs) is rejected cleanly without memory blowup."""
+    billion_laughs_xml = """<?xml version="1.0"?>
+    <!DOCTYPE lolz [
+     <!ENTITY lol "lol">
+     <!ELEMENT lolz (#PCDATA)>
+     <!ENTITY lol1 "&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;">
+     <!ENTITY lol2 "&lol1;&lol1;&lol1;&lol1;&lol1;&lol1;&lol1;&lol1;&lol1;&lol1;">
+     <!ENTITY lol3 "&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;">
+    ]>
+    <XactimateEstimate>
+        <ProjectInfo>
+            <CLAIM_NUMBER>&lol3;</CLAIM_NUMBER>
+        </ProjectInfo>
+    </XactimateEstimate>
+    """
+    esx_bytes = _create_synthetic_esx(billion_laughs_xml)
+    with pytest.raises(ESXSecurityError):
+        parse_esx_to_ast(esx_bytes)
+
+    with pytest.raises(ESXSecurityError):
+        parse_safe_xml(billion_laughs_xml.encode("utf-8"))
+
 

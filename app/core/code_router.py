@@ -17,6 +17,15 @@ DISCREPANCY_TO_CODE_MAP = {
     "Missing O&P": []
 }
 
+VALID_CODE_TAGS: frozenset[str] = frozenset({
+    tag for tags in DISCREPANCY_TO_CODE_MAP.values() for tag in tags
+})
+VALID_CODE_SECTIONS: frozenset[str] = frozenset({
+    "R905.2.8.5",
+    "R905.2.8.2",
+    "R905.2.2",
+})
+
 @lru_cache(maxsize=16)
 def parse_code_files(directory_path: str = "building_codes") -> dict[str, CodeSection]:
     """

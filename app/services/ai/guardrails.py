@@ -32,6 +32,11 @@ class SalesPromiseViolationError(GuardrailValidationError):
     pass
 
 
+class CodeCitationViolationError(GuardrailValidationError):
+    """Raised when AI content asserts an invented or unverified building code citation."""
+    pass
+
+
 class GuardrailResult(BaseModel):
     """Result of a deterministic guardrail inspection."""
     passed: bool
@@ -195,6 +200,60 @@ def verify_prohibited_sales_promises(text: str, raise_on_failure: bool = False) 
         violations=violations,
         details={"violations_count": len(violations)},
     )
+
+
+CODE_CITATION_PATTERN = re.compile(
+    r"\b(?:IRC|IBC|FBC|Code|Section)\s+(?:Section\s+)?([A-Z]?\d+(?:\.\d+)+)",
+    re.IGNORECASE,
+)
+CODE_TAG_PATTERN = re.compile(
+    r"\b((?:SECTION_|GA_)[A-Z0-9_]+)\b",
+    re.IGNORECASE,
+)
+
+
+def verify_building_code_citations(
+    text: str,
+    allowed_sections: set[str] | frozenset[str] | list[str] | None = None,
+    allowed_tags: set[str] | frozenset[str] | list[str] | None = None,
+    raise_on_failure: bool = False,
+) -> GuardrailResult:
+    """
+    Ensure all building code references in AI narrative strictly match
+    the deterministic code router mappings. Reject hallucinated citations.
+    """
+    from app.core.code_router import VALID_CODE_SECTIONS, VALID_CODE_TAGS
+
+    valid_sections = set(allowed_sections) if allowed_sections is not None else set(VALID_CODE_SECTIONS)
+    valid_tags = set(allowed_tags) if allowed_tags is not None else set(VALID_CODE_TAGS)
+
+    violations: list[str] = []
+
+    # Check section numbers (e.g. IRC Section R905.2.8.5)
+    for match in CODE_CITATION_PATTERN.finditer(text):
+        sec = match.group(1).strip()
+        if not any(sec.upper() == s.upper() for s in valid_sections):
+            violations.append(f"Invented or unverified building code section citation: '{match.group(0)}' ({sec})")
+
+    # Check XML-style tags if mentioned
+    for match in CODE_TAG_PATTERN.finditer(text):
+        tag = match.group(1).strip().upper()
+        if tag not in valid_tags:
+            violations.append(f"Invented or unverified building code tag citation: '{tag}'")
+
+    if violations and raise_on_failure:
+        raise CodeCitationViolationError(
+            f"Prohibited building code citations detected: {'; '.join(violations)}",
+            violations=violations,
+            details={"violations_count": len(violations)},
+        )
+
+    return GuardrailResult(
+        passed=len(violations) == 0,
+        violations=violations,
+        details={"violations_count": len(violations)},
+    )
+
 
 
 def check_all_guardrails(

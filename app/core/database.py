@@ -366,8 +366,14 @@ def run_migrations(db_path: str | Path | None = None) -> None:
             m28.up(conn)
             conn.execute("UPDATE schema_version SET version = 28, applied_at = CURRENT_TIMESTAMP WHERE id = 1")
 
+        if current_version < 29:
+            import importlib
+            m29 = importlib.import_module("app.core.migrations.0029_add_requires_manual_reconciliation")
+            m29.up(conn)
+            conn.execute("UPDATE schema_version SET version = 29, applied_at = CURRENT_TIMESTAMP WHERE id = 1")
+
         conn.execute("COMMIT")
-        logger.info("migrations_applied", current_version=current_version, target_version=28)
+        logger.info("migrations_applied", current_version=current_version, target_version=29)
 
         
         # Since seed logic was removed from up(), do it here outside the transaction
