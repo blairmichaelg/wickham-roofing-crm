@@ -81,6 +81,11 @@ python scripts/check_openapi_diff.py
 3. Add a test scenario in `tests/test_commissions_coverage.py` covering the new scheme and any edge cases.
 4. Confirm the accounting dashboard template in `app/templates/accounting_dashboard.html` renders the new value correctly.
 
+### 6. AI Prompt Template Versioning & Auditability
+
+All prompts in `app/services/ai/prompts.py` are cryptographically versioned using SHA256 hashes (`get_prompt_version_hash()`) to guarantee cache isolation and forensic auditability.
+**Policy:** Any future modifications to an AI prompt template MUST be documented in `CHANGELOG.md` alongside its updated prompt version hash. AI-generated text intended for customer- or carrier-facing documents must always pass through the `@enforce_provenance` decorator with mandatory guardrail checks (`verify_prohibited_sales_promises` and `verify_building_code_citations`).
+
 ---
 
 

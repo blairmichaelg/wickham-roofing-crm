@@ -1,5 +1,31 @@
 # Changelog
 
+## [2.11.0] - 2026-09-14
+### Added & Hardened (Document Pipeline, PDF Generation & AI Guardrail Hardening)
+- **Phase 1 — AI Provenance Contract, Prompt Versioning & Cache Isolation**:
+  - **`ProvenanceString` Type Contract (`app/services/ai/provenance.py`)**: Created Pydantic model encapsulating `text`, `prompt_name`, `prompt_version_hash`, `generation_timestamp`, and `guardrails_applied`.
+  - **`@enforce_provenance` Enforcement Decorator**: Decorated Gemini free-form text generations in `app/services/ai/client.py` and `app/services/ai_service.py` to prevent un-guardrailed raw AI text from reaching customer- or carrier-facing pipelines.
+  - **Cryptographic Prompt Versioning (`app/services/ai/prompts.py`)**: Implemented SHA256 prompt hashing via `get_prompt_version_hash()` across all prompt templates. Established repository policy that future prompt edits must be documented in `CHANGELOG.md` with their updated hash.
+  - **Cache Isolation Partition (`app/core/cache.py`, `app/workers/inspection_processor.py`)**: Added `prompt_hash` column and index to SQLite cache, guaranteeing prompt modifications instantly invalidate stale cached completions.
+  - **Defensive Narrative Consumption (`app/services/sales_narrative.py`)**: Added strict assertions ensuring only verified `ProvenanceString` inputs enter sales presentations and door scripts.
+- **Phase 2 — Building Code Enumeration, Reconciliation Flag & Safe XML Ingestion**:
+  - **Building Code Router Hardening (`app/core/code_router.py`)**: Enumerated `VALID_CODE_TAGS` and `VALID_CODE_SECTIONS` covering all IRC R905/R908 statutory rules; added `is_valid_code_tag()` and `is_valid_code_section()` validators.
+  - **Code Citation Guardrail (`app/services/ai/guardrails.py`)**: Created `CodeCitationViolationError` and `verify_building_code_citations()` to catch and block hallucinated or invalid building code sections.
+  - **Reconciliation Flag Migration (`Migration 0029`, `app/core/database.py`)**: Added `requires_manual_reconciliation INTEGER NOT NULL DEFAULT 0` column to `jobs` table.
+  - **Pipeline Reconciliation Detection (`app/core/pipeline.py`, `app/core/ingestion_models.py`)**: Flag set automatically when Statement of Loss line items diverge from gross RCV or parser confidence drops.
+  - **Triage Action Surfacing (`app/services/next_best_action.py`)**: Injected `requires_manual_reconciliation` as Priority 1 triage alert in the Office Control Center.
+  - **ESX Defused XML Security (`app/services/esx_parser.py`, `requirements.txt`, `pyproject.toml`)**: Swapped standard XML parsing for `defusedxml.ElementTree` with layered regex pre-scan for defense-in-depth against XML entity expansion / XXE vulnerabilities.
+- **Phase 3 — Layout Containment, Pagination & Visual AI Provenance**:
+  - **Two-Pass Numbered Canvas (`app/services/pdf/engine.py`)**: Implemented `NumberedCanvas` computing dynamic total page counts ("Page X of Y") across all multi-page PDF generators.
+  - **Layout Containment Utilities (`app/services/pdf/engine.py`)**: Added `wrap_keep_in_frame()` wrapping flowables in ReportLab `KeepInFrame` to prevent text overruns and unwanted page spilling.
+  - **Visual AI Provenance Flowable (`app/services/pdf/engine.py`)**: Added `build_ai_provenance_flowable()` rendering AI-assisted text inside branded callout containers (`BRAND_LIGHT_BG`, `BRAND_BORDER`) with mandatory statutory disclaimer ("AI-assisted draft — verify against source documents"). Formatted using pure paragraph-level styling to eliminate nested-table character squishing.
+  - **Standardized All 10 PDF Generators**: Converted `supplement.py`, `neighbor_letter.py`, `evidence_packet.py`, `inspection_report.py`, `documents.py`, `invoice.py`, `commission.py`, and `commercial.py` to use `NumberedCanvas` pagination and containment wrappers.
+- **Verification & Test Suite**:
+  - Added `tests/test_ai_provenance_and_guardrails.py` (14 assertions covering prompt hashes, decorator enforcement, code citation validations, and prohibited promise blocking).
+  - Added `tests/test_pdf_containment_and_provenance.py` (4 assertions covering NumberedCanvas, KeepInFrame bounding, visual provenance rendering, and supplement layout).
+  - Updated `tests/test_esx_parser_and_security.py` and `tests/test_cache.py`.
+  - Full suite verified: 606 passing tests (100%), 79.85% code coverage.
+
 ## [2.10.2] - 2026-09-14
 ### Fixed (Field App Mobile Bottom Tab Bar — Scroll Offset & Action Consistency)
 - **Bug A — Dynamic Scroll Target Offset & Scroll Margin (`app/templates/field_app.html`, `app/static/css/output.css`)**:
